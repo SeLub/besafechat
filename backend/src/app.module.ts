@@ -7,6 +7,7 @@ import { UsernameModule } from './domains/username/username.module';
 import { MessageModule } from './domains/message/message.module';
 import { ContactModule } from './domains/contact/contact.module';
 import { ChatModule } from './domains/chat/chat.module';
+import { StorageModule } from './domains/storage/storage.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ChatModule } from './domains/chat/chat.module';
     MessageModule,
     ContactModule,
     ChatModule,
+    StorageModule,
   ],
 })
 export class AppModule {

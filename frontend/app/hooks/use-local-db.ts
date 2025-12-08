@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { KeyService } from '../lib/db/services/key-service';
-import { MessageService } from '../lib/db/services/message-service';
+import { useState, useEffect } from "react";
+import { KeyService } from "../lib/db/services/key-service";
+import { MessageService } from "../lib/db/services/message-service";
 
 export function useLocalDb(privateKeyBase64: string) {
   const [isReady, setIsReady] = useState(false);
@@ -10,7 +10,7 @@ export function useLocalDb(privateKeyBase64: string) {
   useEffect(() => {
     const init = async () => {
       await keyService.savePrivateKey(
-        new Uint8Array(Buffer.from(privateKeyBase64, 'base64')),
+        Uint8Array.from(atob(privateKeyBase64), (c) => c.charCodeAt(0)),
         privateKeyBase64
       );
       setIsReady(true);

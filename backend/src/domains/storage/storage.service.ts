@@ -17,7 +17,7 @@ export class StorageService {
     const accessKeyId = this.configService.get<string>('STORAGE_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>('STORAGE_SECRET_ACCESS_KEY');
     const endpoint = this.configService.get<string>('STORAGE_ENDPOINT');
-    this.bucket = this.configService.get<string>('STORAGE_BUCKET_NAME') || 'telegram.backet';
+    this.bucket = this.configService.get<string>('STORAGE_BUCKET_NAME') || 'besafe.backet';
 
     if (!accessKeyId || !secretAccessKey) {
       throw new Error('STORAGE_ACCESS_KEY_ID and STORAGE_SECRET_ACCESS_KEY are required');

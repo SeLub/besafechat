@@ -2,133 +2,269 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { db } from "@/lib/db/db";
+import { UsernameSelection } from "@/components/auth/username-selection";
+import { MethodSelection } from "@/components/auth/method-selection";
+import { SeedDisplay } from "@/components/auth/seed-display";
+import { SeedVerification } from "@/components/auth/seed-verification";
+import { PasswordCreation } from "@/components/auth/password-creation";
+import { RecoveryOptions } from "@/components/auth/recovery-options";
+import { generateSeed } from "@/lib/crypto/seed";
 import {
-  storeKeyPair,
-  getPrivateKey,
-  hasStoredKey,
-  clearStoredKey,
-} from "@/lib/db/key-management";
+  createAccountWithCloud,
+  createAccountWithSeed,
+  recoverWithPassword,
+  recoverWithSeed
+} from "@/lib/auth-recovery";
+
+type AuthStep = 'main' | 'username-selection' | 'method-selection' | 'seed-display' | 'seed-verify' | 'password' | 'recovery' | 'complete';
+type AuthMethod = 'cloud' | 'self-custody' | null;
 
 export default function AuthRoute() {
   const [loading, setLoading] = useState(false);
   const [hasKey, setHasKey] = useState(false);
+  const [step, setStep] = useState<AuthStep>('main');
+  const [method, setMethod] = useState<AuthMethod>(null);
+  const [username, setUsername] = useState('');
+  const [seed, setSeed] = useState<string[]>([]);
 
   useEffect(() => {
     const checkKey = async () => {
-      const stored = await hasStoredKey();
-      setHasKey(stored);
+      const key = await db.privateKeys.get('current');
+      setHasKey(!!key);
     };
     checkKey();
   }, []);
 
-  const handleCreateAccount = async () => {
-    if (typeof window === "undefined") {
-      toast.error("This action is only available in browser");
-      return;
+  const handleCreateAccount = () => {
+    setStep('username-selection');
+  };
+
+  const handleUsernameSelected = (selectedUsername: string) => {
+    setUsername(selectedUsername);
+    setStep('method-selection');
+  };
+
+  const handleMethodSelect = (selectedMethod: 'cloud' | 'self-custody') => {
+    setMethod(selectedMethod);
+    const newSeed = generateSeed();
+    setSeed(newSeed);
+    
+    if (selectedMethod === 'cloud') {
+      // Skip seed display for cloud - go directly to password
+      setStep('password');
+    } else {
+      // Self-custody shows seed
+      setStep('seed-display');
     }
+  };
+
+  const handleSeedConfirmed = () => {
+    setStep('seed-verify');
+  };
+
+  const handleSeedVerified = () => {
+    if (method === 'cloud') {
+      setStep('password');
+    } else {
+      finalizeSelfCustody();
+    }
+  };
+
+  const handlePasswordCreated = async (password: string) => {
     setLoading(true);
     try {
-      // Генерация ключей
-      const keyPair = await window.crypto.subtle.generateKey(
-        { name: "Ed25519" },
-        true,
-        ["sign", "verify"]
-      );
-
-      const publicKey = await window.crypto.subtle.exportKey(
-        "raw",
-        keyPair.publicKey
-      );
-      const privateKey = await window.crypto.subtle.exportKey(
-        "pkcs8",
-        keyPair.privateKey
-      );
-
-      const publicKeyBase64 = btoa(
-        String.fromCharCode(...new Uint8Array(publicKey))
-      );
-      const privateKeyUint8 = new Uint8Array(privateKey);
-      const deviceId = "web-browser-" + Date.now();
-
-      // Сохраняем в зашифрованном виде
-      await storeKeyPair(publicKeyBase64, privateKeyUint8);
-
-      // Отправляем на сервер
-      const res = await fetch("http://localhost:4000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ publicKey: publicKeyBase64, deviceId }),
-      });
-
-      console.log("🔐 Проверка crypto.subtle:", crypto.subtle);
-      console.log("🔐 Длина приватного ключа:", privateKeyUint8.length);
-
-      if (!res.ok) throw new Error("Login failed");
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Auth error:", error);
-      toast.error(
-        `Failed to create account: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      // 1. Derive keys and save to IndexedDB
+      const { publicKeyBase64 } = await createAccountWithSeed(seed);
+      
+      // 2. Login to backend
+      await loginToBackend(publicKeyBase64);
+      
+      // 3. Set username
+      await setUsernameOnBackend(username);
+      
+      // 4. Upload encrypted seed to S3
+      await createAccountWithCloud(password);
+      
+      setStep('complete');
+      toast.success('Account created with cloud backup!');
+      setTimeout(() => window.location.href = '/', 1500);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
   };
 
+  const finalizeSelfCustody = async () => {
+    setLoading(true);
+    try {
+      const { publicKeyBase64 } = await createAccountWithSeed(seed);
+      await loginToBackend(publicKeyBase64);
+      await setUsernameOnBackend(username);
+      setStep('complete');
+      toast.success('Account created!');
+      setTimeout(() => window.location.href = '/', 1500);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setUsernameOnBackend = async (usernameValue: string) => {
+    const res = await fetch('http://localhost:4000/username/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username: usernameValue, isSearchable: 'yes' })
+    });
+    if (!res.ok) throw new Error('Failed to set username');
+  };
+
+  const loginToBackend = async (publicKeyBase64: string) => {
+    const deviceId = 'web-browser-' + Date.now();
+    const res = await fetch('http://localhost:4000/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ publicKey: publicKeyBase64, deviceId })
+    });
+    if (!res.ok) throw new Error('Backend login failed');
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const record = await db.privateKeys.get("current");
+      const record = await db.privateKeys.get('current');
       if (!record) {
-        toast.error("No stored key found");
-        setLoading(false);
+        toast.error('No stored key found');
         return;
       }
-
-      const deviceId = "web-browser-" + Date.now();
-      const res = await fetch("http://localhost:4000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ publicKey: record.publicKeyBase64, deviceId }),
-      });
-
-      if (!res.ok) throw new Error("Login failed");
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Login error:", error);
-      toast.error(
-        `Failed to login: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      await loginToBackend(record.publicKeyBase64);
+      window.location.href = '/';
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   const handleClearKey = async () => {
-    await clearStoredKey();
+    await db.privateKeys.delete('current');
     setHasKey(false);
-    toast.success("Stored key cleared");
+    toast.success('Key cleared');
   };
+
+  const handleRecovery = () => {
+    setStep('recovery');
+  };
+
+  const handlePasswordRecovery = async (username: string, password: string) => {
+    setLoading(true);
+    try {
+      const { publicKeyBase64 } = await recoverWithPassword(username, password);
+      await loginToBackend(publicKeyBase64);
+      toast.success('Account recovered!');
+      window.location.href = '/';
+    } catch (error: any) {
+      throw new Error(error.message || 'Recovery failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeedRecovery = async (recoveredSeed: string[]) => {
+    setLoading(true);
+    try {
+      const { publicKeyBase64 } = await recoverWithSeed(recoveredSeed);
+      await loginToBackend(publicKeyBase64);
+      toast.success('Account recovered!');
+      window.location.href = '/';
+    } catch (error: any) {
+      throw new Error(error.message || 'Recovery failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (step === 'username-selection') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <UsernameSelection onUsernameSelected={handleUsernameSelected} />
+      </div>
+    );
+  }
+
+  if (step === 'method-selection') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <MethodSelection
+          onSelectCloud={() => handleMethodSelect('cloud')}
+          onSelectSelfCustody={() => handleMethodSelect('self-custody')}
+        />
+      </div>
+    );
+  }
+
+  if (step === 'seed-display') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <SeedDisplay seed={seed} onConfirm={handleSeedConfirmed} />
+      </div>
+    );
+  }
+
+  if (step === 'seed-verify') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <SeedVerification seed={seed} onVerified={handleSeedVerified} />
+      </div>
+    );
+  }
+
+  if (step === 'password') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <PasswordCreation onPasswordCreated={handlePasswordCreated} />
+      </div>
+    );
+  }
+
+  if (step === 'recovery') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <RecoveryOptions
+          onPasswordRecovery={handlePasswordRecovery}
+          onSeedRecovery={handleSeedRecovery}
+        />
+      </div>
+    );
+  }
+
+  if (step === 'complete') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-4xl mb-4">✓</div>
+          <h2 className="text-2xl font-bold mb-2">Account Created!</h2>
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-6 p-6 bg-card rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold text-foreground text-center">
-          StalkerChat
-        </h1>
-        <p className="text-muted-foreground text-center">
-          Anonymous E2EE Messenger
-        </p>
+      <div className="w-full max-w-md space-y-6 p-6">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-2">BeSafe Chat</h1>
+          <p className="text-muted-foreground">Anonymous E2EE Messenger</p>
+        </div>
+
         {hasKey ? (
           <div className="space-y-3">
-            <Button onClick={handleLogin} disabled={loading} className="w-full">
-              {loading ? "Logging in..." : "Login"}
+            <Button onClick={handleLogin} disabled={loading} className="w-full py-6 text-lg">
+              {loading ? 'Logging in...' : 'Continue as User'}
             </Button>
             <div className="text-center">
               <button
@@ -140,13 +276,14 @@ export default function AuthRoute() {
             </div>
           </div>
         ) : (
-          <Button
-            onClick={handleCreateAccount}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? "Creating..." : "Create Account"}
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={handleRecovery} variant="outline" className="w-full py-6 text-lg">
+              Restore Access
+            </Button>
+            <Button onClick={handleCreateAccount} className="w-full py-6 text-lg">
+              Create Account
+            </Button>
+          </div>
         )}
       </div>
     </div>
