@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useNotifications } from "@/hooks/use-notifications";
 import { 
@@ -18,6 +18,7 @@ interface HamburgerMenuProps {
   userProfile?: {
     displayName?: string;
     publicKey: string;
+    avatarUrl?: string;
   };
   onProfileClick?: () => void;
   onContactsClick?: () => void;
@@ -84,6 +85,7 @@ export function HamburgerMenu({ userProfile, onProfileClick, onContactsClick, on
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {getInitials(userProfile?.displayName)}
                 </AvatarFallback>
+                {userProfile?.avatarUrl && <AvatarImage src={userProfile.avatarUrl} />}
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">

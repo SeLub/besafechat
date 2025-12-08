@@ -63,4 +63,8 @@ export class UserService {
 
     return user?.publicKey?.toString('base64') || null;
   }
+
+  async updateDisplayName(userId: string, displayName: string): Promise<void> {
+    await this.userRepository.update({ id: userId }, { displayName: displayName.trim() });
+  }
 }

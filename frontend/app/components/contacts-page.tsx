@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/lib/avatar-utils";
 import { ArrowLeft, ChevronDown, ChevronRight, MessageCircle, Check, X, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -233,6 +234,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(contact.user)}
                       </AvatarFallback>
+                      <AvatarImage src={getAvatarUrl(contact.user.id)} />
                     </Avatar>
                     <div>
                       <div className="font-medium">
@@ -288,6 +290,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.fromUser || {})}
                           </AvatarFallback>
+                          {request.fromUser?.id && <AvatarImage src={getAvatarUrl(request.fromUser.id)} />}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
@@ -363,6 +366,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.toUser || {})}
                           </AvatarFallback>
+                          {request.toUser?.id && <AvatarImage src={getAvatarUrl(request.toUser.id)} />}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">

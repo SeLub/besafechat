@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/lib/avatar-utils";
 import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
 
@@ -9,6 +10,7 @@ interface Chat {
   timestamp?: string;
   unreadCount?: number;
   isOnline?: boolean;
+  userId?: string;
 }
 
 interface ChatListProps {
@@ -111,6 +113,7 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
           <AvatarFallback className="bg-primary text-primary-foreground">
             {getInitials(chat.name)}
           </AvatarFallback>
+          {chat.userId && <AvatarImage src={getAvatarUrl(chat.userId)} />}
         </Avatar>
         {chat.isOnline && (
           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />

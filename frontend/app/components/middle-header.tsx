@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/lib/avatar-utils";
 import { Phone, Video, Info } from "lucide-react";
 
 interface MiddleHeaderProps {
@@ -26,6 +27,7 @@ export function MiddleHeader({ selectedChat, rightPanelOpen, onToggleRightPanel 
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(selectedChat.name)}
             </AvatarFallback>
+            {selectedChat.userId && <AvatarImage src={getAvatarUrl(selectedChat.userId)} />}
           </Avatar>
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>

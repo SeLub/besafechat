@@ -95,6 +95,7 @@ export class SessionService {
 
   return sessions.map(session => ({
     id: session.id,
+    deviceId: session.deviceId,
     deviceModel: session.deviceModel || 'Unknown device',
     ipAddress: session.ipAddress || '0.0.0.0',
     lastActiveAt: session.lastActiveAt,

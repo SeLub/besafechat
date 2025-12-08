@@ -1,20 +1,22 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { ReactNode } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { UsernameSetupModal } from "@/components/username-setup-modal";
+import { DisplayNameModal } from "@/components/display-name-modal";
 import { PrivacySettingsModal } from "@/components/privacy-settings-modal";
 import { ThemeSelectorModal } from "@/components/theme-selector-modal";
 import { StorageSettingsModal } from "@/components/storage-settings-modal";
+import { DevicesSettingsModal } from "@/components/devices-settings-modal";
 import { ContactsPage } from "@/components/contacts-page";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Edit3, 
   Camera, 
   User, 
-  Phone, 
   AtSign,
   Bell,
   Shield,
@@ -22,7 +24,8 @@ import {
   Database,
   Globe,
   HelpCircle,
-  LogOut
+  LogOut,
+  Key
 } from "lucide-react";
 
 interface LeftPanelPageProps {
@@ -31,18 +34,22 @@ interface LeftPanelPageProps {
   userProfile?: {
     displayName?: string;
     publicKey: string;
-    phone?: string;
     username?: string;
+    avatarUrl?: string;
   };
   onChatCreated?: (chatId: string) => void;
 }
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
-  const { logout } = useAuth();
+  const { logout, checkAuth } = useAuth();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [storageModalOpen, setStorageModalOpen] = useState(false);
+  const [devicesModalOpen, setDevicesModalOpen] = useState(false);
+  const [displayNameModalOpen, setDisplayNameModalOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   if (!page) return null;
 
@@ -54,6 +61,46 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const handleLogout = async () => {
     await logout();
     window.location.href = '/auth';
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Get presigned URL (always uploads as PNG)
+      const res = await fetch("http://localhost:4000/storage/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          fileType: "avatar",
+          contentType: "image/png"
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to get upload URL");
+
+      const { uploadUrl } = await res.json();
+
+      // Upload to S3
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: file,
+      });
+
+      toast.success("Avatar updated");
+      // Force reload with cache bust
+      setTimeout(() => checkAuth(), 500);
+    } catch (error) {
+      toast.error("Failed to upload avatar");
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (page === 'profile') {
@@ -75,10 +122,20 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {getInitials(userProfile?.displayName)}
                 </AvatarFallback>
+                {userProfile?.avatarUrl && <AvatarImage src={userProfile.avatarUrl} />}
               </Avatar>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
+              />
               <Button 
                 size="icon" 
                 className="absolute -bottom-2 -right-2 rounded-full h-8 w-8"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
               >
                 <Camera className="h-4 w-4" />
               </Button>
@@ -92,7 +149,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 icon={<User className="h-5 w-5" />}
                 label="Display Name"
                 value={userProfile?.displayName || "Not set"}
-                onEdit={() => {}}
+                onEdit={() => setDisplayNameModalOpen(true)}
               />
               
               <ProfileField
@@ -101,16 +158,14 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 value={userProfile?.username ? `@${userProfile.username}` : "Not set"}
                 onEdit={() => setUsernameModalOpen(true)}
               />
-              
-              <ProfileField
-                icon={<Phone className="h-5 w-5" />}
-                label="Phone"
-                value={userProfile?.phone || "Not set"}
-                onEdit={() => {}}
-              />
 
               <div className="pt-4 border-t border-border">
-                <div className="text-sm text-muted-foreground mb-2">Public Key</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <Key className="h-4 w-4 text-muted-foreground" />
+                    <div className="text-sm text-muted-foreground">Public Key</div>
+                  </div>
+                </div>
                 <div className="text-xs font-mono bg-muted p-3 rounded-lg break-all">
                   {userProfile?.publicKey}
                 </div>
@@ -124,6 +179,14 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
           currentUsername={userProfile?.username}
+        />
+        
+        {/* Display Name Modal */}
+        <DisplayNameModal
+          isOpen={displayNameModalOpen}
+          onClose={() => setDisplayNameModalOpen(false)}
+          currentDisplayName={userProfile?.displayName}
+          onUpdate={checkAuth}
         />
       </>
     );
@@ -183,8 +246,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 />
                 <SettingsItem
                   icon={<Shield className="h-5 w-5" />}
-                  label="Active Sessions"
-                  onClick={() => {}}
+                  label="Devices"
+                  onClick={() => setDevicesModalOpen(true)}
                 />
               </SettingsSection>
 
@@ -247,6 +310,12 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         <StorageSettingsModal
           isOpen={storageModalOpen}
           onClose={() => setStorageModalOpen(false)}
+        />
+        
+        {/* Devices Modal */}
+        <DevicesSettingsModal
+          isOpen={devicesModalOpen}
+          onClose={() => setDevicesModalOpen(false)}
         />
       </>
     );

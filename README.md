@@ -611,11 +611,15 @@ grep access_token cookies.txt | awk '{print $7}'
   - **Self-Custody**: Локальное хранение seed, полный контроль пользователя
 - ✅ **Криптография**: @scure/bip39, @noble/ed25519, @noble/hashes (browser-native, без полифилов)
 - ✅ **Username-based Recovery**: Публичный эндпоинт для восстановления аккаунта без предварительной аутентификации
+- ✅ **Profile Management**: Загрузка аватаров, редактирование display name
+- ✅ **Unified Storage API**: Единый `/storage` endpoint для всех типов файлов (аватары, изображения, документы)
+- ✅ **Public Avatars**: Прямые S3 URL для аватаров без presigned URLs, автоматическое отображение в чатах и контактах
+- ✅ **Device Management**: Просмотр активных сессий, отзыв устройств, QR-код для подключения (mock)
 
 ### В разработке
 
 - 🔄 **Настоящее E2EE**: Signal Protocol интеграция для сообщений
-- 🔄 **Медиа сообщения**: Загрузка файлов в S3
+- 🔄 **Медиа сообщения**: Загрузка изображений/видео/документов в чаты
 
 ---
 
@@ -639,6 +643,9 @@ grep access_token cookies.txt | awk '{print $7}'
 - [x] **Персистентность состояния**: Восстановление чатов после перезагрузки
 - [x] **Seed-based Account Recovery**: BIP39 12-word seed с Cloud/Self-Custody режимами
 - [x] **Username System**: Обязательная регистрация @username для восстановления аккаунта
+- [x] **Profile System**: Аватары (PNG, до 5MB), display name (1-24 символа, emoji)
+- [x] **Storage API**: Унифицированные endpoints для загрузки файлов в S3
+- [x] **Device Management**: Управление активными сессиями, multi-device support
 - [ ] Настоящее E2EE шифрование сообщений (Signal Protocol)
 
 ### Этап 2: Кроссплатформенность (Q2 2026)

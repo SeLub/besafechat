@@ -22,6 +22,7 @@ import { SessionService } from '../services/session.service';
 import { JwtSessionGuard } from '../guards/jwt-session.guard';
 import { UserService } from '../services/user.service';
 import { RefreshDto } from '../dto/refresh.dto';
+import { StorageService } from '../../storage/storage.service';
 import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Auth')
@@ -30,7 +31,8 @@ export class AuthSessionController {
   constructor(
     private authService: AuthService,
     private sessionService: SessionService,
-    private userService: UserService
+    private userService: UserService,
+    private storageService: StorageService,
   ) {}
 
   @Post('login')
@@ -100,11 +102,24 @@ export class AuthSessionController {
       throw new UnauthorizedException('User not found');
     }
 
+    // Check for avatar existence and generate presigned URL
+    let avatarUrl: string | null = null;
+    const extensions = ['png', 'jpg', 'jpeg', 'webp'];
+    
+    for (const ext of extensions) {
+      const key = `users/${user.id}/avatar.${ext}`;
+      if (await this.storageService.fileExists(key)) {
+        avatarUrl = await this.storageService.getPresignedUrlForDownload(key);
+        break;
+      }
+    }
+
     return {
       id: user.id,
       publicKey: user.publicKey.toString('base64'),
       displayName: user.displayName,
       username: user.username?.username,
+      avatarUrl,
     };
   }
 
@@ -131,6 +146,16 @@ export class AuthSessionController {
       sessionId,
       req.user!.sessionId // ← передаём текущий ID
     );
+    return { success: true };
+  }
+
+  @Post('sessions/revoke-all')
+  @UseGuards(JwtSessionGuard)
+  @ApiSecurity('access-token-cookie')
+  @ApiOperation({ summary: 'Close all other sessions except current' })
+  @HttpCode(HttpStatus.OK)
+  async revokeAllOtherSessions(@Req() req: Request) {
+    await this.sessionService.revokeAllSessions(req.user!.id, req.user!.sessionId);
     return { success: true };
   }
 
