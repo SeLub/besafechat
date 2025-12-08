@@ -13,13 +13,28 @@ interface ThemeSelectorModalProps {
   onClose: () => void;
 }
 
-export function ThemeSelectorModal({ isOpen, onClose }: ThemeSelectorModalProps) {
+export function ThemeSelectorModal({
+  isOpen,
+  onClose,
+}: ThemeSelectorModalProps) {
   const { theme, setTheme } = useTheme();
 
   const themes = [
-    { id: "stalker" as const, name: "Stalker", description: "Privacy-focused green theme" },
-    { id: "telegram" as const, name: "Telegram", description: "Classic blue messenger" },
-    { id: "minimal" as const, name: "Minimal", description: "Clean monochrome design" },
+    {
+      id: "besafe" as const,
+      name: "BeSafe",
+      description: "Privacy-focused green theme",
+    },
+    {
+      id: "telegram" as const,
+      name: "Telegram",
+      description: "Classic blue messenger",
+    },
+    {
+      id: "minimal" as const,
+      name: "Minimal",
+      description: "Clean monochrome design",
+    },
   ];
 
   const handleThemeSelect = (themeId: typeof theme) => {
@@ -42,11 +57,11 @@ export function ThemeSelectorModal({ isOpen, onClose }: ThemeSelectorModalProps)
             >
               <div>
                 <div className="font-medium">{t.name}</div>
-                <div className="text-sm text-muted-foreground">{t.description}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t.description}
+                </div>
               </div>
-              {theme === t.id && (
-                <Check className="h-5 w-5 text-primary" />
-              )}
+              {theme === t.id && <Check className="h-5 w-5 text-primary" />}
             </div>
           ))}
         </div>

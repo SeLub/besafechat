@@ -1,5 +1,5 @@
-/* Stalker Theme - Privacy-focused green aesthetic */
-[data-theme="stalker"] {
+/* BeSafe Theme - Privacy-focused green aesthetic */
+[data-theme="besafe"] {
   /* Light mode */
   --background: hsl(127, 50%, 90%);
   --foreground: hsl(137, 40%, 15%);
@@ -28,7 +28,7 @@
   --online-status: hsl(140, 70%, 45%);
 }
 
-[data-theme="stalker"].dark {
+[data-theme="besafe"].dark {
   /* Dark mode */
   --background: hsl(127, 15%, 10%);
   --foreground: hsl(127, 10%, 95%);

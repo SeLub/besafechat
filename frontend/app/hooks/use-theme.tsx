@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "stalker" | "telegram" | "minimal";
+type Theme = "besafe" | "telegram" | "minimal";
 
 interface ThemeContextType {
   theme: Theme;
@@ -10,15 +10,15 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("stalker");
+  const [theme, setThemeState] = useState<Theme>("besafe");
 
   useEffect(() => {
     const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored && ["stalker", "telegram", "minimal"].includes(stored)) {
+    if (stored && ["besafe", "telegram", "minimal"].includes(stored)) {
       setThemeState(stored);
       document.documentElement.setAttribute("data-theme", stored);
     } else {
-      document.documentElement.setAttribute("data-theme", "stalker");
+      document.documentElement.setAttribute("data-theme", "besafe");
     }
   }, []);
 

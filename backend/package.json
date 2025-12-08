@@ -1,5 +1,5 @@
 {
-  "name": "stalkerchat-backend",
+  "name": "besafechat-backend",
   "version": "1.0.0",
   "description": "E2EE Messenger Backend",
   "main": "dist/main.js",
@@ -14,8 +14,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "docker:build": "docker build -t stalkerchat/backend .",
-    "docker:run": "docker run -p 4000:4000 --env-file .env stalkerchat/backend"
+    "docker:build": "docker build -t besafechat/backend .",
+    "docker:run": "docker run -p 4000:4000 --env-file .env besafechat/backend"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.939.0",

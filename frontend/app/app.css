@@ -4,8 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 @theme inline {
@@ -39,7 +40,10 @@
 
 /* Smooth transitions for theme switching */
 * {
-  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease;
 }
 
 /* Links using tertiary color */
@@ -127,6 +131,6 @@ button:focus {
 }
 
 /* Import all themes */
-@import "./css/themes/stalker.theme.css";
+@import "./css/themes/besafe.theme.css";
 @import "./css/themes/telegram.theme.css";
 @import "./css/themes/minimal.theme.css";

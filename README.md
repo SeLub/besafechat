@@ -1,21 +1,21 @@
-# 🕵️‍♂️ StalkerChat — Анонимный E2EE-Мессенджер
+# 🕵️‍♂️ BeSafeChat — Анонимный E2EE-Мессенджер
 
 > **Без телефона. Без email. Без отслеживания. Только сквозное шифрование и полный контроль над данными.**
 
-StalkerChat — это **кроссплатформенный мессенджер с E2EE по умолчанию**, вдохновлённый Session и Signal, но с удобством Telegram.  
+BeSafeChat — это **кроссплатформенный мессенджер с E2EE по умолчанию**, вдохновлённый Session и Signal, но с удобством Telegram.  
 Регистрация анонимна, данные хранятся только на твоих устройствах, а сервер — всего лишь маршрутизатор.
 
 ---
 
-## 🕵️‍♂️ StalkerChat — Anonymous E2EE Messenger
+## 🕵️‍♂️ BeSafeChat — Anonymous E2EE Messenger
 
 **No phone. No email. No tracking. Just end-to-end encrypted communication under your control.**
 
-StalkerChat is a **cross-platform, privacy-first messenger** built for users who value anonymity and security. Unlike mainstream apps, StalkerChat requires **no personal identifiers**—registration is fully anonymous using a cryptographic Ed25519 key pair generated on your device.
+BeSafeChat is a **cross-platform, privacy-first messenger** built for users who value anonymity and security. Unlike mainstream apps, BeSafeChat requires **no personal identifiers**—registration is fully anonymous using a cryptographic Ed25519 key pair generated on your device.
 
-All messages are **end-to-end encrypted by default**. The server acts only as a secure relay—**it never sees your messages**. Your chat history lives **only on your devices**, stored locally in an encrypted SQLite database.
+All messages are **end-to-end encrypted by default**. The server acts only as a secure relay—**it never sees your messages**. Your chat history lives **only on your devices**, stored locally in an encrypted indexedDB database.
 
-Built with modern web and native technologies, StalkerChat runs seamlessly on **Web, Desktop (Windows/macOS/Linux), and Mobile (iOS/Android)**—all from a single codebase.
+Built with modern web and native technologies, BeSafeChat runs seamlessly on **Web, Desktop (Windows/macOS/Linux), and Mobile (iOS/Android)**—all from a single codebase.
 
 ### 🔐 Core Principles
 
@@ -24,7 +24,7 @@ Built with modern web and native technologies, StalkerChat runs seamlessly on **
 - **User-controlled data**: No cloud storage of message content
 - **Transparency**: Open architecture, auditable code, zero telemetry
 
-StalkerChat isn’t just another messenger—it’s a **privacy tool for the post-surveillance era**.
+BeSafeChat isn’t just another messenger—it’s a **privacy tool for the post-surveillance era**.
 
 ---
 
@@ -61,8 +61,8 @@ StalkerChat isn’t just another messenger—it’s a **privacy tool for the pos
 ### 1. Клонируй репозиторий
 
 ```bash
-git clone https://github.com/your-username/stalkerchat.git
-cd stalkerchat
+git clone https://github.com/your-username/BeSafeChat.git
+cd BeSafeChat
 ```
 
 ### 2. Настрой переменные окружения
@@ -78,7 +78,7 @@ DB_HOST=127.0.0.1
 DB_PORT=5433
 DB_USERNAME=user
 DB_PASSWORD=secure_password
-DB_DATABASE=stalker
+DB_DATABASE=besafe
 
 # Redis
 REDIS_URL=redis://127.0.0.1:6380
@@ -89,7 +89,7 @@ JWT_SECRET=your_strong_random_secret_here
 # Tebi S3
 STORAGE_ACCESS_KEY_ID=your_tebi_key
 STORAGE_SECRET_ACCESS_KEY=your_tebi_secret
-STORAGE_BUCKET_NAME=stalker.backet
+STORAGE_BUCKET_NAME=besafe.backet
 STORAGE_ENDPOINT=https://s3.tebi.io
 
 # CORS
@@ -118,7 +118,7 @@ npm run start:dev
 ## 📁 Структура проекта
 
 ```
-stalkerchat/
+BeSafeChat/
 ├── backend/                 # NestJS-бэкенд
 │   ├── src/
 │   │   ├── common/          # Общие утилиты
@@ -199,7 +199,7 @@ stalkerchat/
 │   │   │   └── auth-guard.tsx          # Защита маршрутов
 │   │   ├── css/                        # Стили и темы
 │   │   │   └── themes/                 # Цветовые схемы
-│   │   │       ├── stalker.theme.css   # Зелёная privacy-focused тема
+│   │   │       ├── besafe.theme.css   # Зелёная privacy-focused тема
 │   │   │       ├── telegram.theme.css  # Синяя классическая тема
 │   │   │       └── minimal.theme.css   # Монохромная минималистичная тема
 │   │   ├── hooks/                      # React хуки
@@ -591,10 +591,11 @@ grep access_token cookies.txt | awk '{print $7}'
 ## ✅ Текущий статус реализации
 
 ### Реализовано
+
 - ✅ **Аутентификация**: Ed25519 ключи, JWT куки, мульти-сессии
 - ✅ **Система контактов**: Запросы, принятие/отклонение, поиск по @username
 - ✅ **Real-time сообщения**: WebSocket, мгновенная доставка
-- ✅ **UI/UX**: Telegram-подобный интерфейс, 3 темы оформления (Stalker/Telegram/Minimal)
+- ✅ **UI/UX**: Telegram-подобный интерфейс, 3 темы оформления (BeSafe/Telegram/Minimal)
 - ✅ **Система тем**: Переключаемые цветовые схемы с сохранением в localStorage
 - ✅ **Уведомления**: Toast сообщения, счетчики непрочитанных
 - ✅ **Архитектура**: Модульная структура, изолированные состояния
@@ -612,6 +613,7 @@ grep access_token cookies.txt | awk '{print $7}'
 - ✅ **Username-based Recovery**: Публичный эндпоинт для восстановления аккаунта без предварительной аутентификации
 
 ### В разработке
+
 - 🔄 **Настоящее E2EE**: Signal Protocol интеграция для сообщений
 - 🔄 **Медиа сообщения**: Загрузка файлов в S3
 
@@ -622,7 +624,7 @@ grep access_token cookies.txt | awk '{print $7}'
 ### Этап 1: Базовый мессенджер (Q1 2026)
 
 - [x] Анонимная регистрация и аутентификация
-- [x] Управление сессиями и безопасность  
+- [x] Управление сессиями и безопасность
 - [x] WebSocket-шлюз для E2EE-сообщений
 - [x] **Базовый фронтенд (React Router v7)**
 - [x] **Система контактов и запросов**
@@ -643,7 +645,7 @@ grep access_token cookies.txt | awk '{print $7}'
 
 - [ ] Electron-обёртка для десктопа
 - [ ] Capacitor для iOS/Android
-- [ ] Локальное хранение истории (SQLite)
+- [ ] Локальное хранение истории (indexedDB)
 
 ### Этап 3: Дополнительные функции (Q3 2026)
 
@@ -665,17 +667,17 @@ grep access_token cookies.txt | awk '{print $7}'
 
 ## 📄 Лицензия
 
-MIT © 2025 StalkerChat Team
+MIT © 2025 BeSafeChat Team
 
 ---
 
 ## 🙌 Поддержка
 
 Нашли баг? Хотите предложить фичу?  
-→ Откройте [Issue](https://github.com/your-username/stalkerchat/issues)  
-→ Или пришлите [Pull Request](https://github.com/your-username/stalkerchat/pulls)
+→ Откройте [Issue](https://github.com/your-username/BeSafeChat/issues)  
+→ Или пришлите [Pull Request](https://github.com/your-username/BeSafeChat/pulls)
 
 ---
 
 Готов к работе! 🚀  
-**StalkerChat — твой разговор остаётся между вами.**
+**BeSafeChat — твой разговор остаётся между вами.**

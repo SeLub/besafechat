@@ -3,7 +3,7 @@ import { ChatList } from "@/components/chat-list";
 import { LeftPanelPages } from "@/components/left-panel-pages";
 
 interface LeftColumnProps {
-  leftPanelPage: 'profile' | 'settings' | 'contacts' | null;
+  leftPanelPage: "profile" | "settings" | "contacts" | null;
   userProfile: any;
   chats: any[];
   selectedChatId?: string;
@@ -42,13 +42,13 @@ export function LeftColumn({
         <>
           {/* Header with Hamburger Menu */}
           <div className="flex items-center justify-between p-4 border-b border-border">
-            <HamburgerMenu 
+            <HamburgerMenu
               userProfile={userProfile}
               onProfileClick={onProfileClick}
               onContactsClick={onContactsClick}
               onSettingsClick={onSettingsClick}
             />
-            <h2 className="text-lg font-semibold">StalkerChat</h2>
+            <h2 className="text-lg font-semibold">BeSafeChat</h2>
             <div className="w-10" />
           </div>
 

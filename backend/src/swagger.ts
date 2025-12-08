@@ -10,7 +10,7 @@ export async function registerSwagger(app: INestApplication) {
   const serverUrl = `http://${host}:${port}`;
 
   const config = new DocumentBuilder()
-    .setTitle('StalkerChat API')
+    .setTitle('BeSafeChat API')
     .setDescription('E2EE Messenger API Documentation')
     .setVersion('1.0')
     .addSecurity('access-token-cookie', {
