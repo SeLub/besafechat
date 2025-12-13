@@ -9,11 +9,20 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { JwtSessionGuard } from '../../user/guards/jwt-session.guard';
 import { StorageService } from '../storage.service';
 import { UploadDto } from '../dto/upload.dto';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+
+// Define interface for request with user property
+interface RequestWithUser {
+  user?: {
+    id: string;
+    sessionId: string;
+    publicKey: Buffer;
+ };
+  url: string;
+}
 
 @ApiTags('Storage')
 @Controller('storage')
@@ -24,7 +33,7 @@ export class StorageController {
 
   @Post('upload')
   @ApiOperation({ summary: 'Get presigned URL for file upload' })
-  async getUploadUrl(@Req() req: Request, @Body() dto: UploadDto) {
+  async getUploadUrl(@Req() req: RequestWithUser, @Body() dto: UploadDto) {
     const userId = req.user!.id;
     const { fileType, contentType, filename } = dto;
 
@@ -75,7 +84,7 @@ export class StorageController {
 
   @Get('download/*')
   @ApiOperation({ summary: 'Get presigned URL for file download' })
-  async getDownloadUrl(@Req() req: Request) {
+  async getDownloadUrl(@Req() req: RequestWithUser) {
     const key = req.url.replace('/storage/download/', '');
     const downloadUrl = await this.storageService.getPresignedUrlForDownload(key);
     return { downloadUrl };
@@ -83,7 +92,7 @@ export class StorageController {
 
   @Delete('*')
   @ApiOperation({ summary: 'Delete file from storage' })
-  async deleteFile(@Req() req: Request) {
+  async deleteFile(@Req() req: RequestWithUser) {
     const key = req.url.replace('/storage/', '');
     const userId = req.user!.id;
 

@@ -3,7 +3,7 @@ import {
   Post,
   Body,
   UsePipes,
-  ValidationPipe,
+ ValidationPipe,
   Get,
   Param,
   UseGuards,
@@ -12,10 +12,18 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { SetUsernameDto } from '../dto/set-username.dto';
 import { UsernameService } from '../services/username.service';
 import { JwtSessionGuard } from '../../user/guards/jwt-session.guard';
+
+// Define interface for request with user property
+interface RequestWithUser {
+  user?: {
+    id: string;
+    sessionId: string;
+    publicKey: Buffer;
+  };
+}
 
 @Controller('username')
 export class UsernameController {
@@ -25,7 +33,7 @@ export class UsernameController {
   @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async setUsername(@Req() req: Request, @Body() dto: SetUsernameDto) {
+ async setUsername(@Req() req: RequestWithUser, @Body() dto: SetUsernameDto) {
     const isSearchable = dto.isSearchable === 'yes';
     await this.usernameService.setUsername(req.user!.id, dto.username, isSearchable);
     return { success: true, message: 'Username updated successfully' };

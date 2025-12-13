@@ -14,7 +14,6 @@ import {
   ParseUUIDPipe,
   NotFoundException,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
 import { LoginDto } from '../dto/login.dto';
 import { AuthService } from '../services/auth.service';
 import { UseGuards } from '@nestjs/common';
@@ -24,6 +23,29 @@ import { UserService } from '../services/user.service';
 import { RefreshDto } from '../dto/refresh.dto';
 import { StorageService } from '../../storage/storage.service';
 import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+
+// Define interfaces for request and response with user property for future Fastify compatibility
+interface RequestWithUser {
+  user?: {
+    id: string;
+    sessionId: string;
+    publicKey: Buffer;
+ };
+  ip?: string;
+  socket?: {
+    remoteAddress?: string;
+  };
+ cookies?: {
+    [key: string]: string;
+  };
+}
+
+interface ResponseWithCookies {
+  cookie(name: string, value: any, options?: any): this;
+  clearCookie(name: string, options?: any): this;
+  json(body: any): this;
+  status(code: number): this;
+}
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -40,11 +62,11 @@ export class AuthSessionController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async login(
     @Body() loginDto: LoginDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
     // ✅ Исправлено: socket вместо connection
-    const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+    const ipAddress = req.ip || req.socket?.remoteAddress || undefined;
 
     const { tokens } = await this.authService.loginWithPublicKey(
       loginDto.publicKey,
@@ -75,7 +97,7 @@ export class AuthSessionController {
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'End of current session, logout' })
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: RequestWithUser, @Res({ passthrough: true }) res: ResponseWithCookies) {
     if (!req.user) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -96,7 +118,7 @@ export class AuthSessionController {
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'Get current user profile' })
-  async getProfile(@Req() req: Request) {
+  async getProfile(@Req() req: RequestWithUser) {
     const user = await this.userService.getProfileByUserId(req.user!.id);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -127,7 +149,7 @@ export class AuthSessionController {
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'List of active sessions' })
-  async getSessions(@Req() req: Request) {
+  async getSessions(@Req() req: RequestWithUser) {
     const sessions = await this.sessionService.findActiveSessionsByUserId(
       req.user!.id,
       req.user!.sessionId
@@ -140,7 +162,7 @@ export class AuthSessionController {
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'revoke active session (but not current)' })
-  async revokeSession(@Req() req: Request, @Param('id', new ParseUUIDPipe()) sessionId: string) {
+  async revokeSession(@Req() req: RequestWithUser, @Param('id', new ParseUUIDPipe()) sessionId: string) {
     await this.sessionService.revokeSessionById(
       req.user!.id,
       sessionId,
@@ -154,7 +176,7 @@ export class AuthSessionController {
   @ApiSecurity('access-token-cookie')
   @ApiOperation({ summary: 'Close all other sessions except current' })
   @HttpCode(HttpStatus.OK)
-  async revokeAllOtherSessions(@Req() req: Request) {
+  async revokeAllOtherSessions(@Req() req: RequestWithUser) {
     await this.sessionService.revokeAllSessions(req.user!.id, req.user!.sessionId);
     return { success: true };
   }
@@ -175,8 +197,8 @@ export class AuthSessionController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async refresh(
     @Body() refreshDto: RefreshDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
     const ipAddress = req.ip || req.socket?.remoteAddress || undefined;
     const { accessToken, refreshToken } = await this.sessionService.refreshSession(

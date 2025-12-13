@@ -12,11 +12,20 @@ import {
   ValidationPipe,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { Request } from 'express';
+// Remove direct Express import for future Fastify compatibility
 import { ContactRequestService } from '../services/contact-request.service';
 import { SendRequestDto } from '../dto/send-request.dto';
 import { JwtSessionGuard } from '../../user/guards/jwt-session.guard';
 import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
+
+// Define interface for request with user property
+interface RequestWithUser {
+  user?: {
+    id: string;
+    sessionId: string;
+    publicKey: Buffer;
+ };
+}
 
 @ApiTags('Contacts')
 @Controller('contacts')
@@ -29,7 +38,7 @@ export class ContactRequestController {
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Send contact request' })
-  async sendRequest(@Req() req: Request, @Body() dto: SendRequestDto) {
+  async sendRequest(@Req() req: RequestWithUser, @Body() dto: SendRequestDto) {
     const request = await this.contactRequestService.sendRequest(
       req.user!.id,
       dto.toUserId,
@@ -45,7 +54,7 @@ export class ContactRequestController {
 
   @Get('requests/incoming')
   @ApiOperation({ summary: 'Get incoming contact requests' })
-  async getIncomingRequests(@Req() req: Request) {
+  async getIncomingRequests(@Req() req: RequestWithUser) {
     const requests = await this.contactRequestService.getIncomingRequests(req.user!.id);
     
     return {
@@ -64,7 +73,7 @@ export class ContactRequestController {
 
   @Get('requests/outgoing')
   @ApiOperation({ summary: 'Get outgoing contact requests' })
-  async getOutgoingRequests(@Req() req: Request) {
+  async getOutgoingRequests(@Req() req: RequestWithUser) {
     const requests = await this.contactRequestService.getOutgoingRequests(req.user!.id);
     
     return {
@@ -86,7 +95,7 @@ export class ContactRequestController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept contact request' })
   async acceptRequest(
-    @Req() req: Request,
+    @Req() req: RequestWithUser,
     @Param('id', ParseUUIDPipe) requestId: string,
   ) {
     return await this.contactRequestService.acceptRequest(requestId, req.user!.id);
@@ -96,7 +105,7 @@ export class ContactRequestController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject contact request' })
   async rejectRequest(
-    @Req() req: Request,
+    @Req() req: RequestWithUser,
     @Param('id', ParseUUIDPipe) requestId: string,
   ) {
     return await this.contactRequestService.rejectRequest(requestId, req.user!.id);
@@ -105,7 +114,7 @@ export class ContactRequestController {
   @Get('check/:userId')
   @ApiOperation({ summary: 'Check contact request status with user' })
   async checkRequestStatus(
-    @Req() req: Request,
+    @Req() req: RequestWithUser,
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
     const status = await this.contactRequestService.checkRequestStatus(req.user!.id, userId);
@@ -114,7 +123,7 @@ export class ContactRequestController {
 
   @Get()
   @ApiOperation({ summary: 'Get accepted contacts' })
-  async getContacts(@Req() req: Request) {
+  async getContacts(@Req() req: RequestWithUser) {
     const contacts = await this.contactRequestService.getAcceptedContacts(req.user!.id);
     return { contacts };
   }

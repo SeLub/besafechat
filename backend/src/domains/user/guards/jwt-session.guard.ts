@@ -1,12 +1,16 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Request } from 'express';
+// Remove direct Express import for future Fastify compatibility
 import { SessionService } from '../services/session.service';
 
-interface RequestWithUser extends Request {
-  user: {
+// Define interface for request with user property
+interface RequestWithUser {
+  user?: {
     id: string;
     sessionId: string;
     publicKey: Buffer;
+ };
+  cookies?: {
+    [key: string]: string;
   };
 }
 
@@ -15,7 +19,7 @@ export class JwtSessionGuard implements CanActivate {
   constructor(private sessionService: SessionService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<RequestWithUser>();
 
     // 1. Получаем access_token из куки
     const accessToken = request.cookies?.access_token;
