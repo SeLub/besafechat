@@ -2,6 +2,9 @@ import { generateSeed, deriveKeysFromSeed, validateSeed } from './crypto/seed';
 import { encryptSeedForCloud, decryptSeedFromCloud } from './crypto/encryption';
 import { db } from './db/db';
 
+// Store seed temporarily in memory only (not in IndexedDB)
+let temporarySeed: string[] | null = null;
+
 /**
  * Upload seed to cloud (call after login)
  */
@@ -12,13 +15,12 @@ export async function createAccountWithCloud(password: string) {
     throw new Error('No key found in IndexedDB');
   }
   
-  // 2. Get seed from IndexedDB (stored during createAccountWithSeed)
-  const seedRecord = await db.seeds.get('current');
-  if (!seedRecord) {
-    throw new Error('No seed found in IndexedDB');
+  // 2. Get seed from temporary memory storage
+  if (!temporarySeed) {
+    throw new Error('No seed found in temporary storage');
   }
   
-  const seed = seedRecord.words;
+  const seed = temporarySeed;
   const publicKeyBase64 = keyRecord.publicKeyBase64;
   
   // 3. Encrypt seed for cloud
@@ -48,6 +50,9 @@ export async function createAccountWithCloud(password: string) {
   
   // 6. Download backup file
   downloadBackupFile(encrypted, publicKeyBase64);
+  
+  // 7. Clear temporary seed storage after successful upload
+  temporarySeed = null;
 }
 
 /**
@@ -70,12 +75,8 @@ export async function createAccountWithSeed(seed: string[]) {
     createdAt: Date.now()
   });
   
-  // Store seed temporarily for cloud backup
-  await db.seeds.put({
-    id: 'current',
-    words: seed,
-    createdAt: Date.now()
-  });
+  // Store seed temporarily in memory only (not in IndexedDB)
+  temporarySeed = [...seed]; // Create a copy to avoid reference issues
   
   return { privateKey, publicKey, publicKeyBase64 };
 }
@@ -127,7 +128,20 @@ export async function recoverWithPassword(username: string, password: string) {
  * Recover account with seed phrase
  */
 export async function recoverWithSeed(seed: string[]) {
-  return await createAccountWithSeed(seed);
+  // For recovery, we don't need to keep the seed in temporary storage
+  // So we call createAccountWithSeed which will temporarily store it,
+  // but we'll clear it after since it's for recovery, not for cloud backup
+  const result = await createAccountWithSeed(seed);
+  // Clear the temporary seed after recovery since we don't need it for cloud backup
+  temporarySeed = null;
+  return result;
+}
+
+/**
+ * Clear temporary seed storage (useful for logout or security cleanup)
+ */
+export function clearTemporarySeed() {
+  temporarySeed = null;
 }
 
 /**

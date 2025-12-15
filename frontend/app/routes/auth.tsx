@@ -13,7 +13,8 @@ import {
   createAccountWithCloud,
   createAccountWithSeed,
   recoverWithPassword,
-  recoverWithSeed
+  recoverWithSeed,
+  clearTemporarySeed
 } from "@/lib/auth-recovery";
 
 type AuthStep = 'main' | 'username-selection' | 'method-selection' | 'seed-display' | 'seed-verify' | 'password' | 'recovery' | 'complete';
@@ -151,6 +152,7 @@ export default function AuthRoute() {
 
   const handleClearKey = async () => {
     await db.privateKeys.delete('current');
+    clearTemporarySeed(); // Also clear temporary seed storage
     setHasKey(false);
     toast.success('Key cleared');
   };

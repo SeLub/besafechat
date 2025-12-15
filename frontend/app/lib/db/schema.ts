@@ -23,15 +23,8 @@ export interface PrivateKey {
   source?: 'cloud' | 'seed';
 }
 
-export interface Seed {
-  id: string; // "current"
-  words: string[];
-  createdAt: number;
-}
-
 export const SCHEMA = {
   messages: "id, chatId, timestamp",
   contacts: "++id",
   privateKeys: "id",
-  seeds: "id",
 };
