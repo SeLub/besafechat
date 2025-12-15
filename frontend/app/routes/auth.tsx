@@ -8,14 +8,9 @@ import { SeedDisplay } from "@/components/auth/seed-display";
 import { SeedVerification } from "@/components/auth/seed-verification";
 import { PasswordCreation } from "@/components/auth/password-creation";
 import { RecoveryOptions } from "@/components/auth/recovery-options";
-import { generateSeed } from "@/lib/crypto/seed";
-import {
-  createAccountWithCloud,
-  createAccountWithSeed,
-  recoverWithPassword,
-  recoverWithSeed,
-  clearTemporarySeed
-} from "@/lib/auth-recovery";
+import { CryptoService } from "@/services/crypto.service";
+import { AccountService } from "@/services/account.service";
+import { AuthService } from "@/services/auth.service";
 
 type AuthStep = 'main' | 'username-selection' | 'method-selection' | 'seed-display' | 'seed-verify' | 'password' | 'recovery' | 'complete';
 type AuthMethod = 'cloud' | 'self-custody' | null;
@@ -47,7 +42,7 @@ export default function AuthRoute() {
 
   const handleMethodSelect = (selectedMethod: 'cloud' | 'self-custody') => {
     setMethod(selectedMethod);
-    const newSeed = generateSeed();
+    const newSeed = CryptoService.generateSeed();
     setSeed(newSeed);
     
     if (selectedMethod === 'cloud') {
@@ -75,7 +70,7 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       // 1. Derive keys and save to IndexedDB
-      const { publicKeyBase64 } = await createAccountWithSeed(seed);
+      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
       
       // 2. Login to backend
       await loginToBackend(publicKeyBase64);
@@ -84,7 +79,7 @@ export default function AuthRoute() {
       await setUsernameOnBackend(username);
       
       // 4. Upload encrypted seed to S3
-      await createAccountWithCloud(password);
+      await AccountService.createAccountWithCloud(password);
       
       setStep('complete');
       toast.success('Account created with cloud backup!');
@@ -99,7 +94,7 @@ export default function AuthRoute() {
   const finalizeSelfCustody = async () => {
     setLoading(true);
     try {
-      const { publicKeyBase64 } = await createAccountWithSeed(seed);
+      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
       await loginToBackend(publicKeyBase64);
       await setUsernameOnBackend(username);
       setStep('complete');
@@ -113,24 +108,18 @@ export default function AuthRoute() {
   };
 
   const setUsernameOnBackend = async (usernameValue: string) => {
-    const res = await fetch('http://localhost:4000/username/set', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ username: usernameValue, isSearchable: 'yes' })
+    await AuthService.setUsername({ 
+      username: usernameValue, 
+      isSearchable: 'yes' 
     });
-    if (!res.ok) throw new Error('Failed to set username');
   };
 
   const loginToBackend = async (publicKeyBase64: string) => {
-    const deviceId = 'web-browser-' + Date.now();
-    const res = await fetch('http://localhost:4000/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ publicKey: publicKeyBase64, deviceId })
+    const { deviceId } = AccountService.getDeviceInfo();
+    await AuthService.login({ 
+      publicKey: publicKeyBase64, 
+      deviceId 
     });
-    if (!res.ok) throw new Error('Backend login failed');
   };
 
   const handleLogin = async () => {
@@ -152,7 +141,7 @@ export default function AuthRoute() {
 
   const handleClearKey = async () => {
     await db.privateKeys.delete('current');
-    clearTemporarySeed(); // Also clear temporary seed storage
+    AccountService.clearTemporarySeed(); // Also clear temporary seed storage
     setHasKey(false);
     toast.success('Key cleared');
   };
@@ -164,7 +153,7 @@ export default function AuthRoute() {
   const handlePasswordRecovery = async (username: string, password: string) => {
     setLoading(true);
     try {
-      const { publicKeyBase64 } = await recoverWithPassword(username, password);
+      const { publicKeyBase64 } = await AccountService.recoverWithPassword(username, password);
       await loginToBackend(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
@@ -178,7 +167,7 @@ export default function AuthRoute() {
   const handleSeedRecovery = async (recoveredSeed: string[]) => {
     setLoading(true);
     try {
-      const { publicKeyBase64 } = await recoverWithSeed(recoveredSeed);
+      const { publicKeyBase64 } = await AccountService.recoverWithSeed(recoveredSeed);
       await loginToBackend(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
