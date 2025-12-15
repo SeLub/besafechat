@@ -5,6 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import { AuthService } from "@/services/auth.service";
 
 interface User {
   id: string;
@@ -87,32 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await storeKeyPair(publicKeyBase64, privateKeyUint8);
 
     // Отправка публичного ключа на сервер
-    const res = await fetch("http://localhost:4000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ publicKey: publicKeyBase64, deviceId }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Registration failed: ${res.status}`);
-    }
+    await AuthService.login({ publicKey: publicKeyBase64, deviceId });
 
     await checkAuth(); // Получаем профиль после входа
   };
 
   // Вход — используем сохранённый публичный ключ
   const login = async (publicKeyBase64: string, deviceId: string) => {
-    const res = await fetch("http://localhost:4000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ publicKey: publicKeyBase64, deviceId }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Login failed: ${res.status}`);
-    }
+    await AuthService.login({ publicKey: publicKeyBase64, deviceId });
 
     await checkAuth();
   };
@@ -126,10 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.socketInstance = null;
       }
 
-      await fetch("http://localhost:4000/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await AuthService.logout();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
