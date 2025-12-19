@@ -11,17 +11,21 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
+        port: configService.get('DB_PORT', 5433),
         username: configService.get('DB_USERNAME', 'user'),
         password: configService.get('DB_PASSWORD', 'secure_password'),
         database: configService.get('DB_DATABASE', 'messenger'),
-        // 🔥 Явно укажи путь к entity
-        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') !== 'production',
-        logging: false,
+        // Explicitly specify entity paths
+        entities: [
+          __dirname + '/../**/*.entity{.ts,.js}',
+        ],
+        // Use migrations instead of synchronize for production
+        migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+        synchronize: configService.get('NODE_ENV') !== 'production', // Only use sync in non-production
+        logging: configService.get('NODE_ENV') === 'development', // Enable logging in development
       }),
       inject: [ConfigService],
     }),
   ],
 })
-export class DatabaseModule {}
+export class DatabaseModule {} 
