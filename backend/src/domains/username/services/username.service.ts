@@ -61,12 +61,15 @@ export class UsernameService {
   }
 
   async findUserByUsername(username: string) {
-    const usernameRecord = await this.usernameRepository.findOne({
-      where: { username, isSearchable: true },
-      relations: ['user'],
-    });
+    // Use a more explicit query builder approach to avoid issues with nullable unique fields
+    const usernameRecord = await this.usernameRepository
+      .createQueryBuilder('username')
+      .leftJoinAndSelect('username.user', 'user')
+      .where('username.username = :username', { username })
+      .andWhere('username.isSearchable = :isSearchable', { isSearchable: true })
+      .getOne();
 
-    if (!usernameRecord) {
+    if (!usernameRecord || !usernameRecord.user) {
       return null;
     }
 

@@ -18,7 +18,7 @@ export class User {
 
   // Связь с опциональным именем пользователя
   @OneToOne(() => Username, (username) => username.user, { nullable: true })
-  username!: Username;
+  username?: Username;
 
   // Сессии (устройства)
   @OneToMany(() => Session, (session) => session.user)
