@@ -15,7 +15,7 @@ export interface Contact {
   isPinned: boolean;
 }
 
-export interface PrivateKey {
+export interface PrivateKeys {
   id: string; // "current"
   publicKeyBase64: string; // Публичный ключ в base64
   data: Uint8Array; // Зашифрованный приватный ключ
@@ -26,5 +26,5 @@ export interface PrivateKey {
 export const SCHEMA = {
   messages: "id, chatId, timestamp",
   contacts: "++id",
-  privateKeys: "id",
+  publicKey: "id",
 };

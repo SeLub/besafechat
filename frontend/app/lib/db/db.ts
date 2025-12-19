@@ -4,7 +4,7 @@ import { SCHEMA, type Message, type Contact, type PrivateKey } from "./schema";
 class BeSafeDB extends Dexie {
   messages!: Dexie.Table<Message, string>;
   contacts!: Dexie.Table<Contact, string>;
-  privateKeys!: Dexie.Table<PrivateKey, string>;
+  publicKey!: Dexie.Table<PrivateKey, string>;
 
   constructor() {
     super("BeSafeDB");

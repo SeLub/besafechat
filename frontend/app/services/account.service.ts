@@ -2,7 +2,7 @@ import { db } from '../lib/db/db';
 import { CryptoService } from './crypto.service';
 import { AuthService } from './auth.service';
 import { StorageService } from './storage.service';
-import { deviceService } from './device.service';
+import { DeviceService } from './device.service';
 
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
@@ -13,7 +13,7 @@ export class AccountService {
    */
   static async createAccountWithCloud(password: string) {
     // 1. Get current key from IndexedDB
-    const keyRecord = await db.privateKeys.get('current');
+    const keyRecord = await db.publicKey.get('current');
     if (!keyRecord) {
       throw new Error('No key found in IndexedDB');
     }
@@ -41,7 +41,7 @@ export class AccountService {
     }
     
     // 5. Update IndexedDB to mark as cloud backup
-    await db.privateKeys.update('current', { source: 'cloud' });
+    await db.publicKey.update('current', { source: 'cloud' });
     
     // 6. Download backup file
     AccountService.downloadBackupFile(encrypted, publicKeyBase64);
@@ -63,7 +63,7 @@ export class AccountService {
     const { privateKey, publicKey, publicKeyBase64 } = await CryptoService.deriveKeysFromSeed(seed);
     
     // Save to IndexedDB
-    await db.privateKeys.put({
+    await db.publicKey.put({
       id: 'current',
       publicKeyBase64,
       source: 'seed',
@@ -106,7 +106,7 @@ export class AccountService {
     const { privateKey, publicKey, publicKeyBase64 } = await CryptoService.deriveKeysFromSeed(seed);
     
     // 4. Save to IndexedDB
-    await db.privateKeys.put({
+    await db.publicKey.put({
       id: 'current',
       publicKeyBase64,
       source: 'cloud',
@@ -168,8 +168,8 @@ export class AccountService {
    */
   static getDeviceInfo() {
     return {
-      deviceId: deviceService.getDeviceId(),
-      deviceName: deviceService.getDeviceName(),
+      deviceId: DeviceService.getDeviceId(),
+      deviceName: DeviceService.getDeviceName(),
     };
   }
 }

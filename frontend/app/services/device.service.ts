@@ -81,6 +81,3 @@ export class DeviceService {
     return DeviceService.desktopDeviceMapping.get(platform) || platform;
   }
 }
-
-// Export singleton instance
-export const deviceService = new DeviceService();

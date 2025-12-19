@@ -18,14 +18,14 @@ export async function storeKeyPair(
     createdAt: Date.now(),
   };
 
-  await db.privateKeys.put(record);
+  await db.publicKey.put(record);
 }
 
 // Получение приватного ключа
 export async function getPrivateKey(
   publicKeyBase64: string
 ): Promise<Uint8Array | null> {
-  const record = await db.privateKeys.get("current");
+  const record = await db.publicKey.get("current");
   if (!record || record.publicKeyBase64 !== publicKeyBase64) {
     return null;
   }
@@ -37,10 +37,10 @@ export async function getPrivateKey(
 
 // Проверка наличия ключа
 export async function hasStoredKey(): Promise<boolean> {
-  return (await db.privateKeys.get("current")) !== undefined;
+  return (await db.publicKey.get("current")) !== undefined;
 }
 
 // Очистка
 export async function clearStoredKey(): Promise<void> {
-  await db.privateKeys.clear();
+  await db.publicKey.clear();
 }

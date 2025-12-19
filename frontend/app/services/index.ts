@@ -1,4 +1,4 @@
-export { DeviceService, deviceService } from './device.service';
+export { DeviceService } from './device.service';
 export { API_CONFIG } from './api-config';
 export { CryptoService } from './crypto.service';
 export { AuthService } from './auth.service';

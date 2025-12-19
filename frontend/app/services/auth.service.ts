@@ -1,5 +1,5 @@
 import { apiRequest } from './api-utils';
-import { deviceService } from './device.service';
+import { DeviceService } from './device.service';
 
 export interface UserProfile {
   id: string;
@@ -116,8 +116,8 @@ export class AuthService {
    */
   static getDeviceInfo(): { deviceId: string; deviceName: string } {
     return {
-      deviceId: deviceService.getDeviceId(),
-      deviceName: deviceService.getDeviceName(),
+      deviceId: DeviceService.getDeviceId(),
+      deviceName: DeviceService.getDeviceName(),
     };
   }
 }

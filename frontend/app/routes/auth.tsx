@@ -25,7 +25,7 @@ export default function AuthRoute() {
 
   useEffect(() => {
     const checkKey = async () => {
-      const key = await db.privateKeys.get('current');
+      const key = await db.publicKey.get('current');
       setHasKey(!!key);
     };
     checkKey();
@@ -125,7 +125,7 @@ export default function AuthRoute() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const record = await db.privateKeys.get('current');
+      const record = await db.publicKey.get('current');
       if (!record) {
         toast.error('No stored key found');
         return;
@@ -140,7 +140,7 @@ export default function AuthRoute() {
   };
 
   const handleClearKey = async () => {
-    await db.privateKeys.delete('current');
+    await db.publicKey.delete('current');
     AccountService.clearTemporarySeed(); // Also clear temporary seed storage
     setHasKey(false);
     toast.success('Key cleared');
