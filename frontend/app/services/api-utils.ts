@@ -14,12 +14,9 @@ export async function handleApiResponse<T>(res: Response): Promise<T> {
 /**
  * Generic API request function
  */
-export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  
+
   const defaultOptions: RequestInit = {
     credentials: 'include',
     headers: {
@@ -27,7 +24,7 @@ export async function apiRequest<T>(
       ...options.headers,
     },
   };
-  
+
   const mergedOptions = {
     ...defaultOptions,
     ...options,
@@ -36,7 +33,7 @@ export async function apiRequest<T>(
       ...options.headers,
     },
   };
-  
+
   const res = await fetch(url, mergedOptions);
   return handleApiResponse<T>(res);
 }

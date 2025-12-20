@@ -47,9 +47,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
     return (
       <div className="max-w-md mx-auto p-6">
         <h2 className="text-2xl font-bold text-center mb-4">Restore Access</h2>
-        <p className="text-center text-muted-foreground mb-6">
-          Choose your recovery method:
-        </p>
+        <p className="text-center text-muted-foreground mb-6">Choose your recovery method:</p>
 
         <div className="space-y-3">
           <button
@@ -57,9 +55,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
             className="w-full p-4 border-2 rounded-lg hover:border-primary hover:bg-accent transition text-left"
           >
             <div className="font-medium mb-1">🔑 Password (Cloud Recovery)</div>
-            <div className="text-sm text-muted-foreground">
-              If you saved your seed in the cloud
-            </div>
+            <div className="text-sm text-muted-foreground">If you saved your seed in the cloud</div>
           </button>
 
           <button
@@ -67,9 +63,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
             className="w-full p-4 border-2 rounded-lg hover:border-primary hover:bg-accent transition text-left"
           >
             <div className="font-medium mb-1">📝 Seed Phrase (12 words)</div>
-            <div className="text-sm text-muted-foreground">
-              Enter your 12-word seed phrase
-            </div>
+            <div className="text-sm text-muted-foreground">Enter your 12-word seed phrase</div>
           </button>
         </div>
       </div>
@@ -87,15 +81,13 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
         </button>
 
         <h2 className="text-2xl font-bold mb-4">Cloud Recovery</h2>
-        <p className="text-muted-foreground mb-6">
-          Enter your username and password
-        </p>
+        <p className="text-muted-foreground mb-6">Enter your username and password</p>
 
         <div className="space-y-4 mb-6">
           <input
             type="text"
             value={username}
-            onChange={(e) => {
+            onChange={e => {
               setUsername(e.target.value);
               setError('');
             }}
@@ -105,13 +97,13 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
           <input
             type="password"
             value={password}
-            onChange={(e) => {
+            onChange={e => {
               setPassword(e.target.value);
               setError('');
             }}
             placeholder="Password"
             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+            onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
           />
         </div>
 
@@ -149,7 +141,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
       <div className="space-y-4 mb-6">
         <textarea
           value={seedInput}
-          onChange={(e) => {
+          onChange={e => {
             setSeedInput(e.target.value);
             setError('');
           }}

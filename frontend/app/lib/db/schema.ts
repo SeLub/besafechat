@@ -2,7 +2,7 @@ export interface Message {
   id: string;
   chatId: string;
   senderId: string;
-  contentType: "text" | "image" | "file";
+  contentType: 'text' | 'image' | 'file';
   encryptedContent: Uint8Array;
   encryptedKey?: Uint8Array;
   timestamp: number;
@@ -24,7 +24,7 @@ export interface PrivateKeys {
 }
 
 export const SCHEMA = {
-  messages: "id, chatId, timestamp",
-  contacts: "++id",
-  publicKey: "id",
+  messages: 'id, chatId, timestamp',
+  contacts: '++id',
+  publicKey: 'id',
 };

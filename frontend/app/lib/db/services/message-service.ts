@@ -1,8 +1,8 @@
-import { db } from "../db";
-import type { Message } from "../schema";
+import { db } from '../db';
+import type { Message } from '../schema';
 
 export class MessageService {
-  async addMessage(message: Omit<Message, "id">): Promise<string> {
+  async addMessage(message: Omit<Message, 'id'>): Promise<string> {
     const id = crypto.randomUUID();
     await db.messages.add({ ...message, id });
     return id;
@@ -10,10 +10,10 @@ export class MessageService {
 
   async getMessagesByChat(chatId: string, limit = 50): Promise<Message[]> {
     return db.messages
-      .where("chatId")
+      .where('chatId')
       .equals(chatId)
       .reverse()
-      .sortBy("timestamp")
-      .then((messages) => messages.slice(0, limit));
+      .sortBy('timestamp')
+      .then(messages => messages.slice(0, limit));
   }
 }

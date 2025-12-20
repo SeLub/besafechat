@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { getUserAccentColor } from "@/lib/colors";
+import { useEffect, useRef } from 'react';
+import { getUserAccentColor } from '@/lib/colors';
 
 interface MessageListProps {
   messages: {
@@ -15,7 +15,7 @@ export function MessageList({ messages, selectedChat }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   return (
@@ -33,7 +33,7 @@ export function MessageList({ messages, selectedChat }: MessageListProps) {
             </div>
           </div>
         ) : (
-          messages.map((msg) => {
+          messages.map(msg => {
             const accentColor =
               !msg.isOwn && selectedChat?.userId
                 ? getUserAccentColor(selectedChat.userId)
@@ -49,13 +49,13 @@ export function MessageList({ messages, selectedChat }: MessageListProps) {
               <div
                 key={msg.id}
                 className={`mb-2 p-3 rounded-lg max-w-xs shadow ${
-                  msg.isOwn ? "ml-auto message-own" : "message-other"
+                  msg.isOwn ? 'ml-auto message-own' : 'message-other'
                 }`}
                 style={accentStyle}
               >
                 {!msg.isOwn && (
                   <div className="text-xs text-muted-foreground mb-1">
-                    {selectedChat?.name || "Unknown"}
+                    {selectedChat?.name || 'Unknown'}
                   </div>
                 )}
                 <div>{msg.text}</div>

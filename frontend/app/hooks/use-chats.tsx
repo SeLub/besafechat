@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "./use-auth";
-import { saveContact } from "@/lib/db/contact-storage";
+import { useState, useEffect } from 'react';
+import { useAuth } from './use-auth';
+import { saveContact } from '@/lib/db/contact-storage';
 
 interface Chat {
   id: string;
@@ -50,28 +50,25 @@ export function useChats() {
 
   const loadChatsFromBackend = async () => {
     try {
-      const res = await fetch("http://localhost:4000/contacts", {
-        credentials: "include",
+      const res = await fetch('http://localhost:4000/contacts', {
+        credentials: 'include',
       });
 
       if (res.ok) {
         const data = await res.json();
         const chats = data.contacts.map((contact: any) => ({
           id: `chat_${contact.user.id}`,
-          name:
-            contact.user.displayName ||
-            `@${contact.user.username}` ||
-            "Unknown User",
+          name: contact.user.displayName || `@${contact.user.username}` || 'Unknown User',
           userId: contact.user.id,
           publicKey: contact.user.publicKey,
           isOnline: false,
         }));
-        
+
         // Save contacts to IndexedDB
         for (const chat of chats) {
           await saveContact(chat.userId, chat.name, false);
         }
-        
+
         setChats([...mockChats, ...chats]);
       } else {
         setChats(mockChats);
@@ -93,7 +90,7 @@ export function useChats() {
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {
       id: newChat.id || newChat.publicKey || Date.now().toString(),
-      name: newChat.name || newChat.username || "Unknown User",
+      name: newChat.name || newChat.username || 'Unknown User',
       lastMessage: undefined,
       timestamp: undefined,
       unreadCount: 0,
@@ -101,11 +98,11 @@ export function useChats() {
       ...newChat,
     };
 
-    setChats((prev) => {
+    setChats(prev => {
       // Check if chat already exists by userId or publicKey
       const exists = prev.find(
-        (c) => (c.userId && c.userId === chat.userId) || 
-               (c.publicKey && c.publicKey === chat.publicKey)
+        c =>
+          (c.userId && c.userId === chat.userId) || (c.publicKey && c.publicKey === chat.publicKey)
       );
       if (exists) return prev;
 
@@ -116,15 +113,15 @@ export function useChats() {
   };
 
   const updateChatLastMessage = (chatId: string, message: string) => {
-    setChats((prev) =>
-      prev.map((chat) =>
+    setChats(prev =>
+      prev.map(chat =>
         chat.id === chatId
           ? {
               ...chat,
               lastMessage: message,
               timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
+                hour: '2-digit',
+                minute: '2-digit',
               }),
             }
           : chat
@@ -133,11 +130,7 @@ export function useChats() {
   };
 
   const updateChatOnlineStatus = (userId: string, isOnline: boolean) => {
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.userId === userId ? { ...chat, isOnline } : chat
-      )
-    );
+    setChats(prev => prev.map(chat => (chat.userId === userId ? { ...chat, isOnline } : chat)));
   };
 
   const loadOnlineStatuses = async () => {
@@ -154,8 +147,8 @@ export function useChats() {
 
       if (res.ok) {
         const { statuses } = await res.json();
-        setChats((prev) =>
-          prev.map((chat) => ({
+        setChats(prev =>
+          prev.map(chat => ({
             ...chat,
             isOnline: chat.userId ? statuses[chat.userId] || false : false,
           }))
@@ -167,7 +160,7 @@ export function useChats() {
   };
 
   const getChatById = (chatId: string) => {
-    return chats.find((chat) => chat.id === chatId);
+    return chats.find(chat => chat.id === chatId);
   };
 
   return {

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { X, Shield } from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { X, Shield } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 
 interface PrivacySettingsModalProps {
   isOpen: boolean;
@@ -29,7 +29,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
       // For now, assume user is searchable by default
       setIsSearchable(true);
     } catch (error) {
-      console.error("Failed to load privacy settings");
+      console.error('Failed to load privacy settings');
     } finally {
       setInitialLoading(false);
     }
@@ -51,13 +51,13 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
       });
 
       if (res.ok) {
-        toast.success("Privacy settings updated");
+        toast.success('Privacy settings updated');
         onClose();
       } else {
-        toast.error("Failed to update settings");
+        toast.error('Failed to update settings');
       }
     } catch (error) {
-      toast.error("Failed to update settings");
+      toast.error('Failed to update settings');
     } finally {
       setLoading(false);
     }
@@ -69,7 +69,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
     <>
       {/* Overlay */}
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      
+
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         {/* Header */}
@@ -101,16 +101,13 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
                         Let others search for you by username
                       </div>
                     </div>
-                    <Switch
-                      checked={isSearchable}
-                      onCheckedChange={setIsSearchable}
-                    />
+                    <Switch checked={isSearchable} onCheckedChange={setIsSearchable} />
                   </div>
                 </div>
 
                 <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-                  <strong>Note:</strong> When disabled, others won't be able to find you through username search, 
-                  but existing contacts can still message you.
+                  <strong>Note:</strong> When disabled, others won't be able to find you through
+                  username search, but existing contacts can still message you.
                 </div>
               </div>
             </>
@@ -124,7 +121,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={loading}>
-              {loading ? "Saving..." : "Save Changes"}
+              {loading ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         )}

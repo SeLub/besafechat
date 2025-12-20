@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getAvatarUrl } from "@/lib/avatar-utils";
-import { ArrowLeft, ChevronDown, ChevronRight, MessageCircle, Check, X, Clock } from "lucide-react";
-import { toast } from "sonner";
-import { useNotifications } from "@/hooks/use-notifications";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl } from '@/lib/avatar-utils';
+import { ArrowLeft, ChevronDown, ChevronRight, MessageCircle, Check, X, Clock } from 'lucide-react';
+import { toast } from 'sonner';
+import { useNotifications } from '@/hooks/use-notifications';
 
 interface Contact {
   id: string;
@@ -79,7 +79,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
         setOutgoingRequests(outgoingData.requests || []);
       }
     } catch (error) {
-      toast.error("Failed to load contacts");
+      toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
     }
@@ -95,18 +95,18 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
 
       if (res.ok) {
         const data = await res.json();
-        toast.success("Request accepted");
+        toast.success('Request accepted');
         loadData();
-        
+
         // Handle chat creation
         if (data.chatId && onChatCreated) {
           onChatCreated(data.chatId);
         }
       } else {
-        toast.error("Failed to accept request");
+        toast.error('Failed to accept request');
       }
     } catch (error) {
-      toast.error("Failed to accept request");
+      toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
     }
@@ -121,13 +121,13 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
       });
 
       if (res.ok) {
-        toast.success("Request rejected");
+        toast.success('Request rejected');
         loadData();
       } else {
-        toast.error("Failed to reject request");
+        toast.error('Failed to reject request');
       }
     } catch (error) {
-      toast.error("Failed to reject request");
+      toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
     }
@@ -149,21 +149,26 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
           onChatCreated(data.chatId);
         }
       } else {
-        toast.error("Failed to open chat");
+        toast.error('Failed to open chat');
       }
     } catch (error) {
-      toast.error("Failed to open chat");
+      toast.error('Failed to open chat');
     }
   };
 
   const getInitials = (user: { displayName?: string; username?: string }) => {
     if (user.displayName) {
-      return user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      return user.displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
     }
     if (user.username) {
       return user.username.slice(0, 2).toUpperCase();
     }
-    return "U";
+    return 'U';
   };
 
   const formatDate = (dateString: string) => {
@@ -175,7 +180,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
     if (diffDays === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
-      return "Yesterday";
+      return 'Yesterday';
     } else if (diffDays < 7) {
       return `${diffDays} days ago`;
     } else {
@@ -216,14 +221,14 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium text-foreground">📱 Contacts ({contacts.length})</h3>
           </div>
-          
+
           {contacts.length === 0 ? (
             <div className="text-center text-muted-foreground py-4">
               <div className="text-sm">No contacts yet</div>
             </div>
           ) : (
             <div className="space-y-2">
-              {contacts.map((contact) => (
+              {contacts.map(contact => (
                 <div
                   key={contact.id}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-accent cursor-pointer"
@@ -238,7 +243,9 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                     </Avatar>
                     <div>
                       <div className="font-medium">
-                        {contact.user.displayName || `@${contact.user.username}` || "Anonymous User"}
+                        {contact.user.displayName ||
+                          `@${contact.user.username}` ||
+                          'Anonymous User'}
                       </div>
                       {contact.user.username && (
                         <div className="text-sm text-muted-foreground">
@@ -257,7 +264,9 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
         {/* Requests Section */}
         <div className="p-4 border-t border-border">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-foreground">📨 Requests ({incomingRequests.length + outgoingRequests.length})</h3>
+            <h3 className="font-medium text-foreground">
+              📨 Requests ({incomingRequests.length + outgoingRequests.length})
+            </h3>
           </div>
 
           {/* Pending Requests Accordion */}
@@ -275,7 +284,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                 <span className="font-medium">Pending ({incomingRequests.length})</span>
               </div>
             </button>
-            
+
             {pendingExpanded && (
               <div className="mt-2 space-y-2">
                 {incomingRequests.length === 0 ? (
@@ -283,19 +292,23 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                     No pending requests
                   </div>
                 ) : (
-                  incomingRequests.map((request) => (
+                  incomingRequests.map(request => (
                     <div key={request.id} className="p-3 border border-border rounded-lg">
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.fromUser || {})}
                           </AvatarFallback>
-                          {request.fromUser?.id && <AvatarImage src={getAvatarUrl(request.fromUser.id)} />}
+                          {request.fromUser?.id && (
+                            <AvatarImage src={getAvatarUrl(request.fromUser.id)} />
+                          )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.fromUser?.displayName || `@${request.fromUser?.username}` || "Anonymous User"}
+                              {request.fromUser?.displayName ||
+                                `@${request.fromUser?.username}` ||
+                                'Anonymous User'}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {formatDate(request.createdAt)}
@@ -351,7 +364,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                 <span className="font-medium">Sent ({outgoingRequests.length})</span>
               </div>
             </button>
-            
+
             {sentExpanded && (
               <div className="mt-2 space-y-2">
                 {outgoingRequests.length === 0 ? (
@@ -359,27 +372,37 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                     No sent requests
                   </div>
                 ) : (
-                  outgoingRequests.map((request) => (
+                  outgoingRequests.map(request => (
                     <div key={request.id} className="p-3 border border-border rounded-lg">
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.toUser || {})}
                           </AvatarFallback>
-                          {request.toUser?.id && <AvatarImage src={getAvatarUrl(request.toUser.id)} />}
+                          {request.toUser?.id && (
+                            <AvatarImage src={getAvatarUrl(request.toUser.id)} />
+                          )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.toUser?.displayName || `@${request.toUser?.username}` || "Anonymous User"}
+                              {request.toUser?.displayName ||
+                                `@${request.toUser?.username}` ||
+                                'Anonymous User'}
                             </div>
                             <div className="flex items-center space-x-2">
-                              <div className={`text-xs px-2 py-1 rounded-full ${
-                                request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                request.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {request.status === 'pending' && <Clock className="h-3 w-3 inline mr-1" />}
+                              <div
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  request.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : request.status === 'accepted'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {request.status === 'pending' && (
+                                  <Clock className="h-3 w-3 inline mr-1" />
+                                )}
                                 {request.status || 'pending'}
                               </div>
                               <div className="text-xs text-muted-foreground">

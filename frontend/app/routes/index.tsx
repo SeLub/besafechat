@@ -1,15 +1,15 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { io, Socket } from "socket.io-client";
-import { LeftColumn } from "@/components/left-column";
-import { MiddleColumn } from "@/components/middle-column";
-import { RightPanel } from "@/components/right-panel";
-import { NewChatModal } from "@/components/new-chat-modal";
-import { AuthGuard } from "@/components/auth-guard";
-import { useAuth } from "@/hooks/use-auth";
-import { useChats } from "@/hooks/use-chats";
-import { useWebSocketNotifications } from "@/hooks/use-websocket-notifications";
-import { saveMessage, loadMessages } from "@/lib/db/message-storage";
-import { cleanupOldMessages } from "@/lib/db/cleanup";
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Socket } from 'socket.io-client';
+import { LeftColumn } from '@/components/left-column';
+import { MiddleColumn } from '@/components/middle-column';
+import { RightPanel } from '@/components/right-panel';
+import { NewChatModal } from '@/components/new-chat-modal';
+import { AuthGuard } from '@/components/auth-guard';
+import { useAuth } from '@/hooks/use-auth';
+import { useChats } from '@/hooks/use-chats';
+import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
+import { saveMessage, loadMessages } from '@/lib/db/message-storage';
+import { cleanupOldMessages } from '@/lib/db/cleanup';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -17,26 +17,19 @@ function ChatRouteContent() {
   >([]);
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [leftPanelPage, setLeftPanelPage] = useState<
-    "profile" | "settings" | "contacts" | null
-  >(null);
+  const [leftPanelPage, setLeftPanelPage] = useState<'profile' | 'settings' | 'contacts' | null>(
+    null
+  );
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
-  const {
-    chats,
-    addChat,
-    updateChatLastMessage,
-    updateChatOnlineStatus,
-    getChatById,
-  } = useChats();
+  const { chats, addChat, updateChatLastMessage, updateChatOnlineStatus, getChatById } = useChats();
 
   const handleSendMessage = async (message: string) => {
     if (!socketRef.current || !selectedChatId || !user) return;
 
     const selectedChat = getChatById(selectedChatId);
-    const recipientId =
-      selectedChat?.userId || selectedChat?.id || selectedChatId;
+    const recipientId = selectedChat?.userId || selectedChat?.id || selectedChatId;
 
     // Encode Unicode to base64
     const encoder = new TextEncoder();
@@ -45,11 +38,11 @@ function ChatRouteContent() {
 
     const timestamp = new Date().toISOString();
 
-    socketRef.current.emit("message", {
+    socketRef.current.emit('message', {
       to: recipientId,
-      type: "text",
+      type: 'text',
       encryptedContent: base64Message,
-      encryptedKey: "dummy_key",
+      encryptedKey: 'dummy_key',
       timestamp,
     });
 
@@ -60,7 +53,7 @@ function ChatRouteContent() {
       isOwn: true,
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages(prev => [...prev, newMessage]);
 
     // Save sent message immediately using recipientId as chatId
     console.log('💾 Saving sent message with recipientId:', recipientId);
@@ -73,15 +66,15 @@ function ChatRouteContent() {
   const handleChatSelect = async (chatId: string) => {
     setSelectedChatId(chatId);
     setRightPanelOpen(false);
-    
+
     // Save to localStorage for persistence
     localStorage.setItem('selectedChatId', chatId);
-    
+
     // Get chat to find userId
     const chat = getChatById(chatId);
     // Always use userId as the key
     const loadKey = chat?.userId || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
-    
+
     console.log('📚 Loading messages for userId:', loadKey);
     // Load messages from IndexedDB
     const loadedMessages = await loadMessages(loadKey);
@@ -98,22 +91,20 @@ function ChatRouteContent() {
       try {
         // Load chat info from backend
         const res = await fetch(`http://localhost:4000/chats/${chatId}`, {
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (res.ok) {
           const chatData = await res.json();
           // Find the other user in the chat
-          const otherMember = chatData.members?.find(
-            (m: any) => m.userId !== user?.id
-          );
+          const otherMember = chatData.members?.find((m: any) => m.userId !== user?.id);
 
           const newChatId = addChat({
             id: chatId,
             name:
               otherMember?.user?.displayName ||
               `@${otherMember?.user?.username?.username}` ||
-              "Unknown User",
+              'Unknown User',
             publicKey: otherMember?.user?.publicKey,
             userId: otherMember?.user?.id,
           });
@@ -127,6 +118,7 @@ function ChatRouteContent() {
         // Fallback if API fails
         const newChatId = addChat({ id: chatId });
         setSelectedChatId(newChatId);
+        console.log(error);
       }
       setNewChatModalOpen(false);
     },
@@ -138,30 +130,34 @@ function ChatRouteContent() {
     chatsRef.current = chats;
   }, [chats]);
 
-  const handleMessageReceived = useCallback(async (message: any) => {
-    const selectedChat = chatsRef.current.find(c => c.id === selectedChatId);
-    
-    // Check if message is for currently selected chat (by userId or chatId)
-    const isSelectedChat = selectedChat && 
-      (selectedChat.userId === message.fromUserId || 
-       message.chatId === selectedChatId ||
-       message.chatId === selectedChatId?.replace('chat_', ''));
-    
-    if (isSelectedChat) {
-      setMessages((prev) => {
-        if (prev.some(m => m.id === message.id)) {
-          return prev;
-        }
-        return [...prev, message];
-      });
-    }
-    
-    // Always save to IndexedDB using senderId as chatId (to match sent messages)
-    if (message.fromUserId) {
-      console.log('💾 Saving received message with senderId:', message.fromUserId);
-      await saveMessage(message.fromUserId, message.fromUserId, message.text, false, message.id);
-    }
-  }, [selectedChatId]);
+  const handleMessageReceived = useCallback(
+    async (message: any) => {
+      const selectedChat = chatsRef.current.find(c => c.id === selectedChatId);
+
+      // Check if message is for currently selected chat (by userId or chatId)
+      const isSelectedChat =
+        selectedChat &&
+        (selectedChat.userId === message.fromUserId ||
+          message.chatId === selectedChatId ||
+          message.chatId === selectedChatId?.replace('chat_', ''));
+
+      if (isSelectedChat) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === message.id)) {
+            return prev;
+          }
+          return [...prev, message];
+        });
+      }
+
+      // Always save to IndexedDB using senderId as chatId (to match sent messages)
+      if (message.fromUserId) {
+        console.log('💾 Saving received message with senderId:', message.fromUserId);
+        await saveMessage(message.fromUserId, message.fromUserId, message.text, false, message.id);
+      }
+    },
+    [selectedChatId]
+  );
 
   const handleUserOnline = useCallback(
     (userId: string) => {
@@ -209,22 +205,22 @@ function ChatRouteContent() {
   }, [chats.length]);
 
   const handleProfileClick = () => {
-    setLeftPanelPage("profile");
+    setLeftPanelPage('profile');
   };
 
   const handleContactsClick = () => {
-    setLeftPanelPage("contacts");
+    setLeftPanelPage('contacts');
   };
 
   const handleSettingsClick = () => {
-    setLeftPanelPage("settings");
+    setLeftPanelPage('settings');
   };
 
   const handleBackToChats = () => {
     setLeftPanelPage(null);
   };
 
-  const selectedChat = getChatById(selectedChatId || "");
+  const selectedChat = getChatById(selectedChatId || '');
 
   return (
     <div id="Main" className="flex h-screen bg-background text-foreground">

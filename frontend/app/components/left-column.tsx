@@ -1,9 +1,9 @@
-import { HamburgerMenu } from "@/components/hamburger-menu";
-import { ChatList } from "@/components/chat-list";
-import { LeftPanelPages } from "@/components/left-panel-pages";
+import { HamburgerMenu } from '@/components/hamburger-menu';
+import { ChatList } from '@/components/chat-list';
+import { LeftPanelPages } from '@/components/left-panel-pages';
 
 interface LeftColumnProps {
-  leftPanelPage: "profile" | "settings" | "contacts" | null;
+  leftPanelPage: 'profile' | 'settings' | 'contacts' | null;
   userProfile: any;
   chats: any[];
   selectedChatId?: string;

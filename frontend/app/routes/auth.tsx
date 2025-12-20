@@ -1,18 +1,26 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { db } from "@/lib/db/db";
-import { UsernameSelection } from "@/components/auth/username-selection";
-import { MethodSelection } from "@/components/auth/method-selection";
-import { SeedDisplay } from "@/components/auth/seed-display";
-import { SeedVerification } from "@/components/auth/seed-verification";
-import { PasswordCreation } from "@/components/auth/password-creation";
-import { RecoveryOptions } from "@/components/auth/recovery-options";
-import { CryptoService } from "@/services/crypto.service";
-import { AccountService } from "@/services/account.service";
-import { AuthService } from "@/services/auth.service";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { db } from '@/lib/db/db';
+import { UsernameSelection } from '@/components/auth/username-selection';
+import { MethodSelection } from '@/components/auth/method-selection';
+import { SeedDisplay } from '@/components/auth/seed-display';
+import { SeedVerification } from '@/components/auth/seed-verification';
+import { PasswordCreation } from '@/components/auth/password-creation';
+import { RecoveryOptions } from '@/components/auth/recovery-options';
+import { CryptoService } from '@/services/crypto.service';
+import { AccountService } from '@/services/account.service';
+import { AuthService } from '@/services/auth.service';
 
-type AuthStep = 'main' | 'username-selection' | 'method-selection' | 'seed-display' | 'seed-verify' | 'password' | 'recovery' | 'complete';
+type AuthStep =
+  | 'main'
+  | 'username-selection'
+  | 'method-selection'
+  | 'seed-display'
+  | 'seed-verify'
+  | 'password'
+  | 'recovery'
+  | 'complete';
 type AuthMethod = 'cloud' | 'self-custody' | null;
 
 export default function AuthRoute() {
@@ -44,7 +52,7 @@ export default function AuthRoute() {
     setMethod(selectedMethod);
     const newSeed = CryptoService.generateSeed();
     setSeed(newSeed);
-    
+
     if (selectedMethod === 'cloud') {
       // Skip seed display for cloud - go directly to password
       setStep('password');
@@ -71,19 +79,19 @@ export default function AuthRoute() {
     try {
       // 1. Derive keys and save to IndexedDB
       const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
-      
+
       // 2. Login to backend
       await loginToBackend(publicKeyBase64);
-      
+
       // 3. Set username
       await setUsernameOnBackend(username);
-      
+
       // 4. Upload encrypted seed to S3
       await AccountService.createAccountWithCloud(password);
-      
+
       setStep('complete');
       toast.success('Account created with cloud backup!');
-      setTimeout(() => window.location.href = '/', 1500);
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -99,7 +107,7 @@ export default function AuthRoute() {
       await setUsernameOnBackend(username);
       setStep('complete');
       toast.success('Account created!');
-      setTimeout(() => window.location.href = '/', 1500);
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -108,17 +116,17 @@ export default function AuthRoute() {
   };
 
   const setUsernameOnBackend = async (usernameValue: string) => {
-    await AuthService.setUsername({ 
-      username: usernameValue, 
-      isSearchable: 'yes' 
+    await AuthService.setUsername({
+      username: usernameValue,
+      isSearchable: 'yes',
     });
   };
 
   const loginToBackend = async (publicKeyBase64: string) => {
     const { deviceId } = AccountService.getDeviceInfo();
-    await AuthService.login({ 
-      publicKey: publicKeyBase64, 
-      deviceId 
+    await AuthService.login({
+      publicKey: publicKeyBase64,
+      deviceId,
     });
   };
 

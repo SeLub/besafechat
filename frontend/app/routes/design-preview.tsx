@@ -1,13 +1,13 @@
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export default function DesignPreview() {
   // Добавим переключение темы
   useEffect(() => {
-    const toggle = document.createElement("button");
-    toggle.textContent = "Toggle Theme";
+    const toggle = document.createElement('button');
+    toggle.textContent = 'Toggle Theme';
     toggle.className =
-      "fixed bottom-4 right-4 px-4 py-2 bg-primary text-primary-foreground rounded";
-    toggle.onclick = () => document.documentElement.classList.toggle("dark");
+      'fixed bottom-4 right-4 px-4 py-2 bg-primary text-primary-foreground rounded';
+    toggle.onclick = () => document.documentElement.classList.toggle('dark');
     document.body.appendChild(toggle);
 
     return () => {

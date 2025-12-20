@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Check, X, Clock, Send } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ArrowLeft, Check, X, Clock, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ContactRequest {
   id: string;
@@ -59,7 +59,7 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
         setOutgoingRequests(outgoingData.requests || []);
       }
     } catch (error) {
-      toast.error("Failed to load requests");
+      toast.error('Failed to load requests');
     } finally {
       setLoading(false);
     }
@@ -74,14 +74,14 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
       });
 
       if (res.ok) {
-        toast.success("Request accepted");
+        toast.success('Request accepted');
         loadRequests();
         // TODO: Handle chat creation when backend implements it
       } else {
-        toast.error("Failed to accept request");
+        toast.error('Failed to accept request');
       }
     } catch (error) {
-      toast.error("Failed to accept request");
+      toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
     }
@@ -96,13 +96,13 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
       });
 
       if (res.ok) {
-        toast.success("Request rejected");
+        toast.success('Request rejected');
         loadRequests();
       } else {
-        toast.error("Failed to reject request");
+        toast.error('Failed to reject request');
       }
     } catch (error) {
-      toast.error("Failed to reject request");
+      toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
     }
@@ -110,12 +110,17 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
 
   const getInitials = (user: { displayName?: string; username?: string }) => {
     if (user.displayName) {
-      return user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      return user.displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
     }
     if (user.username) {
       return user.username.slice(0, 2).toUpperCase();
     }
-    return "U";
+    return 'U';
   };
 
   const formatDate = (dateString: string) => {
@@ -127,7 +132,7 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
     if (diffDays === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
-      return "Yesterday";
+      return 'Yesterday';
     } else if (diffDays < 7) {
       return `${diffDays} days ago`;
     } else {
@@ -184,7 +189,7 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
                   <div>No incoming requests</div>
                 </div>
               ) : (
-                incomingRequests.map((request) => (
+                incomingRequests.map(request => (
                   <div key={request.id} className="p-4 border border-border rounded-lg">
                     <div className="flex items-start space-x-3">
                       <Avatar className="h-10 w-10">
@@ -195,7 +200,9 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">
-                            {request.fromUser?.displayName || `@${request.fromUser?.username}` || "Anonymous User"}
+                            {request.fromUser?.displayName ||
+                              `@${request.fromUser?.username}` ||
+                              'Anonymous User'}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {formatDate(request.createdAt)}
@@ -207,9 +214,7 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
                           </div>
                         )}
                         {request.message && (
-                          <div className="mt-2 p-2 bg-muted rounded text-sm">
-                            {request.message}
-                          </div>
+                          <div className="mt-2 p-2 bg-muted rounded text-sm">{request.message}</div>
                         )}
                         <div className="flex space-x-2 mt-3">
                           <Button
@@ -235,55 +240,59 @@ export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps)
                   </div>
                 ))
               )
+            ) : outgoingRequests.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Send className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <div>No sent requests</div>
+              </div>
             ) : (
-              outgoingRequests.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <Send className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <div>No sent requests</div>
-                </div>
-              ) : (
-                outgoingRequests.map((request) => (
-                  <div key={request.id} className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(request.toUser || {})}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">
-                            {request.toUser?.displayName || `@${request.toUser?.username}` || "Anonymous User"}
+              outgoingRequests.map(request => (
+                <div key={request.id} className="p-4 border border-border rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {getInitials(request.toUser || {})}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">
+                          {request.toUser?.displayName ||
+                            `@${request.toUser?.username}` ||
+                            'Anonymous User'}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              request.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : request.status === 'accepted'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {request.status === 'pending' && (
+                              <Clock className="h-3 w-3 inline mr-1" />
+                            )}
+                            {request.status || 'pending'}
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className={`text-xs px-2 py-1 rounded-full ${
-                              request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              request.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {request.status === 'pending' && <Clock className="h-3 w-3 inline mr-1" />}
-                              {request.status || 'pending'}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {formatDate(request.createdAt)}
-                            </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(request.createdAt)}
                           </div>
                         </div>
-                        {request.toUser?.username && (
-                          <div className="text-sm text-muted-foreground">
-                            @{request.toUser.username}
-                          </div>
-                        )}
-                        {request.message && (
-                          <div className="mt-2 p-2 bg-muted rounded text-sm">
-                            {request.message}
-                          </div>
-                        )}
                       </div>
+                      {request.toUser?.username && (
+                        <div className="text-sm text-muted-foreground">
+                          @{request.toUser.username}
+                        </div>
+                      )}
+                      {request.message && (
+                        <div className="mt-2 p-2 bg-muted rounded text-sm">{request.message}</div>
+                      )}
                     </div>
                   </div>
-                ))
-              )
+                </div>
+              ))
             )}
           </div>
         )}

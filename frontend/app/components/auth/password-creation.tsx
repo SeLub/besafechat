@@ -24,11 +24,12 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
   };
 
   const strength = getPasswordStrength(password);
-  const isValid = password.length >= 8 && 
-                  /[a-z]/.test(password) && 
-                  /[A-Z]/.test(password) && 
-                  /[0-9]/.test(password) &&
-                  password === confirmPassword;
+  const isValid =
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    password === confirmPassword;
 
   console.log('[PasswordCreation] Debug:', {
     password,
@@ -38,7 +39,7 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
     hasUpper: /[A-Z]/.test(password),
     hasNumber: /[0-9]/.test(password),
     passwordsMatch: password === confirmPassword,
-    isValid
+    isValid,
   });
 
   return (
@@ -50,14 +51,12 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Password (min 8 characters)
-          </label>
+          <label className="block text-sm font-medium mb-2">Password (min 8 characters)</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary pr-10"
               placeholder="Enter password"
             />
@@ -69,7 +68,7 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
               {showPassword ? '👁️' : '👁️‍🗨️'}
             </button>
           </div>
-          
+
           {password && (
             <div className="mt-2">
               <div className="flex items-center justify-between text-xs mb-1">
@@ -77,7 +76,7 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
                 <span>{strength.score}%</span>
               </div>
               <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div 
+                <div
                   className={`h-full ${strength.color} transition-all`}
                   style={{ width: `${strength.score}%` }}
                 />
@@ -87,13 +86,11 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Confirm Password
-          </label>
+          <label className="block text-sm font-medium mb-2">Confirm Password</label>
           <input
             type={showPassword ? 'text' : 'password'}
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={e => setConfirmPassword(e.target.value)}
             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="Confirm password"
           />
@@ -126,8 +123,8 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
 
       <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6">
         <p className="text-sm text-orange-800 dark:text-orange-200">
-          <strong>⚠️ Important:</strong> Without this password AND your backup file, 
-          you cannot recover your account. Use a password manager!
+          <strong>⚠️ Important:</strong> Without this password AND your backup file, you cannot
+          recover your account. Use a password manager!
         </p>
       </div>
 

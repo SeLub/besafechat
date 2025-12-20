@@ -20,8 +20,8 @@ export function SeedVerification({ seed, onVerified }: SeedVerificationProps) {
   const [error, setError] = useState('');
 
   const handleVerify = () => {
-    const correct = verifyIndices.every((idx, i) => 
-      inputs[i].toLowerCase().trim() === seed[idx].toLowerCase()
+    const correct = verifyIndices.every(
+      (idx, i) => inputs[i].toLowerCase().trim() === seed[idx].toLowerCase()
     );
 
     if (correct) {
@@ -42,13 +42,11 @@ export function SeedVerification({ seed, onVerified }: SeedVerificationProps) {
       <div className="space-y-4 mb-6">
         {verifyIndices.map((wordIndex, i) => (
           <div key={i}>
-            <label className="block text-sm font-medium mb-2">
-              Word #{wordIndex + 1}
-            </label>
+            <label className="block text-sm font-medium mb-2">Word #{wordIndex + 1}</label>
             <input
               type="text"
               value={inputs[i]}
-              onChange={(e) => {
+              onChange={e => {
                 const newInputs = [...inputs];
                 newInputs[i] = e.target.value;
                 setInputs(newInputs);

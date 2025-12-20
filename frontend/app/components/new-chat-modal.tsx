@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { X, Search, User } from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { X, Search, User } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -20,31 +20,31 @@ interface SearchResult {
 }
 
 export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const { checkAuth } = useAuth();
 
   if (!isOpen) return null;
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     // Remove @ if user typed it
     const cleanQuery = searchQuery.replace('@', '');
-    
+
     setLoading(true);
     setSearchError(null);
     setSearchResults([]); // Clear previous results
-    
+
     try {
       const res = await fetch(`http://localhost:4000/username/search/${cleanQuery}`, {
         credentials: 'include',
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         // Only add to results if we have valid data
@@ -53,33 +53,35 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
           const statusRes = await fetch(`http://localhost:4000/contacts/check/${data.id}`, {
             credentials: 'include',
           });
-          
+
           let requestStatus = 'none';
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             requestStatus = statusData.status;
           }
-          
-          setSearchResults([{
-            publicKey: data.publicKey,
-            username: cleanQuery,
-            displayName: data.displayName,
-            userId: data.id,
-            requestStatus,
-          }]);
+
+          setSearchResults([
+            {
+              publicKey: data.publicKey,
+              username: cleanQuery,
+              displayName: data.displayName,
+              userId: data.id,
+              requestStatus,
+            },
+          ]);
           setSearchError(null);
         } else {
           setSearchResults([]);
-          setSearchError("User not found");
+          setSearchError('User not found');
         }
       } else {
         setSearchResults([]);
-        setSearchError("User not found");
+        setSearchError('User not found');
       }
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
-      setSearchError("Search failed");
+      setSearchError('Search failed');
     } finally {
       setLoading(false);
     }
@@ -100,22 +102,22 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
 
       if (res.status === 401) {
         await checkAuth();
-        toast.error("Session expired. Please try again.");
+        toast.error('Session expired. Please try again.');
         return;
       }
 
       if (res.ok) {
         toast.success(`Request sent to @${username}`);
         onClose();
-        setMessage("");
-        setSearchQuery("");
+        setMessage('');
+        setSearchQuery('');
         setSearchResults([]);
       } else {
         const errorData = await res.json();
-        toast.error(errorData.message || "Failed to send request");
+        toast.error(errorData.message || 'Failed to send request');
       }
     } catch (error) {
-      toast.error("Failed to send request");
+      toast.error('Failed to send request');
     } finally {
       setCreating(false);
     }
@@ -123,7 +125,12 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
 
   const getInitials = (result: SearchResult) => {
     if (result.displayName) {
-      return result.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      return result.displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
     }
     if (result.username) {
       return result.username.slice(0, 2).toUpperCase();
@@ -135,7 +142,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
     <>
       {/* Overlay */}
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      
+
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         {/* Header */}
@@ -155,13 +162,13 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                 type="text"
                 placeholder="@username"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <Button onClick={handleSearch} disabled={loading || !searchQuery.trim()}>
-              {loading ? "..." : "Search"}
+              {loading ? '...' : 'Search'}
             </Button>
           </div>
         </div>
@@ -180,7 +187,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
             </div>
           ) : (
             <>
-              {searchResults.map((result) => (
+              {searchResults.map(result => (
                 <div key={result.publicKey} className="p-4 border-b border-border">
                   <div className="flex items-center space-x-3 mb-3">
                     <Avatar className="h-10 w-10">
@@ -190,20 +197,20 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                     </Avatar>
                     <div>
                       <div className="font-medium">
-                        {result.displayName || `@${result.username}` || "Anonymous User"}
+                        {result.displayName || `@${result.username}` || 'Anonymous User'}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {result.username && `@${result.username}`}
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Message Input */}
                   <div className="mb-3">
                     <textarea
                       placeholder="Hi! Let's connect (optional)"
                       value={message}
-                      onChange={(e) => setMessage(e.target.value)}
+                      onChange={e => setMessage(e.target.value)}
                       className="w-full p-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                       rows={2}
                       maxLength={200}
@@ -212,7 +219,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                       {message.length}/200 characters
                     </div>
                   </div>
-                  
+
                   {result.requestStatus === 'connected' ? (
                     <Button className="w-full" disabled>
                       Already Connected
@@ -226,12 +233,14 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                       Request Received
                     </Button>
                   ) : (
-                    <Button 
+                    <Button
                       className="w-full"
                       disabled={creating}
-                      onClick={() => handleSendRequest(result.userId || result.publicKey, result.username || '')}
+                      onClick={() =>
+                        handleSendRequest(result.userId || result.publicKey, result.username || '')
+                      }
                     >
-                      {creating ? "Sending..." : "Send Request"}
+                      {creating ? 'Sending...' : 'Send Request'}
                     </Button>
                   )}
                 </div>

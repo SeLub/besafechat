@@ -7,7 +7,7 @@ export function MethodSelection({ onSelectCloud, onSelectSelfCustody }: MethodSe
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-2xl font-bold text-center mb-8">Choose Your Security Level</h2>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Cloud Recovery */}
         <div className="border-2 border-orange-500 rounded-lg p-6 hover:shadow-lg transition">
@@ -17,7 +17,7 @@ export function MethodSelection({ onSelectCloud, onSelectSelfCustody }: MethodSe
               Security: 75% 🟠
             </span>
           </div>
-          
+
           <ul className="space-y-2 mb-6 text-sm">
             <li className="flex items-start">
               <span className="mr-2">✓</span>
@@ -36,7 +36,7 @@ export function MethodSelection({ onSelectCloud, onSelectSelfCustody }: MethodSe
               <span>Need password + backup file</span>
             </li>
           </ul>
-          
+
           <button
             onClick={onSelectCloud}
             className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition"
@@ -53,7 +53,7 @@ export function MethodSelection({ onSelectCloud, onSelectSelfCustody }: MethodSe
               Security: 100% 🟢
             </span>
           </div>
-          
+
           <ul className="space-y-2 mb-6 text-sm">
             <li className="flex items-start">
               <span className="mr-2">✓</span>
@@ -72,7 +72,7 @@ export function MethodSelection({ onSelectCloud, onSelectSelfCustody }: MethodSe
               <span>Need seed phrase every time</span>
             </li>
           </ul>
-          
+
           <button
             onClick={onSelectSelfCustody}
             className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition"

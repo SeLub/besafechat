@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
 }
 
 export function MessageInput({ onSendMessage }: MessageInputProps) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
 
   const handleSend = () => {
     if (!input.trim()) return;
     onSendMessage(input);
-    setInput("");
+    setInput('');
   };
 
   return (
@@ -20,8 +20,8 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
       <div className="flex items-center">
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Type a message..."
           className="
             flex-1

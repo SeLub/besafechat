@@ -1,7 +1,7 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getAvatarUrl } from "@/lib/avatar-utils";
-import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl } from '@/lib/avatar-utils';
+import { Button } from '@/components/ui/button';
+import { Search, Plus } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -20,17 +20,12 @@ interface ChatListProps {
   onNewChat: () => void;
 }
 
-export function ChatList({
-  chats,
-  selectedChatId,
-  onChatSelect,
-  onNewChat,
-}: ChatListProps) {
+export function ChatList({ chats, selectedChatId, onChatSelect, onNewChat }: ChatListProps) {
   const getInitials = (name: string) => {
     return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
+      .split(' ')
+      .map(n => n[0])
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -51,11 +46,7 @@ export function ChatList({
 
       {/* New Chat Button */}
       <div className="p-3 border-b border-border">
-        <Button
-          onClick={onNewChat}
-          variant="outline"
-          className="w-full justify-start"
-        >
+        <Button onClick={onNewChat} variant="outline" className="w-full justify-start">
           <Plus className="h-4 w-4 mr-2" />
           New Chat
         </Button>
@@ -71,7 +62,7 @@ export function ChatList({
             </div>
           </div>
         ) : (
-          chats.map((chat) => (
+          chats.map(chat => (
             <ChatItem
               key={chat.id}
               chat={chat}
@@ -94,9 +85,9 @@ interface ChatItemProps {
 function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
   const getInitials = (name: string) => {
     return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
+      .split(' ')
+      .map(n => n[0])
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -105,7 +96,7 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
     <div
       onClick={onClick}
       className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 ${
-        isSelected ? "bg-accent" : ""
+        isSelected ? 'bg-accent' : ''
       }`}
     >
       <div className="relative">
@@ -124,19 +115,17 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
         <div className="flex items-center justify-between">
           <div className="font-medium truncate">{chat.name}</div>
           {chat.timestamp && (
-            <div className="text-xs text-muted-foreground ml-2">
-              {chat.timestamp}
-            </div>
+            <div className="text-xs text-muted-foreground ml-2">{chat.timestamp}</div>
           )}
         </div>
 
         <div className="flex items-center justify-between mt-1">
           <div className="text-sm text-muted-foreground truncate">
-            {chat.lastMessage || "No messages yet"}
+            {chat.lastMessage || 'No messages yet'}
           </div>
           {chat.unreadCount && chat.unreadCount > 0 && (
             <div className="ml-2 bg-primary text-primary-foreground text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-              {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
             </div>
           )}
         </div>

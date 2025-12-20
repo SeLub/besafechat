@@ -18,12 +18,12 @@ export async function deriveKeyArgon2id(params: Argon2Params): Promise<Uint8Arra
     password: params.password,
     salt: params.salt,
     iterations: params.timeCost || 3,
-    memorySize: params.memoryCost || 65536,  // 64 MB (in KB)
+    memorySize: params.memoryCost || 65536, // 64 MB (in KB)
     parallelism: params.parallelism || 4,
     hashLength: params.hashLength || 32,
-    outputType: 'binary'
+    outputType: 'binary',
   });
-  
+
   return new Uint8Array(hashHex as ArrayBuffer);
 }
 
@@ -38,13 +38,13 @@ export async function deriveKeyFromPassword(
   // Combine salt with userId for uniqueness
   const userIdBytes = new TextEncoder().encode(userId);
   const combinedSalt = new Uint8Array([...salt, ...userIdBytes]);
-  
+
   return await deriveKeyArgon2id({
     password,
     salt: combinedSalt,
     timeCost: 3,
     memoryCost: 65536,
     parallelism: 4,
-    hashLength: 32
+    hashLength: 32,
   });
 }

@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { QrCode, Smartphone, Monitor, Tablet, X } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { QrCode, Smartphone, Monitor, Tablet, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Session {
   id: string;
@@ -33,46 +33,46 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
 
   const fetchSessions = async () => {
     try {
-      const response = await fetch("http://localhost:4000/auth/sessions", {
-        credentials: "include",
+      const response = await fetch('http://localhost:4000/auth/sessions', {
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
         setSessions(data.sessions);
       }
     } catch (error) {
-      toast.error("Failed to load sessions");
+      toast.error('Failed to load sessions');
     }
   };
 
   const handleRevokeSession = async (sessionId: string) => {
     try {
       const response = await fetch(`http://localhost:4000/auth/sessions/revoke/${sessionId}`, {
-        method: "POST",
-        credentials: "include",
+        method: 'POST',
+        credentials: 'include',
       });
       if (response.ok) {
-        toast.success("Session terminated");
+        toast.success('Session terminated');
         fetchSessions();
       }
     } catch (error) {
-      toast.error("Failed to terminate session");
+      toast.error('Failed to terminate session');
     }
   };
 
   const handleCloseAllOtherSessions = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:4000/auth/sessions/revoke-all", {
-        method: "POST",
-        credentials: "include",
+      const response = await fetch('http://localhost:4000/auth/sessions/revoke-all', {
+        method: 'POST',
+        credentials: 'include',
       });
       if (response.ok) {
-        toast.success("All other sessions closed");
+        toast.success('All other sessions closed');
         fetchSessions();
       }
     } catch (error) {
-      toast.error("Failed to close sessions");
+      toast.error('Failed to close sessions');
     } finally {
       setLoading(false);
     }
@@ -80,8 +80,9 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
 
   const getDeviceIcon = (deviceModel: string) => {
     const model = deviceModel.toLowerCase();
-    if (model.includes("mobile") || model.includes("phone")) return <Smartphone className="h-5 w-5" />;
-    if (model.includes("tablet") || model.includes("ipad")) return <Tablet className="h-5 w-5" />;
+    if (model.includes('mobile') || model.includes('phone'))
+      return <Smartphone className="h-5 w-5" />;
+    if (model.includes('tablet') || model.includes('ipad')) return <Tablet className="h-5 w-5" />;
     return <Monitor className="h-5 w-5" />;
   };
 
@@ -120,7 +121,9 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
                     </div>
                     <div>
                       <div className="font-medium">{currentSession.deviceId}</div>
-                      <div className="text-sm text-muted-foreground">{currentSession.deviceModel}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {currentSession.deviceModel}
+                      </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         IP: {currentSession.ipAddress}
                       </div>
@@ -151,7 +154,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
                 </Button>
               </div>
               <div className="space-y-2">
-                {otherSessions.map((session) => (
+                {otherSessions.map(session => (
                   <div
                     key={session.id}
                     className="border border-border rounded-lg p-4 hover:bg-accent/50 transition-colors"

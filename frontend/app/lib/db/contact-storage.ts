@@ -1,5 +1,5 @@
-import { db } from "./db";
-import type { Contact } from "./schema";
+import { db } from './db';
+import type { Contact } from './schema';
 
 // Сохранение контакта
 export async function saveContact(

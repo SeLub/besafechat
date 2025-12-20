@@ -9,7 +9,7 @@ export interface UploadResponse {
 
 export interface DownloadResponse {
   success: boolean;
-  data?: any;
+  data?: object;
   message?: string;
 }
 

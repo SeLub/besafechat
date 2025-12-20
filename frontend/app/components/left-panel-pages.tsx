@@ -1,22 +1,22 @@
-import { useState, useRef } from "react";
-import type { ReactNode } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { UsernameSetupModal } from "@/components/username-setup-modal";
-import { DisplayNameModal } from "@/components/display-name-modal";
-import { PrivacySettingsModal } from "@/components/privacy-settings-modal";
-import { ThemeSelectorModal } from "@/components/theme-selector-modal";
-import { StorageSettingsModal } from "@/components/storage-settings-modal";
-import { DevicesSettingsModal } from "@/components/devices-settings-modal";
-import { ContactsPage } from "@/components/contacts-page";
-import { useAuth } from "@/hooks/use-auth";
-import { toast } from "sonner";
-import { 
-  ArrowLeft, 
-  Edit3, 
-  Camera, 
-  User, 
+import { useState, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { UsernameSetupModal } from '@/components/username-setup-modal';
+import { DisplayNameModal } from '@/components/display-name-modal';
+import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
+import { ThemeSelectorModal } from '@/components/theme-selector-modal';
+import { StorageSettingsModal } from '@/components/storage-settings-modal';
+import { DevicesSettingsModal } from '@/components/devices-settings-modal';
+import { ContactsPage } from '@/components/contacts-page';
+import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'sonner';
+import {
+  ArrowLeft,
+  Edit3,
+  Camera,
+  User,
   AtSign,
   Bell,
   Shield,
@@ -25,8 +25,8 @@ import {
   Globe,
   HelpCircle,
   LogOut,
-  Key
-} from "lucide-react";
+  Key,
+} from 'lucide-react';
 
 interface LeftPanelPageProps {
   page: 'profile' | 'settings' | 'contacts' | null;
@@ -50,12 +50,17 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const [displayNameModalOpen, setDisplayNameModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   if (!page) return null;
 
   const getInitials = (name?: string) => {
-    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || "U";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || 'U';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const handleLogout = async () => {
@@ -65,39 +70,39 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
 
   const handleAvatarUpload = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+      toast.error('Image must be less than 5MB');
       return;
     }
 
     setUploading(true);
     try {
       // Get presigned URL (always uploads as PNG)
-      const res = await fetch("http://localhost:4000/storage/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          fileType: "avatar",
-          contentType: "image/png"
+      const res = await fetch('http://localhost:4000/storage/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          fileType: 'avatar',
+          contentType: 'image/png',
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to get upload URL");
+      if (!res.ok) throw new Error('Failed to get upload URL');
 
       const { uploadUrl } = await res.json();
 
       // Upload to S3
       await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "image/png" },
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/png' },
         body: file,
       });
 
-      toast.success("Avatar updated");
+      toast.success('Avatar updated');
       // Force reload with cache bust
       setTimeout(() => checkAuth(), 500);
     } catch (error) {
-      toast.error("Failed to upload avatar");
+      toast.error('Failed to upload avatar');
     } finally {
       setUploading(false);
     }
@@ -129,10 +134,10 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
+                onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
               />
-              <Button 
-                size="icon" 
+              <Button
+                size="icon"
                 className="absolute -bottom-2 -right-2 rounded-full h-8 w-8"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
@@ -148,14 +153,14 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
               <ProfileField
                 icon={<User className="h-5 w-5" />}
                 label="Display Name"
-                value={userProfile?.displayName || "Not set"}
+                value={userProfile?.displayName || 'Not set'}
                 onEdit={() => setDisplayNameModalOpen(true)}
               />
-              
+
               <ProfileField
                 icon={<AtSign className="h-5 w-5" />}
                 label="Username"
-                value={userProfile?.username ? `@${userProfile.username}` : "Not set"}
+                value={userProfile?.username ? `@${userProfile.username}` : 'Not set'}
                 onEdit={() => setUsernameModalOpen(true)}
               />
 
@@ -173,14 +178,14 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
             </div>
           </div>
         </div>
-        
+
         {/* Username Modal */}
         <UsernameSetupModal
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
           currentUsername={userProfile?.username}
         />
-        
+
         {/* Display Name Modal */}
         <DisplayNameModal
           isOpen={displayNameModalOpen}
@@ -196,11 +201,11 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
     return (
       <ContactsPage
         onBack={onBack}
-        onChatSelect={(userId) => {
+        onChatSelect={userId => {
           onChatCreated?.(userId);
           onBack();
         }}
-        onChatCreated={(chatId) => {
+        onChatCreated={chatId => {
           onChatCreated?.(chatId);
           onBack();
         }}
@@ -281,8 +286,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
               </SettingsSection>
 
               <div className="p-4 border-t border-border">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full justify-start text-destructive"
                   onClick={handleLogout}
                 >
@@ -293,25 +298,22 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
             </div>
           </div>
         </div>
-        
+
         {/* Privacy Modal */}
         <PrivacySettingsModal
           isOpen={privacyModalOpen}
           onClose={() => setPrivacyModalOpen(false)}
         />
-        
+
         {/* Theme Modal */}
-        <ThemeSelectorModal
-          isOpen={themeModalOpen}
-          onClose={() => setThemeModalOpen(false)}
-        />
-        
+        <ThemeSelectorModal isOpen={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
+
         {/* Storage Modal */}
         <StorageSettingsModal
           isOpen={storageModalOpen}
           onClose={() => setStorageModalOpen(false)}
         />
-        
+
         {/* Devices Modal */}
         <DevicesSettingsModal
           isOpen={devicesModalOpen}
@@ -356,9 +358,7 @@ interface SettingsSectionProps {
 function SettingsSection({ title, children }: SettingsSectionProps) {
   return (
     <div className="mb-6">
-      <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
-        {title}
-      </div>
+      <div className="px-4 py-2 text-sm font-medium text-muted-foreground">{title}</div>
       <div>{children}</div>
     </div>
   );
@@ -374,7 +374,7 @@ interface SettingsItemProps {
 
 function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: SettingsItemProps) {
   return (
-    <div 
+    <div
       className="flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer"
       onClick={!hasSwitch ? onClick : undefined}
     >
@@ -382,9 +382,7 @@ function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: Setti
         <div className="text-muted-foreground">{icon}</div>
         <span>{label}</span>
       </div>
-      {hasSwitch && (
-        <Switch defaultChecked={defaultChecked} />
-      )}
+      {hasSwitch && <Switch defaultChecked={defaultChecked} />}
     </div>
   );
 }

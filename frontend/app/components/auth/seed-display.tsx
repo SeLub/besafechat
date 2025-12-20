@@ -74,8 +74,8 @@ BeSafe Chat - Your privacy, your control`;
 
       <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6">
         <p className="text-sm text-orange-800 dark:text-orange-200">
-          <strong>⚠️ Warning:</strong> This is the ONLY way to recover your account if you lose access.
-          Store it safely and never share with anyone.
+          <strong>⚠️ Warning:</strong> This is the ONLY way to recover your account if you lose
+          access. Store it safely and never share with anyone.
         </p>
       </div>
 

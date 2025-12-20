@@ -58,12 +58,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{
-      counts,
-      clearNotifications,
-      incrementRequests,
-      incrementAccepted,
-    }}>
+    <NotificationContext.Provider
+      value={{
+        counts,
+        clearNotifications,
+        incrementRequests,
+        incrementAccepted,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

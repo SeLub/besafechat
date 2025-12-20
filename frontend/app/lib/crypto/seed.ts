@@ -1,11 +1,7 @@
-import {
-  generateMnemonic,
-  validateMnemonic,
-  mnemonicToSeed,
-} from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
-import * as ed from "@noble/ed25519";
-import { sha512 } from "@noble/hashes/sha2.js";
+import { generateMnemonic, validateMnemonic, mnemonicToSeed } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
+import * as ed from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha2.js';
 
 // Configure sha512 for @noble/ed25519
 // @ts-ignore - hashes property exists at runtime
@@ -20,14 +16,14 @@ ed.hashes.sha512Async = (m: Uint8Array) => Promise.resolve(sha512(m));
  */
 export function generateSeed(): string[] {
   const mnemonic = generateMnemonic(wordlist, 128); // 128 bits = 12 words
-  return mnemonic.split(" ");
+  return mnemonic.split(' ');
 }
 
 /**
  * Validate seed phrase
  */
 export function validateSeed(words: string[]): boolean {
-  const mnemonic = words.join(" ");
+  const mnemonic = words.join(' ');
   return validateMnemonic(mnemonic, wordlist);
 }
 
@@ -39,7 +35,7 @@ export async function deriveKeysFromSeed(words: string[]): Promise<{
   publicKey: Uint8Array;
   publicKeyBase64: string;
 }> {
-  const mnemonic = words.join(" ");
+  const mnemonic = words.join(' ');
   console.log('[seed.ts] Mnemonic:', mnemonic);
   console.log('[seed.ts] mnemonicToSeed function:', mnemonicToSeed);
 
@@ -74,4 +70,3 @@ export async function deriveKeysFromSeed(words: string[]): Promise<{
     throw error;
   }
 }
-

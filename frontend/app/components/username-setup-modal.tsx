@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { X, AtSign } from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { X, AtSign } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 
 interface UsernameSetupModalProps {
   isOpen: boolean;
@@ -12,11 +12,11 @@ interface UsernameSetupModalProps {
   currentSearchable?: boolean;
 }
 
-export function UsernameSetupModal({ 
-  isOpen, 
-  onClose, 
-  currentUsername = "", 
-  currentSearchable = false 
+export function UsernameSetupModal({
+  isOpen,
+  onClose,
+  currentUsername = '',
+  currentSearchable = false,
 }: UsernameSetupModalProps) {
   const [username, setUsername] = useState(currentUsername);
   const [isSearchable, setIsSearchable] = useState(currentSearchable);
@@ -25,20 +25,16 @@ export function UsernameSetupModal({
 
   if (!isOpen) return null;
 
-
-
   const handleSave = async () => {
     if (!username.trim()) {
-      toast.error("Username cannot be empty");
+      toast.error('Username cannot be empty');
       return;
     }
 
     if (!/^[a-z0-9_]{5,32}$/.test(username)) {
-      toast.error("Username must be 5-32 characters (a-z, 0-9, _)");
+      toast.error('Username must be 5-32 characters (a-z, 0-9, _)');
       return;
     }
-
-
 
     setLoading(true);
     try {
@@ -53,15 +49,15 @@ export function UsernameSetupModal({
       });
 
       if (res.ok) {
-        toast.success("Username updated successfully", { duration: 3000 });
+        toast.success('Username updated successfully', { duration: 3000 });
         await checkAuth();
         onClose();
       } else {
-        const errorData = await res.json().catch(() => ({ message: "Failed to update username" }));
-        toast.error(errorData.message || "Failed to update username", { duration: 3000 });
+        const errorData = await res.json().catch(() => ({ message: 'Failed to update username' }));
+        toast.error(errorData.message || 'Failed to update username', { duration: 3000 });
       }
     } catch (error) {
-      toast.error("Failed to update username", { duration: 3000 });
+      toast.error('Failed to update username', { duration: 3000 });
     } finally {
       setLoading(false);
     }
@@ -71,7 +67,7 @@ export function UsernameSetupModal({
     <>
       {/* Overlay */}
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      
+
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         {/* Header */}
@@ -92,7 +88,7 @@ export function UsernameSetupModal({
                 type="text"
                 placeholder="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                onChange={e => setUsername(e.target.value.toLowerCase())}
                 className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
                 maxLength={32}
               />
@@ -109,10 +105,7 @@ export function UsernameSetupModal({
                 Let others search for you by username
               </div>
             </div>
-            <Switch
-              checked={isSearchable}
-              onCheckedChange={setIsSearchable}
-            />
+            <Switch checked={isSearchable} onCheckedChange={setIsSearchable} />
           </div>
         </div>
 
@@ -122,7 +115,7 @@ export function UsernameSetupModal({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={loading || !username.trim()}>
-            {loading ? "Saving..." : "Save"}
+            {loading ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>

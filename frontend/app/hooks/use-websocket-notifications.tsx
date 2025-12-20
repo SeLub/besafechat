@@ -12,7 +12,7 @@ interface WebSocketNotificationsProps {
 }
 
 export function useWebSocketNotifications(
-  onChatCreated?: (chatId: string) => void, 
+  onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (userId: string) => void,
   onUserOffline?: (userId: string) => void
@@ -21,7 +21,7 @@ export function useWebSocketNotifications(
   const { incrementRequests, incrementAccepted } = useNotifications();
 
   const callbacksRef = useRef({ onChatCreated, onMessageReceived, onUserOnline, onUserOffline });
-  
+
   useEffect(() => {
     callbacksRef.current = { onChatCreated, onMessageReceived, onUserOnline, onUserOffline };
   });
@@ -37,28 +37,28 @@ export function useWebSocketNotifications(
     window.socketInstance = socket;
 
     // Contact request received
-    socket.on('contact_request_received', (data) => {
+    socket.on('contact_request_received', data => {
       const { fromUser, message } = data;
       const displayName = fromUser.displayName || `@${fromUser.username}` || 'Someone';
-      
+
       toast.success(`${displayName} wants to connect`, {
         description: message || 'New contact request',
       });
-      
+
       incrementRequests();
     });
 
     // Contact request accepted
-    socket.on('contact_request_accepted', (data) => {
+    socket.on('contact_request_accepted', data => {
       const { byUser, chatId } = data;
       const displayName = byUser.displayName || `@${byUser.username}` || 'Someone';
-      
+
       toast.success(`${displayName} accepted your request`, {
         description: 'You can now start chatting',
       });
-      
+
       incrementAccepted();
-      
+
       // Handle chat creation
       if (chatId) {
         callbacksRef.current.onChatCreated?.(chatId);
@@ -66,10 +66,10 @@ export function useWebSocketNotifications(
     });
 
     // Contact request rejected
-    socket.on('contact_request_rejected', (data) => {
+    socket.on('contact_request_rejected', data => {
       const { byUser } = data;
       const displayName = byUser.displayName || `@${byUser.username}` || 'Someone';
-      
+
       toast.error(`${displayName} declined your request`);
     });
 
@@ -99,8 +99,6 @@ export function useWebSocketNotifications(
     socket.on('user_offline', (data: { userId: string }) => {
       callbacksRef.current.onUserOffline?.(data.userId);
     });
-
-
 
     // Heartbeat to maintain online status
     const heartbeatInterval = setInterval(() => {

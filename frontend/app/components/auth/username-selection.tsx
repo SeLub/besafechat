@@ -9,7 +9,7 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [available, setAvailable] = useState(false);
-  const debounceTimer = useRef<NodeJS.Timeout>();
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const validateUsername = (value: string): string | null => {
     if (value.length < 5) return 'Username must be at least 5 characters';
@@ -20,11 +20,11 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
 
   const checkAvailability = async (value: string) => {
     if (value.length < 5) return;
-    
+
     setChecking(true);
     setError('');
     setAvailable(false);
-    
+
     try {
       const response = await fetch(`http://localhost:4000/username/search/${value}`);
       if (response.ok) {
@@ -45,19 +45,19 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
     setUsername(cleaned);
     setError('');
     setAvailable(false);
-    
+
     // Clear previous timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
-    
+
     // Validate format first
     const validationError = validateUsername(cleaned);
     if (validationError) {
       setError(validationError);
       return;
     }
-    
+
     // Check availability after 500ms delay
     if (cleaned.length >= 5) {
       debounceTimer.current = setTimeout(() => {
@@ -95,29 +95,29 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Username
-          </label>
+          <label className="block text-sm font-medium mb-2">Username</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              @
+            </span>
             <input
               type="text"
               value={username}
-              onChange={(e) => handleChange(e.target.value)}
+              onChange={e => handleChange(e.target.value)}
               placeholder="username"
               className="w-full pl-8 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               maxLength={32}
             />
           </div>
           {username.length > 0 && username.length < 5 && (
-            <p className="text-xs text-muted-foreground mt-1">{username.length} / 5 characters minimum</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {username.length} / 5 characters minimum
+            </p>
           )}
           {checking && (
             <p className="text-xs text-muted-foreground mt-1">Checking availability...</p>
           )}
-          {error && (
-            <p className="text-xs text-red-500 mt-1">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
           {available && !error && !checking && (
             <p className="text-xs text-green-600 mt-1">✓ Username available</p>
           )}

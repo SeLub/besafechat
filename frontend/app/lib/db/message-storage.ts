@@ -1,5 +1,5 @@
-import { db } from "./db";
-import type { Message } from "./schema";
+import { db } from './db';
+import type { Message } from './schema';
 
 // Сохранение сообщения
 export async function saveMessage(
@@ -26,17 +26,22 @@ export async function saveMessage(
     id: messageId || `${senderId}_${timestamp}`,
     chatId,
     senderId,
-    contentType: "text",
+    contentType: 'text',
     encryptedContent,
     timestamp,
     isOwn,
   };
 
   try {
-    console.log('💾 Saving message to IndexedDB:', { id: message.id, chatId, senderId, contentLength: content.length });
+    console.log('💾 Saving message to IndexedDB:', {
+      id: message.id,
+      chatId,
+      senderId,
+      contentLength: content.length,
+    });
     await db.messages.add(message);
     console.log('✅ Message saved successfully');
-    
+
     // Проверяем лимит сообщений (1000 на чат)
     await enforceMessageLimit(chatId, 1000);
   } catch (error: any) {
@@ -57,11 +62,7 @@ export async function saveMessage(
 
 // Ограничение количества сообщений в чате
 async function enforceMessageLimit(chatId: string, limit: number): Promise<void> {
-  const messages = await db.messages
-    .where("chatId")
-    .equals(chatId)
-    .reverse()
-    .sortBy("timestamp");
+  const messages = await db.messages.where('chatId').equals(chatId).reverse().sortBy('timestamp');
 
   if (messages.length > limit) {
     const toDelete = messages.slice(limit).map(m => m.id);
@@ -70,19 +71,18 @@ async function enforceMessageLimit(chatId: string, limit: number): Promise<void>
 }
 
 // Загрузка сообщений для чата
-export async function loadMessages(chatId: string): Promise<Array<{
-  id: string;
-  text: string;
-  isOwn: boolean;
-  fromUserId: string;
-}>> {
-  const messages = await db.messages
-    .where("chatId")
-    .equals(chatId)
-    .sortBy("timestamp");
+export async function loadMessages(chatId: string): Promise<
+  Array<{
+    id: string;
+    text: string;
+    isOwn: boolean;
+    fromUserId: string;
+  }>
+> {
+  const messages = await db.messages.where('chatId').equals(chatId).sortBy('timestamp');
 
   const decoder = new TextDecoder();
-  return messages.map((msg) => ({
+  return messages.map(msg => ({
     id: msg.id,
     text: decoder.decode(msg.encryptedContent),
     isOwn: msg.isOwn,
@@ -92,5 +92,5 @@ export async function loadMessages(chatId: string): Promise<Array<{
 
 // Очистка сообщений чата
 export async function clearChatMessages(chatId: string): Promise<void> {
-  await db.messages.where("chatId").equals(chatId).delete();
+  await db.messages.where('chatId').equals(chatId).delete();
 }

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface DisplayNameModalProps {
   isOpen: boolean;
@@ -10,38 +10,43 @@ interface DisplayNameModalProps {
   onUpdate: () => void;
 }
 
-export function DisplayNameModal({ isOpen, onClose, currentDisplayName, onUpdate }: DisplayNameModalProps) {
-  const [displayName, setDisplayName] = useState(currentDisplayName || "");
+export function DisplayNameModal({
+  isOpen,
+  onClose,
+  currentDisplayName,
+  onUpdate,
+}: DisplayNameModalProps) {
+  const [displayName, setDisplayName] = useState(currentDisplayName || '');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setDisplayName(currentDisplayName || "");
+      setDisplayName(currentDisplayName || '');
     }
   }, [isOpen, currentDisplayName]);
 
   const handleSave = async () => {
     if (!displayName.trim() || displayName.length > 24) {
-      toast.error("Display name must be 1-24 characters");
+      toast.error('Display name must be 1-24 characters');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/profile/display-name", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+      const res = await fetch('http://localhost:4000/profile/display-name', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ displayName: displayName.trim() }),
       });
 
-      if (!res.ok) throw new Error("Failed to update display name");
+      if (!res.ok) throw new Error('Failed to update display name');
 
-      toast.success("Display name updated");
+      toast.success('Display name updated');
       onUpdate();
       onClose();
     } catch (error) {
-      toast.error("Failed to update display name");
+      toast.error('Failed to update display name');
     } finally {
       setLoading(false);
     }
@@ -62,7 +67,7 @@ export function DisplayNameModal({ isOpen, onClose, currentDisplayName, onUpdate
             <input
               type="text"
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={e => setDisplayName(e.target.value)}
               maxLength={24}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Enter your display name"
@@ -77,7 +82,7 @@ export function DisplayNameModal({ isOpen, onClose, currentDisplayName, onUpdate
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={loading || !displayName.trim()}>
-              {loading ? "Saving..." : "Save"}
+              {loading ? 'Saving...' : 'Save'}
             </Button>
           </div>
         </div>

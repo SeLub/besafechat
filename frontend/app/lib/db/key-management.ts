@@ -1,6 +1,6 @@
-import { db } from "./db";
-import { encrypt, decrypt, deriveKey } from "./encryption";
-import type { PrivateKey } from "./schema"; // ← импортируем правильный тип
+import { db } from './db';
+import { encrypt, decrypt, deriveKey } from './encryption';
+import type { PrivateKey } from './schema'; // ← импортируем правильный тип
 
 // Сохранение ключевой пары
 export async function storeKeyPair(
@@ -12,7 +12,7 @@ export async function storeKeyPair(
   const encryptedPrivateKey = await encrypt(privateKeyUint8, key);
 
   const record: PrivateKey = {
-    id: "current",
+    id: 'current',
     publicKeyBase64,
     data: encryptedPrivateKey, // ← Uint8Array
     createdAt: Date.now(),
@@ -22,10 +22,8 @@ export async function storeKeyPair(
 }
 
 // Получение приватного ключа
-export async function getPrivateKey(
-  publicKeyBase64: string
-): Promise<Uint8Array | null> {
-  const record = await db.publicKey.get("current");
+export async function getPrivateKey(publicKeyBase64: string): Promise<Uint8Array | null> {
+  const record = await db.publicKey.get('current');
   if (!record || record.publicKeyBase64 !== publicKeyBase64) {
     return null;
   }
@@ -37,7 +35,7 @@ export async function getPrivateKey(
 
 // Проверка наличия ключа
 export async function hasStoredKey(): Promise<boolean> {
-  return (await db.publicKey.get("current")) !== undefined;
+  return (await db.publicKey.get('current')) !== undefined;
 }
 
 // Очистка

@@ -1,18 +1,10 @@
-import { useState } from "react";
-import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
-import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  Menu, 
-  User, 
-  Users, 
-  Settings, 
-  Moon, 
-  Sun,
-  X 
-} from "lucide-react";
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
+import { useNotifications } from '@/hooks/use-notifications';
+import { Menu, User, Users, Settings, Moon, Sun, X } from 'lucide-react';
 
 interface HamburgerMenuProps {
   userProfile?: {
@@ -25,11 +17,16 @@ interface HamburgerMenuProps {
   onSettingsClick?: () => void;
 }
 
-export function HamburgerMenu({ userProfile, onProfileClick, onContactsClick, onSettingsClick }: HamburgerMenuProps) {
+export function HamburgerMenu({
+  userProfile,
+  onProfileClick,
+  onContactsClick,
+  onSettingsClick,
+}: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { counts, clearNotifications } = useNotifications();
-  
+
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
   const toggleDarkMode = () => {
@@ -38,42 +35,37 @@ export function HamburgerMenu({ userProfile, onProfileClick, onContactsClick, on
   };
 
   const getInitials = (name?: string) => {
-    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || "U";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || 'U';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsOpen(true)}
-        className="shrink-0"
-      >
+      <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)} className="shrink-0">
         <Menu className="h-5 w-5" />
       </Button>
 
       {/* Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed top-0 left-0 h-full w-80 bg-background border-r border-border z-50 transform transition-transform duration-300 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
+      <div
+        className={`fixed top-0 left-0 h-full w-80 bg-background border-r border-border z-50 transform transition-transform duration-300 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h2 className="text-lg font-semibold">Menu</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(false)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -89,7 +81,7 @@ export function HamburgerMenu({ userProfile, onProfileClick, onContactsClick, on
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">
-                  {userProfile?.displayName || "Anonymous User"}
+                  {userProfile?.displayName || 'Anonymous User'}
                 </div>
                 <div className="text-sm text-muted-foreground truncate">
                   {userProfile?.publicKey.slice(0, 16)}...
@@ -132,21 +124,14 @@ export function HamburgerMenu({ userProfile, onProfileClick, onContactsClick, on
                 onSettingsClick?.();
               }}
             />
-            
+
             {/* Night Mode Toggle */}
             <div className="flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer">
               <div className="flex items-center space-x-3">
-                {isDarkMode ? (
-                  <Moon className="h-5 w-5" />
-                ) : (
-                  <Sun className="h-5 w-5" />
-                )}
+                {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 <span>Night Mode</span>
               </div>
-              <Switch
-                checked={isDarkMode}
-                onCheckedChange={toggleDarkMode}
-              />
+              <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
             </div>
           </div>
         </div>

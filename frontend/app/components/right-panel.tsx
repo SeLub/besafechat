@@ -1,19 +1,19 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { 
-  X, 
-  Phone, 
-  Video, 
-  Search, 
-  Bell, 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import {
+  X,
+  Phone,
+  Video,
+  Search,
+  Bell,
   BellOff,
   Shield,
   Trash2,
   Archive,
   Volume2,
-  VolumeX
-} from "lucide-react";
+  VolumeX,
+} from 'lucide-react';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -32,11 +32,19 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
   if (!isOpen || !chatInfo) return null;
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
-    <div id="RightColumn-wrapper" className={`w-80 border-l border-border bg-background flex flex-col ${isOpen ? 'block' : 'hidden'}`}>
+    <div
+      id="RightColumn-wrapper"
+      className={`w-80 border-l border-border bg-background flex flex-col ${isOpen ? 'block' : 'hidden'}`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="font-semibold">Profile</h3>
@@ -54,9 +62,9 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
         </Avatar>
         <h2 className="text-xl font-semibold mb-1">{chatInfo.name}</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          {chatInfo.isOnline ? "Online" : chatInfo.lastSeen || "Last seen recently"}
+          {chatInfo.isOnline ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
         </p>
-        
+
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
           <Button variant="outline" size="icon" className="rounded-full">
@@ -79,7 +87,7 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
             <div className="font-medium">{chatInfo.phone}</div>
           </div>
         )}
-        
+
         {chatInfo.username && (
           <div className="p-4 border-b border-border">
             <div className="text-sm text-muted-foreground mb-1">Username</div>
@@ -96,7 +104,7 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
             </div>
             <Switch defaultChecked />
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Volume2 className="h-5 w-5 text-muted-foreground" />

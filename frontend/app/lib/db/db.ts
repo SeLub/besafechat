@@ -1,5 +1,5 @@
-import Dexie from "dexie";
-import { SCHEMA, type Message, type Contact, type PrivateKey } from "./schema";
+import Dexie from 'dexie';
+import { SCHEMA, type Message, type Contact, type PrivateKey } from './schema';
 
 class BeSafeDB extends Dexie {
   messages!: Dexie.Table<Message, string>;
@@ -7,7 +7,7 @@ class BeSafeDB extends Dexie {
   publicKey!: Dexie.Table<PrivateKey, string>;
 
   constructor() {
-    super("BeSafeDB");
+    super('BeSafeDB');
     this.version(3).stores(SCHEMA);
   }
 }

@@ -1,6 +1,6 @@
-import { MiddleHeader } from "@/components/middle-header";
-import { MessageList } from "@/components/message-list";
-import { MessageInput } from "@/components/message-input";
+import { MiddleHeader } from '@/components/middle-header';
+import { MessageList } from '@/components/message-list';
+import { MessageInput } from '@/components/message-input';
 
 interface MiddleColumnProps {
   selectedChat: any;
@@ -38,9 +38,7 @@ export function MiddleColumn({
         <div className="flex items-center justify-center h-full text-muted-foreground">
           <div className="text-center">
             <div className="text-lg font-medium mb-2">Select a chat</div>
-            <div className="text-sm">
-              Choose a conversation to start messaging
-            </div>
+            <div className="text-sm">Choose a conversation to start messaging</div>
           </div>
         </div>
       )}

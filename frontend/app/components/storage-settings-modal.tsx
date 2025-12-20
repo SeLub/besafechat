@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { X, Database, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { db } from "@/lib/db/db";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { X, Database, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { db } from '@/lib/db/db';
 import {
   getRetentionPeriod,
   setRetentionPeriod,
   cleanupOldMessages,
   type MessageRetentionPeriod,
-} from "@/lib/db/cleanup";
+} from '@/lib/db/cleanup';
 
 interface StorageSettingsModalProps {
   isOpen: boolean;
@@ -26,35 +26,35 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
     setLoading(true);
     try {
       setRetentionPeriod(retention);
-      
+
       // Применяем очистку сразу
       const deleted = await cleanupOldMessages();
-      
+
       if (deleted > 0) {
         toast.success(`Settings saved. ${deleted} old messages deleted.`, { duration: 3000 });
       } else {
-        toast.success("Settings saved", { duration: 3000 });
+        toast.success('Settings saved', { duration: 3000 });
       }
-      
+
       onClose();
     } catch (error) {
-      toast.error("Failed to save settings", { duration: 3000 });
+      toast.error('Failed to save settings', { duration: 3000 });
     } finally {
       setLoading(false);
     }
   };
 
   const options: { value: MessageRetentionPeriod; label: string; description: string }[] = [
-    { value: "7", label: "7 days", description: "Delete messages older than 1 week" },
-    { value: "30", label: "30 days", description: "Delete messages older than 1 month" },
-    { value: "90", label: "90 days", description: "Delete messages older than 3 months" },
-    { value: "forever", label: "Forever", description: "Keep all messages (may use more storage)" },
+    { value: '7', label: '7 days', description: 'Delete messages older than 1 week' },
+    { value: '30', label: '30 days', description: 'Delete messages older than 1 month' },
+    { value: '90', label: '90 days', description: 'Delete messages older than 3 months' },
+    { value: 'forever', label: 'Forever', description: 'Keep all messages (may use more storage)' },
   ];
 
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      
+
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center space-x-2">
@@ -70,22 +70,22 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
           <div className="text-sm text-muted-foreground mb-3">
             Choose how long to keep message history
           </div>
-          
-          {options.map((option) => (
+
+          {options.map(option => (
             <div
               key={option.value}
               onClick={() => setRetention(option.value)}
               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                 retention === option.value
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-accent"
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border hover:bg-accent'
               }`}
             >
               <div className="font-medium">{option.label}</div>
               <div className="text-sm text-muted-foreground">{option.description}</div>
             </div>
           ))}
-          
+
           <div className="text-xs text-muted-foreground pt-2 border-t border-border">
             Note: Maximum 1000 messages per chat regardless of time period
           </div>
@@ -107,11 +107,7 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
                 Are you sure? This cannot be undone.
               </div>
               <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowConfirm(false)}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>
                   Cancel
                 </Button>
                 <Button
@@ -128,14 +124,14 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
                       // Reload page to refresh UI
                       setTimeout(() => window.location.reload(), 500);
                     } catch (error) {
-                      toast.error("Failed to delete messages", { duration: 3000 });
+                      toast.error('Failed to delete messages', { duration: 3000 });
                     } finally {
                       setLoading(false);
                     }
                   }}
                   disabled={loading}
                 >
-                  {loading ? "Deleting..." : "Delete All"}
+                  {loading ? 'Deleting...' : 'Delete All'}
                 </Button>
               </div>
             </div>
@@ -147,7 +143,7 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save"}
+            {loading ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>

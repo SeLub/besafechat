@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import { AuthService } from "@/services/auth.service";
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { AuthService } from '@/services/auth.service';
 
 interface User {
   id: string;
@@ -33,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Проверка аутентификации при старте
   const checkAuth = async () => {
     try {
-      const res = await fetch("http://localhost:4000/auth/profile", {
-        credentials: "include",
+      const res = await fetch('http://localhost:4000/auth/profile', {
+        credentials: 'include',
       });
 
       if (res.ok) {
@@ -47,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
     } catch (error) {
-      console.error("Auth check error:", error);
+      console.error('Auth check error:', error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -55,36 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const clearAuthCookies = () => {
-    document.cookie =
-      "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie =
-      "refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   };
 
   // Регистрация — генерация ключей и сохранение в зашифрованной БД
   const register = async (deviceId: string) => {
     // Генерация Ed25519-пары
-    const keyPair = await window.crypto.subtle.generateKey(
-      { name: "Ed25519" },
-      true,
-      ["sign", "verify"]
-    );
-    const publicKey = await window.crypto.subtle.exportKey(
-      "raw",
-      keyPair.publicKey
-    );
-    const privateKey = await window.crypto.subtle.exportKey(
-      "pkcs8",
-      keyPair.privateKey
-    );
+    const keyPair = await window.crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
+      'sign',
+      'verify',
+    ]);
+    const publicKey = await window.crypto.subtle.exportKey('raw', keyPair.publicKey);
+    const privateKey = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
 
-    const publicKeyBase64 = btoa(
-      String.fromCharCode(...new Uint8Array(publicKey))
-    );
+    const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
     const privateKeyUint8 = new Uint8Array(privateKey);
 
     // ✅ Сохраняем приватный ключ в зашифрованной Dexie-БД
-    const { storeKeyPair } = await import("@/lib/db/key-management");
+    const { storeKeyPair } = await import('@/lib/db/key-management');
     await storeKeyPair(publicKeyBase64, privateKeyUint8);
 
     // Отправка публичного ключа на сервер
@@ -111,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await AuthService.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
     } finally {
       clearAuthCookies();
       setUser(null);
@@ -132,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }

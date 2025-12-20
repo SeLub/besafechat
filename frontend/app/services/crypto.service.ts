@@ -26,11 +26,7 @@ export class CryptoService {
   /**
    * Encrypt seed for cloud storage
    */
-  static async encryptSeedForCloud(
-    seed: string[],
-    password: string,
-    userId: string
-  ) {
+  static async encryptSeedForCloud(seed: string[], password: string, userId: string) {
     return encryptSeedForCloud(seed, password, userId);
   }
 

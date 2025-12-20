@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getAvatarUrl } from "@/lib/avatar-utils";
-import { Phone, Video, Info } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl } from '@/lib/avatar-utils';
+import { Phone, Video, Info } from 'lucide-react';
 
 interface MiddleHeaderProps {
   selectedChat: any;
@@ -9,12 +9,16 @@ interface MiddleHeaderProps {
   onToggleRightPanel: () => void;
 }
 
-export function MiddleHeader({ selectedChat, rightPanelOpen, onToggleRightPanel }: MiddleHeaderProps) {
+export function MiddleHeader({
+  selectedChat,
+  rightPanelOpen,
+  onToggleRightPanel,
+}: MiddleHeaderProps) {
   const getInitials = (name: string) => {
     return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
+      .split(' ')
+      .map(n => n[0])
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -32,10 +36,8 @@ export function MiddleHeader({ selectedChat, rightPanelOpen, onToggleRightPanel 
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>
             <div className="text-sm text-muted-foreground flex items-center">
-              {selectedChat.isOnline && (
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-              )}
-              {selectedChat.isOnline ? "Online" : "Last seen recently"}
+              {selectedChat.isOnline && <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />}
+              {selectedChat.isOnline ? 'Online' : 'Last seen recently'}
             </div>
           </div>
         </div>
@@ -48,11 +50,7 @@ export function MiddleHeader({ selectedChat, rightPanelOpen, onToggleRightPanel 
           <Button variant="ghost" size="icon">
             <Video className="h-5 w-5" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onToggleRightPanel}
-          >
+          <Button variant="ghost" size="icon" onClick={onToggleRightPanel}>
             <Info className="h-5 w-5" />
           </Button>
         </div>
