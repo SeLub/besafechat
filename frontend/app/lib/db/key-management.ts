@@ -1,6 +1,6 @@
 import { db } from './db';
-import { encrypt, decrypt, deriveKey } from './encryption';
-import type { PrivateKey } from './schema'; // ← импортируем правильный тип
+import { decrypt, deriveKey, encrypt } from './encryption';
+import type { publicKey } from './schema'; // ← импортируем правильный тип
 
 // Сохранение ключевой пары
 export async function storeKeyPair(
@@ -9,20 +9,19 @@ export async function storeKeyPair(
 ): Promise<void> {
   const encryptionPassphrase = publicKeyBase64;
   const key = await deriveKey(encryptionPassphrase);
-  const encryptedPrivateKey = await encrypt(privateKeyUint8, key);
+  const encryptedPublicKey = await encrypt(privateKeyUint8, key);
 
-  const record: PrivateKey = {
+  const record: publicKey = {
     id: 'current',
     publicKeyBase64,
-    data: encryptedPrivateKey, // ← Uint8Array
     createdAt: Date.now(),
   };
 
   await db.publicKey.put(record);
 }
 
-// Получение приватного ключа
-export async function getPrivateKey(publicKeyBase64: string): Promise<Uint8Array | null> {
+// Получение публичного ключа
+export async function getPublicKey(publicKeyBase64: string): Promise<Uint8Array | null> {
   const record = await db.publicKey.get('current');
   if (!record || record.publicKeyBase64 !== publicKeyBase64) {
     return null;

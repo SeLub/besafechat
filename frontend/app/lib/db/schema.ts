@@ -15,10 +15,9 @@ export interface Contact {
   isPinned: boolean;
 }
 
-export interface PrivateKeys {
+export interface publicKey {
   id: string; // "current"
   publicKeyBase64: string; // Публичный ключ в base64
-  data: Uint8Array; // Зашифрованный приватный ключ
   createdAt: number;
   source?: 'cloud' | 'seed';
 }
