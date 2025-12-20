@@ -15,11 +15,13 @@ import { ChatMember } from '../chat/chat-member.entity';
 import { RedisService } from '../../common/redis.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ContactRequest, User, Session, MessageMetadata, Chat, ChatMember])],
+  imports: [
+    TypeOrmModule.forFeature([ContactRequest, User, Session, MessageMetadata, Chat, ChatMember]),
+  ],
   providers: [
-    ContactRequestService, 
-    SessionService, 
-    MessagesGateway, 
+    ContactRequestService,
+    SessionService,
+    MessagesGateway,
     MessageMetadataService,
     ChatRoomService,
     RedisService,

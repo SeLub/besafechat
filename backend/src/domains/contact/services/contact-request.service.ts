@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContactRequest, ContactRequestStatus } from '../contact-request.entity';
@@ -14,7 +19,7 @@ export class ContactRequestService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private messagesGateway: MessagesGateway,
-    private chatRoomService: ChatRoomService,
+    private chatRoomService: ChatRoomService
   ) {}
 
   async sendRequest(fromUserId: string, toUserId: string, message?: string) {
@@ -59,7 +64,7 @@ export class ContactRequestService {
       toUserId,
       fromUser,
       savedRequest.id,
-      message?.trim(),
+      message?.trim()
     );
 
     return savedRequest;
@@ -97,15 +102,11 @@ export class ContactRequestService {
     // Create chat between users
     const chat = await this.chatRoomService.findOrCreatePrivateChat(
       request.fromUserId,
-      request.toUserId,
+      request.toUserId
     );
 
     // Send WebSocket notification to request sender
-    await this.messagesGateway.notifyRequestAccepted(
-      request.fromUserId,
-      request.toUser,
-      chat.id,
-    );
+    await this.messagesGateway.notifyRequestAccepted(request.fromUserId, request.toUser, chat.id);
 
     return { success: true, chatId: chat.id };
   }
@@ -124,10 +125,7 @@ export class ContactRequestService {
     await this.contactRequestRepository.save(request);
 
     // Send WebSocket notification to request sender
-    await this.messagesGateway.notifyRequestRejected(
-      request.fromUserId,
-      request.toUser,
-    );
+    await this.messagesGateway.notifyRequestRejected(request.fromUserId, request.toUser);
 
     return { success: true };
   }
@@ -165,10 +163,10 @@ export class ContactRequestService {
       order: { updatedAt: 'DESC' },
     });
 
-    return requests.map(request => {
+    return requests.map((request) => {
       // Get the other user (not the current user)
       const otherUser = request.fromUserId === userId ? request.toUser : request.fromUser;
-      
+
       return {
         id: request.id,
         user: {

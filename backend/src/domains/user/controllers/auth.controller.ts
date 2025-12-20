@@ -21,7 +21,7 @@ export class AuthController {
   async register(@Body() registerDto: RegisterDto) {
     const user = await this.userService.registerUser(
       registerDto.publicKey,
-      registerDto.displayName,
+      registerDto.displayName
     );
     return {
       success: true,

@@ -17,15 +17,15 @@ export class OnlineStatusController {
   @Post('bulk-online-status')
   async getBulkOnlineStatus(@Body() body: { userIds: string[] }) {
     const redis = this.redisService.getClient();
-    const keys = body.userIds.map(id => `online:${id}`);
-    
+    const keys = body.userIds.map((id) => `online:${id}`);
+
     if (keys.length === 0) {
       return { statuses: {} };
     }
 
     const results = await redis.mget(...keys);
     const statuses: Record<string, boolean> = {};
-    
+
     body.userIds.forEach((userId, index) => {
       statuses[userId] = !!results[index];
     });

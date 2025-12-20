@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Patch,
-  Body,
-  Req,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Patch, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtSessionGuard } from '../guards/jwt-session.guard';
 import { UserService } from '../services/user.service';
 import { UpdateDisplayNameDto } from '../dto/update-display-name.dto';

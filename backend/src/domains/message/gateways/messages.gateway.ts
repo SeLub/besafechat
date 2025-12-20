@@ -7,7 +7,6 @@ import {
   SubscribeMessage,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
 import { SessionService } from '../../user/services/session.service';
 import { RedisService } from '../../../common/redis.service';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
@@ -69,8 +68,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       // 6. Уведомляем контакты о том, что пользователь онлайн
       await this.notifyContactsUserOnline(session.user.id);
-
-
     } catch (error) {
       console.error('❌ WebSocket connection error:', error);
       client.disconnect(true);
@@ -103,8 +100,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         encryptedKey,
         timestamp,
       });
-
-
     } catch (error) {
       console.error('❌ Message handling error:', error);
       client.emit('message:error', { error: 'Failed to send message' });

@@ -8,7 +8,7 @@ interface RequestWithUser {
     id: string;
     sessionId: string;
     publicKey: Buffer;
- };
+  };
   cookies?: {
     [key: string]: string;
   };

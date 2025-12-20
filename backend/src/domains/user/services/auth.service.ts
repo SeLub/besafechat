@@ -6,10 +6,15 @@ import { SessionService } from './session.service';
 export class AuthService {
   constructor(
     private userService: UserService,
-    private sessionService: SessionService,
+    private sessionService: SessionService
   ) {}
 
-  async loginWithPublicKey(publicKeyBase64: string, deviceId: string, deviceModel?: string, ipAddress?: string) {
+  async loginWithPublicKey(
+    publicKeyBase64: string,
+    deviceId: string,
+    deviceModel?: string,
+    ipAddress?: string
+  ) {
     // Находим или создаём пользователя
     let user = await this.userService.findByPublicKey(publicKeyBase64);
     if (!user) {

@@ -3,7 +3,7 @@ import {
   Post,
   Body,
   UsePipes,
- ValidationPipe,
+  ValidationPipe,
   Get,
   Param,
   UseGuards,
@@ -33,7 +33,7 @@ export class UsernameController {
   @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
- async setUsername(@Req() req: RequestWithUser, @Body() dto: SetUsernameDto) {
+  async setUsername(@Req() req: RequestWithUser, @Body() dto: SetUsernameDto) {
     const isSearchable = dto.isSearchable === 'yes';
     await this.usernameService.setUsername(req.user!.id, dto.username, isSearchable);
     return { success: true, message: 'Username updated successfully' };

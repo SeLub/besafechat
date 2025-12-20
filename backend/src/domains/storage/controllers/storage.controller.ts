@@ -4,7 +4,6 @@ import {
   Get,
   Delete,
   Body,
-  Param,
   Req,
   UseGuards,
   BadRequestException,
@@ -20,7 +19,7 @@ interface RequestWithUser {
     id: string;
     sessionId: string;
     publicKey: Buffer;
- };
+  };
   url: string;
 }
 
@@ -38,20 +37,20 @@ export class StorageController {
     const { fileType, contentType, filename } = dto;
 
     // Validate content type
-    if (!contentType.startsWith('image/') && 
-        !contentType.startsWith('video/') && 
-        !contentType.startsWith('audio/') &&
-        !contentType.startsWith('application/')) {
+    if (
+      !contentType.startsWith('image/') &&
+      !contentType.startsWith('video/') &&
+      !contentType.startsWith('audio/') &&
+      !contentType.startsWith('application/')
+    ) {
       throw new BadRequestException('Invalid content type');
     }
 
     // Generate file key based on type
     let fileKey: string;
-    const ext = contentType.split('/')[1];
 
     switch (fileType) {
-      case 'avatar':
-        // Delete old avatars before uploading new one
+      case 'avatar': {
         const extensions = ['png', 'jpg', 'jpeg', 'webp'];
         for (const oldExt of extensions) {
           try {
@@ -60,19 +59,21 @@ export class StorageController {
             // File doesn't exist, ignore
           }
         }
-        // Always use PNG for avatars
         fileKey = `users/${userId}/avatar.png`;
         break;
+      }
       case 'image':
       case 'video':
-      case 'audio':
+      case 'audio': {
         if (!filename) throw new BadRequestException('Filename required for media files');
         fileKey = `users/${userId}/media/${Date.now()}-${filename}`;
         break;
-      case 'document':
+      }
+      case 'document': {
         if (!filename) throw new BadRequestException('Filename required for documents');
         fileKey = `users/${userId}/documents/${filename}`;
         break;
+      }
       default:
         throw new BadRequestException('Invalid file type');
     }

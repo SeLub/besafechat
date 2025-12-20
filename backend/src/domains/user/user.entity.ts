@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, OneToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+  OneToOne,
+} from 'typeorm';
 import { Session } from './session.entity';
 import { ChatMember } from '../chat/chat-member.entity';
 import { Username } from '../username/username.entity';

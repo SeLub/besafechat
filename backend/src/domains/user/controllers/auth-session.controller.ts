@@ -30,12 +30,12 @@ interface RequestWithUser {
     id: string;
     sessionId: string;
     publicKey: Buffer;
- };
+  };
   ip?: string;
   socket?: {
     remoteAddress?: string;
   };
- cookies?: {
+  cookies?: {
     [key: string]: string;
   };
 }
@@ -54,7 +54,7 @@ export class AuthSessionController {
     private authService: AuthService,
     private sessionService: SessionService,
     private userService: UserService,
-    private storageService: StorageService,
+    private storageService: StorageService
   ) {}
 
   @Post('login')
@@ -127,7 +127,7 @@ export class AuthSessionController {
     // Check for avatar existence and generate presigned URL
     let avatarUrl: string | null = null;
     const extensions = ['png', 'jpg', 'jpeg', 'webp'];
-    
+
     for (const ext of extensions) {
       const key = `users/${user.id}/avatar.${ext}`;
       if (await this.storageService.fileExists(key)) {
@@ -162,7 +162,10 @@ export class AuthSessionController {
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'revoke active session (but not current)' })
-  async revokeSession(@Req() req: RequestWithUser, @Param('id', new ParseUUIDPipe()) sessionId: string) {
+  async revokeSession(
+    @Req() req: RequestWithUser,
+    @Param('id', new ParseUUIDPipe()) sessionId: string
+  ) {
     await this.sessionService.revokeSessionById(
       req.user!.id,
       sessionId,

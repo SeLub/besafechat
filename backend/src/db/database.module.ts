@@ -16,9 +16,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         password: configService.get('DB_PASSWORD', 'secure_password'),
         database: configService.get('DB_DATABASE', 'messenger'),
         // Explicitly specify entity paths
-        entities: [
-          __dirname + '/../**/*.entity{.ts,.js}',
-        ],
+        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
         // Use migrations instead of synchronize for production
         migrations: [__dirname + '/../migrations/*{.ts,.js}'],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only use sync in non-production
@@ -28,4 +26,4 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     }),
   ],
 })
-export class DatabaseModule {} 
+export class DatabaseModule {}

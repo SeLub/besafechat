@@ -13,7 +13,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   console.error('🚨 CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
   console.error('Stack:', reason?.stack);
-  
+
   // Don't exit the process for EADDRINUSE errors as they're recoverable
   if (reason?.code === 'EADDRINUSE') {
     console.warn('⚠️ Address in use, waiting for port to become available...');
@@ -45,7 +45,7 @@ async function bootstrap() {
   await registerSwagger(app);
 
   const port = configService.get('PORT', 4000);
-  
+
   // Graceful shutdown handling to prevent port conflicts during restarts
   let server: any;
   try {
@@ -78,7 +78,7 @@ async function bootstrap() {
       await app.close();
     }
     // Small delay to ensure port is released
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     process.exit(0);
   });
 
@@ -88,7 +88,7 @@ async function bootstrap() {
       await app.close();
     }
     // Small delay to ensure port is released
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     process.exit(0);
   });
 }

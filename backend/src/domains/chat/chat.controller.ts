@@ -15,7 +15,7 @@ export class ChatController {
     private chatRepository: Repository<Chat>,
     @InjectRepository(ChatMember)
     private chatMemberRepository: Repository<ChatMember>,
-    private chatRoomService: ChatRoomService,
+    private chatRoomService: ChatRoomService
   ) {}
 
   @Get(':id')
@@ -30,7 +30,7 @@ export class ChatController {
     }
 
     // Check if user is member of this chat
-    const isMember = chat.members.some(member => member.userId === user.id);
+    const isMember = chat.members.some((member) => member.userId === user.id);
     if (!isMember) {
       return { error: 'Access denied' };
     }

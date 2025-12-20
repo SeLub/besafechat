@@ -10,7 +10,7 @@ export class SessionService {
   constructor(
     @InjectRepository(Session)
     private sessionRepository: Repository<Session>,
-    private dataSource: DataSource,
+    private dataSource: DataSource
   ) {}
 
   async createSession(userId: string, deviceId: string, deviceModel?: string, ipAddress?: string) {
@@ -87,71 +87,71 @@ export class SessionService {
   }
 
   async findActiveSessionsByUserId(userId: string, currentSessionId: string) {
-  const sessions = await this.sessionRepository.find({
-    where: { user: { id: userId }, revoked: false },
-    order: { lastActiveAt: 'DESC' },
-    select: ['id', 'deviceId', 'deviceModel', 'ipAddress', 'lastActiveAt', 'createdAt'],
-  });
+    const sessions = await this.sessionRepository.find({
+      where: { user: { id: userId }, revoked: false },
+      order: { lastActiveAt: 'DESC' },
+      select: ['id', 'deviceId', 'deviceModel', 'ipAddress', 'lastActiveAt', 'createdAt'],
+    });
 
-  return sessions.map(session => ({
-    id: session.id,
-    deviceId: session.deviceId,
-    deviceModel: session.deviceModel || 'Unknown device',
-    ipAddress: session.ipAddress || '0.0.0.0',
-    lastActiveAt: session.lastActiveAt,
-    createdAt: session.createdAt,
-    current: session.id === currentSessionId,
-  }));
-}
-
-async revokeSessionById(userId: string, sessionIdToRevoke: string, currentSessionId: string) {
-  if (sessionIdToRevoke === currentSessionId) {
-    throw new UnauthorizedException('Cannot revoke current session via this endpoint');
+    return sessions.map((session) => ({
+      id: session.id,
+      deviceId: session.deviceId,
+      deviceModel: session.deviceModel || 'Unknown device',
+      ipAddress: session.ipAddress || '0.0.0.0',
+      lastActiveAt: session.lastActiveAt,
+      createdAt: session.createdAt,
+      current: session.id === currentSessionId,
+    }));
   }
 
-  const result = await this.sessionRepository.update(
-    { id: sessionIdToRevoke, user: { id: userId }, revoked: false },
-    { revoked: true }
-  );
+  async revokeSessionById(userId: string, sessionIdToRevoke: string, currentSessionId: string) {
+    if (sessionIdToRevoke === currentSessionId) {
+      throw new UnauthorizedException('Cannot revoke current session via this endpoint');
+    }
 
-  if (result.affected === 0) {
-    throw new UnauthorizedException('Session not found or already revoked');
-  }
-}
+    const result = await this.sessionRepository.update(
+      { id: sessionIdToRevoke, user: { id: userId }, revoked: false },
+      { revoked: true }
+    );
 
-private async isCurrentSession(userId: string, sessionId: string): Promise<boolean> {
-  const session = await this.sessionRepository.findOne({
-    where: { id: sessionId, user: { id: userId } }
-  });
-  return session?.revoked === false;
-}
-
-async refreshSession(refreshToken: string, ipAddress?: string) {
-  const session = await this.sessionRepository.findOne({
-    where: { refreshToken, revoked: false },
-    relations: ['user'],
-  });
-
-  if (!session || session.expiresAt < new Date()) {
-    throw new UnauthorizedException('Invalid or expired refresh token');
+    if (result.affected === 0) {
+      throw new UnauthorizedException('Session not found or already revoked');
+    }
   }
 
-  // Генерируем новые токены
-  const newAccessToken = randomBytes(32).toString('hex');
-  const newRefreshToken = randomBytes(64).toString('hex');
+  private async isCurrentSession(userId: string, sessionId: string): Promise<boolean> {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId, user: { id: userId } },
+    });
+    return session?.revoked === false;
+  }
 
-  // Обновляем сессию
-  session.accessTokenHash = this.hashToken(newAccessToken);
-  session.refreshToken = newRefreshToken;
-  session.lastActiveAt = new Date();
-  if (ipAddress) session.ipAddress = ipAddress;
+  async refreshSession(refreshToken: string, ipAddress?: string) {
+    const session = await this.sessionRepository.findOne({
+      where: { refreshToken, revoked: false },
+      relations: ['user'],
+    });
 
-  await this.sessionRepository.save(session);
+    if (!session || session.expiresAt < new Date()) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
-  return {
-    accessToken: newAccessToken,
-    refreshToken: newRefreshToken,
-    user: session.user,
-  };
-}
+    // Генерируем новые токены
+    const newAccessToken = randomBytes(32).toString('hex');
+    const newRefreshToken = randomBytes(64).toString('hex');
+
+    // Обновляем сессию
+    session.accessTokenHash = this.hashToken(newAccessToken);
+    session.refreshToken = newRefreshToken;
+    session.lastActiveAt = new Date();
+    if (ipAddress) session.ipAddress = ipAddress;
+
+    await this.sessionRepository.save(session);
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      user: session.user,
+    };
+  }
 }
