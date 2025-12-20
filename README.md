@@ -13,14 +13,14 @@ BeSafeChat — это **кроссплатформенный мессендже�
 
 BeSafeChat is a **cross-platform, privacy-first messenger** built for users who value anonymity and security. Unlike mainstream apps, BeSafeChat requires **no personal identifiers**—registration is fully anonymous using a cryptographic Ed25519 key pair generated on your device.
 
-All messages are **end-to-end encrypted by default**. The server acts only as a secure relay—**it never sees your messages**. Your chat history lives **only on your devices**, stored locally in an encrypted indexedDB database.
+All messages use **end-to-end encryption** with basic implementation. The server acts only as a secure relay—**it never sees your message content**. Your chat history lives **only on your devices**, stored locally in an encrypted indexedDB database. Advanced Signal Protocol integration is in development.
 
 Built with modern web and native technologies, BeSafeChat runs seamlessly on **Web, Desktop (Windows/macOS/Linux), and Mobile (iOS/Android)**—all from a single codebase.
 
 ### 🔐 Core Principles
 
 - **True anonymity**: No phone number, email, or real-name required
-- **E2EE by default**: Signal Protocol-grade encryption for all messages
+- **E2EE in progress**: Basic encryption implemented, Signal Protocol integration in development
 - **User-controlled data**: No cloud storage of message content
 - **Transparency**: Open architecture, auditable code, zero telemetry
 
@@ -210,8 +210,8 @@ BeSafeChat/
 │   │   │   └── use-websocket-notifications.tsx # WebSocket уведомления
 │   │   ├── lib/                        # Библиотеки и утилиты
 │   │   │   └── db/                     # IndexedDB (Dexie.js)
-│   │   │       ├── db.ts               # Инициализация базы данных
-│   │   │       ├── schema.ts           # Схема таблиц (messages, contacts, privateKeys)
+│   │   │       ├── db.ts               # Инициализация базы данных (версия 3)
+│   │   │       ├── schema.ts           # Схема таблиц (messages, contacts, publicKey)
 │   │   │       ├── encryption.ts       # AES-GCM шифрование для приватных ключей
 │   │   │       ├── key-management.ts   # Управление криптографическими ключами
 │   │   │       ├── message-storage.ts  # Сохранение и загрузка сообщений
@@ -609,6 +609,7 @@ grep access_token cookies.txt | awk '{print $7}'
 - ✅ **Seed-based Recovery**: BIP39 12-word seed phrases с двумя режимами восстановления
   - **Cloud Recovery**: Argon2id-encrypted seed в S3, восстановление по @username + password
   - **Self-Custody**: Локальное хранение seed, полный контроль пользователя
+- ✅ **Безопасность хранения**: Временное хранение seed только в памяти (не в IndexedDB)
 - ✅ **Криптография**: @scure/bip39, @noble/ed25519, @noble/hashes (browser-native, без полифилов)
 - ✅ **Username-based Recovery**: Публичный эндпоинт для восстановления аккаунта без предварительной аутентификации
 - ✅ **Profile Management**: Загрузка аватаров, редактирование display name
@@ -618,7 +619,7 @@ grep access_token cookies.txt | awk '{print $7}'
 
 ### В разработке
 
-- 🔄 **Настоящее E2EE**: Signal Protocol интеграция для сообщений
+- 🔄 **Advanced E2EE**: Signal Protocol интеграция для сообщений
 - 🔄 **Медиа сообщения**: Загрузка изображений/видео/документов в чаты
 
 ---
@@ -646,7 +647,10 @@ grep access_token cookies.txt | awk '{print $7}'
 - [x] **Profile System**: Аватары (PNG, до 5MB), display name (1-24 символа, emoji)
 - [x] **Storage API**: Унифицированные endpoints для загрузки файлов в S3
 - [x] **Device Management**: Управление активными сессиями, multi-device support
-- [ ] Настоящее E2EE шифрование сообщений (Signal Protocol)
+- [x] **Seed-based Recovery**: BIP39 seed phrases with cloud and self-custody options
+- [x] **Enhanced Security**: Temporary seed storage (no persistent IndexedDB storage)
+- [ ] Advanced E2EE шифрование сообщений (Signal Protocol)
+- [ ] Медиа-сообщения (фото/файлы через S3)
 
 ### Этап 2: Кроссплатформенность (Q2 2026)
 
@@ -665,9 +669,10 @@ grep access_token cookies.txt | awk '{print $7}'
 ## 🛡 Безопасность
 
 - **Нет привязки к телефону/email** — полная анонимность
-- **E2EE по умолчанию** — сервер не видит содержимое сообщений
+- **E2EE в разработке** — базовое шифрование реализовано, Signal Protocol в процессе
 - **HttpOnly JWT-куки** — защита от XSS
 - **Ограничение сессий** — макс. 5 устройств
+- **Безопасность seed-фраз** — временно в памяти, не в IndexedDB
 - **Аудит зависимостей** — через `npm audit`
 
 ---
@@ -686,5 +691,94 @@ MIT © 2025 BeSafeChat Team
 
 ---
 
-Готов к работе! 🚀  
+## 📈 Proposed Improvements for BeSafeChat
+
+### 🔒 Security Enhancements
+
+1. **Strengthen Seed Backup Security**
+   - Increase Argon2id parameters (timeCost: 5, memoryCost: 128MB)
+   - Add pepper for additional security layer
+   - Implement device fingerprinting for session validation
+
+2. **Advanced Message Integrity**
+   - Implement Signal Protocol for true E2EE
+   - Add message signature verification
+   - Implement Perfect Forward Secrecy (PFS)
+
+3. **Enhanced Session Management**
+   - Multi-device synchronization with secure key sharing
+   - Automatic key rotation when devices are removed
+   - Suspicious activity detection and notifications
+
+### 🚀 Functional Improvements
+
+4. **Group Chat Support**
+   - Secure group key management
+   - End-to-end encrypted group messaging
+   - Group admin features and permissions
+
+5. **Advanced Message Features**
+   - Message reactions and editing
+   - Message threading and replies
+   - Scheduled messages
+
+6. **Media Support**
+   - End-to-end encrypted image/video sharing
+   - File sharing with chunked upload
+   - Voice message support
+
+### 🎨 User Experience Enhancements
+
+7. **Advanced Theme System**
+   - Custom theme creation
+   - Accessibility features (high contrast, font size)
+   - Dynamic theme switching
+
+8. **Enhanced Notifications**
+   - Rich notification system with privacy controls
+   - Do-not-disturb scheduling
+   - Notification filtering and grouping
+
+9. **Advanced Privacy Controls**
+   - Message expiration (disappearing messages)
+   - Read receipts toggle
+   - Typing indicators toggle
+
+## 🗺 Implementation Roadmap
+
+### Phase 1 (Next 2-4 weeks): Security Hardening
+- [ ] Implement enhanced Argon2id parameters
+- [ ] Add message integrity verification
+- [ ] Strengthen session management
+- [ ] Implement rate limiting and DDoS protection
+
+### Phase 2 (Next 4-8 weeks): Feature Expansion
+- [ ] Complete Signal Protocol integration
+- [ ] Add group chat functionality
+- [ ] Implement multi-device sync
+- [ ] Add advanced notification system
+
+### Phase 3 (Next 8-12 weeks): Advanced Features
+- [ ] Media messaging (images, voice, files)
+- [ ] Message reactions and editing
+- [ ] Enhanced privacy controls
+- [ ] Advanced theme customization
+
+### Phase 4 (Long-term): Platform Expansion
+- [ ] Electron desktop application
+- [ ] Mobile app with Capacitor
+- [ ] Advanced contact management
+- [ ] Voice/video calling capabilities
+
+## 📊 Expected Benefits
+
+- **Enhanced Security**: Stronger encryption, better session management, improved integrity verification
+- **Better User Experience**: Rich themes, advanced notifications, multi-device sync
+- **Scalability**: Group chats, enhanced message storage, better performance
+- **Privacy**: Zero-knowledge architecture maintained, enhanced privacy controls
+- **Reliability**: Better error handling, monitoring, and recovery options
+
+---
+
+Готов к работе! 🚀
 **BeSafeChat — твой разговор остаётся между вами.**
