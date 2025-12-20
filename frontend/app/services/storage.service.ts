@@ -9,7 +9,7 @@ export interface UploadResponse {
 
 export interface DownloadResponse {
   success: boolean;
-  data?: object;
+  data?: EncryptedSeed & { publicKey: string };
   message?: string;
 }
 

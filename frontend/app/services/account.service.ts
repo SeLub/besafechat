@@ -65,7 +65,6 @@ export class AccountService {
     await db.publicKey.put({
       id: 'current',
       publicKeyBase64,
-      source: 'seed',
       createdAt: Date.now(),
     });
 
@@ -108,7 +107,6 @@ export class AccountService {
     await db.publicKey.put({
       id: 'current',
       publicKeyBase64,
-      source: 'cloud',
       createdAt: Date.now(),
     });
 

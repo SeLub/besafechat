@@ -19,7 +19,6 @@ export interface publicKey {
   id: string; // "current"
   publicKeyBase64: string; // Публичный ключ в base64
   createdAt: number;
-  source?: 'cloud' | 'seed';
 }
 
 export const SCHEMA = {

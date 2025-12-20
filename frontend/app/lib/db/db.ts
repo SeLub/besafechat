@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import { SCHEMA, type Message, type Contact, type publicKey } from './schema';
+import { SCHEMA, type Contact, type Message, type publicKey } from './schema';
 
 class BeSafeDB extends Dexie {
   messages!: Dexie.Table<Message, string>;
@@ -8,7 +8,7 @@ class BeSafeDB extends Dexie {
 
   constructor() {
     super('BeSafeDB');
-    this.version(3).stores(SCHEMA);
+    this.version(4).stores(SCHEMA);
   }
 }
 
