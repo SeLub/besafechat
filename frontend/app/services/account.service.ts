@@ -40,7 +40,7 @@ export class AccountService {
     }
 
     // 5. Update IndexedDB to mark as cloud backup
-    await db.publicKey.update('current', { source: 'cloud' });
+    await db.publicKey.update('current', {});
 
     // 6. Download backup file
     AccountService.downloadBackupFile(encrypted, publicKeyBase64);
