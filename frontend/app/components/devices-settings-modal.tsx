@@ -38,7 +38,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
       });
       if (response.ok) {
         const data = await response.json();
-        setSessions(data.sessions);
+        setSessions(data.data.sessions);
       }
     } catch (error) {
       toast.error('Failed to load sessions');

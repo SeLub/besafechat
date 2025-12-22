@@ -1,7 +1,9 @@
-import { API_CONFIG } from './api-config';
-import { handleApiResponse, apiRequest } from './api-utils';
-import type { OnlineStatusResponse, BulkOnlineStatusResponse } from '@/types/account';
-import type { BulkOnlineStatusRequest } from '@/types/account';
+import type {
+  BulkOnlineStatusRequest,
+  BulkOnlineStatusResponse,
+  OnlineStatusResponse,
+} from '~/types/account';
+import { apiRequest } from './api-utils';
 
 export class OnlineStatusService {
   static async getOnlineStatus(userId: string): Promise<OnlineStatusResponse> {

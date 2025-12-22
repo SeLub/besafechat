@@ -73,11 +73,11 @@ export class DeviceService {
 
   private static getIosDeviceName(): string {
     const resolution = `${window.screen?.width || 0}x${window.screen?.height || 0}`;
-    return DeviceService.iosDeviceMapping.get(resolution) || 'iOS Device';
+    return this.iosDeviceMapping.get(resolution) || 'iOS Device';
   }
 
   private static getDesktopDeviceName(): string {
     const platform = navigator.platform || 'Unknown';
-    return DeviceService.desktopDeviceMapping.get(platform) || platform;
+    return this.desktopDeviceMapping.get(platform) || platform;
   }
 }

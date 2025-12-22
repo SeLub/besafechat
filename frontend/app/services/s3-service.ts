@@ -140,7 +140,7 @@ export class S3Service {
   /**
    * Удалить файл
    */
-  static async deleteFile(path: string, fileName: string): Promise<ApiResponse> {
+  static async deleteFile(path: string, fileName: string): Promise<{ message: string }> {
     return this.withRetry(async () => {
       const response = await fetch(`${this.baseUrl}/s3/delete`, {
         method: 'DELETE',
