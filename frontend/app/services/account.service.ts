@@ -61,7 +61,7 @@ export class AccountService {
     // Derive keys
     const { privateKey, publicKey, publicKeyBase64 } = await CryptoService.deriveKeysFromSeed(seed);
 
-    // Save to IndexedDB
+    // Save public key to IndexedDB
     await db.publicKey.put({
       id: 'current',
       publicKeyBase64,

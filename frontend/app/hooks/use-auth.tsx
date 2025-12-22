@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { AuthService } from '@/services/auth.service';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   };
 
-  // Регистрация — генерация ключей и сохранение в зашифрованной БД
+  // Регистрация — генерация ключей и сохранение публичного ключа в IndexedDB
   const register = async (deviceId: string) => {
     // Генерация Ed25519-пары
     const keyPair = await window.crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
@@ -61,14 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'verify',
     ]);
     const publicKey = await window.crypto.subtle.exportKey('raw', keyPair.publicKey);
-    const privateKey = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
 
     const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
-    const privateKeyUint8 = new Uint8Array(privateKey);
 
-    // ✅ Сохраняем приватный ключ в зашифрованной Dexie-БД
-    const { storeKeyPair } = await import('@/lib/db/key-management');
-    await storeKeyPair(publicKeyBase64, privateKeyUint8);
+    // Сохраняем публичный ключ в IndexedDB
+    const { storePublicKey } = await import('@/lib/db/key-management');
+    await storePublicKey(publicKeyBase64);
 
     // Отправка публичного ключа на сервер
     await AuthService.login({ publicKey: publicKeyBase64, deviceId });

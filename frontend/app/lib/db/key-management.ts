@@ -1,17 +1,14 @@
-import { db } from './db';
-import { decrypt, deriveKey, encrypt } from './encryption';
-import type { publicKey } from './schema'; // ← импортируем правильный тип
+export interface PublicKeyRecord {
+  id: string; // "current"
+  publicKeyBase64: string; // Публичный ключ в base64
+  createdAt: number;
+}
 
-// Сохранение ключевой пары
-export async function storeKeyPair(
-  publicKeyBase64: string,
-  privateKeyUint8: Uint8Array
-): Promise<void> {
-  const encryptionPassphrase = publicKeyBase64;
-  const key = await deriveKey(encryptionPassphrase);
-  const encryptedPublicKey = await encrypt(privateKeyUint8, key);
+// Сохранение публичного ключа
+export async function storePublicKey(publicKeyBase64: string): Promise<void> {
+  const db = (window as any).db; // Access to IndexedDB instance
 
-  const record: publicKey = {
+  const record: PublicKeyRecord = {
     id: 'current',
     publicKeyBase64,
     createdAt: Date.now(),
@@ -21,23 +18,20 @@ export async function storeKeyPair(
 }
 
 // Получение публичного ключа
-export async function getPublicKey(publicKeyBase64: string): Promise<Uint8Array | null> {
+export async function getStoredPublicKey(): Promise<string | null> {
+  const db = (window as any).db; // Access to IndexedDB instance
   const record = await db.publicKey.get('current');
-  if (!record || record.publicKeyBase64 !== publicKeyBase64) {
-    return null;
-  }
-
-  const encryptionPassphrase = publicKeyBase64;
-  const key = await deriveKey(encryptionPassphrase);
-  return decrypt(record.data, key); // ← record.data — Uint8Array
+  return record ? record.publicKeyBase64 : null;
 }
 
 // Проверка наличия ключа
 export async function hasStoredKey(): Promise<boolean> {
+  const db = (window as any).db; // Access to IndexedDB instance
   return (await db.publicKey.get('current')) !== undefined;
 }
 
 // Очистка
 export async function clearStoredKey(): Promise<void> {
+  const db = (window as any).db; // Access to IndexedDB instance
   await db.publicKey.clear();
 }
