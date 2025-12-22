@@ -7,7 +7,7 @@ import { UsernameModule } from './domains/username/username.module';
 import { MessageModule } from './domains/message/message.module';
 import { ContactModule } from './domains/contact/contact.module';
 import { ChatModule } from './domains/chat/chat.module';
-import { StorageModule } from './domains/storage/storage.module';
+import { S3Module } from './domains/s3/s3.module';
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { StorageModule } from './domains/storage/storage.module';
     MessageModule,
     ContactModule,
     ChatModule,
-    StorageModule,
+    S3Module,
   ],
 })
 export class AppModule {

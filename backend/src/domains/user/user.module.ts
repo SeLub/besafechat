@@ -11,10 +11,10 @@ import { UserService } from './services/user.service';
 import { AuthService } from './services/auth.service';
 import { SessionService } from './services/session.service';
 import { RedisService } from '../../common/redis.service';
-import { StorageModule } from '../storage/storage.module';
+import { S3Module } from '../s3/s3.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Session]), forwardRef(() => StorageModule)],
+  imports: [TypeOrmModule.forFeature([User, Session]), forwardRef(() => S3Module)],
   controllers: [AuthController, AuthSessionController, OnlineStatusController, ProfileController],
   providers: [UserService, AuthService, SessionService, RedisService],
   exports: [SessionService, UserService],

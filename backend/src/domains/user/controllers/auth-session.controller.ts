@@ -21,8 +21,9 @@ import { SessionService } from '../services/session.service';
 import { JwtSessionGuard } from '../guards/jwt-session.guard';
 import { UserService } from '../services/user.service';
 import { RefreshDto } from '../dto/refresh.dto';
-import { StorageService } from '../../storage/storage.service';
+import { S3Service } from '../../s3/s3.service';
 import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiResponseDto } from '../../../common/dto/api-response.dto';
 
 // Define interfaces for request and response with user property for future Fastify compatibility
 interface RequestWithUser {
@@ -54,7 +55,7 @@ export class AuthSessionController {
     private authService: AuthService,
     private sessionService: SessionService,
     private userService: UserService,
-    private storageService: StorageService
+    private storageService: S3Service
   ) {}
 
   @Post('login')
@@ -64,7 +65,7 @@ export class AuthSessionController {
     @Body() loginDto: LoginDto,
     @Req() req: RequestWithUser,
     @Res({ passthrough: true }) res: ResponseWithCookies
-  ) {
+  ): Promise<ApiResponseDto<null>> {
     // ✅ Исправлено: socket вместо connection
     const ipAddress = req.ip || req.socket?.remoteAddress || undefined;
 
@@ -89,7 +90,7 @@ export class AuthSessionController {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    return { success: true };
+    return new ApiResponseDto(true);
   }
 
   @Post('logout')
@@ -97,7 +98,10 @@ export class AuthSessionController {
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'End of current session, logout' })
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: RequestWithUser, @Res({ passthrough: true }) res: ResponseWithCookies) {
+  async logout(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: ResponseWithCookies
+  ): Promise<ApiResponseDto<null>> {
     if (!req.user) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -111,14 +115,22 @@ export class AuthSessionController {
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
 
-    return { success: true };
+    return new ApiResponseDto(true);
   }
 
   @Get('profile')
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'Get current user profile' })
-  async getProfile(@Req() req: RequestWithUser) {
+  async getProfile(@Req() req: RequestWithUser): Promise<
+    ApiResponseDto<{
+      id: string;
+      publicKey: string;
+      displayName?: string;
+      username?: string;
+      avatarUrl: string | null;
+    }>
+  > {
     const user = await this.userService.getProfileByUserId(req.user!.id);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -136,26 +148,26 @@ export class AuthSessionController {
       }
     }
 
-    return {
+    return new ApiResponseDto(true, {
       id: user.id,
       publicKey: user.publicKey.toString('base64'),
       displayName: user.displayName,
       username: user.username?.username,
       avatarUrl,
-    };
+    });
   }
 
   @Get('sessions')
   @UseGuards(JwtSessionGuard)
   @ApiSecurity('access-token-cookie') // ← имя из addSecurity
   @ApiOperation({ summary: 'List of active sessions' })
-  async getSessions(@Req() req: RequestWithUser) {
+  async getSessions(@Req() req: RequestWithUser): Promise<ApiResponseDto<{ sessions: any[] }>> {
     const sessions = await this.sessionService.findActiveSessionsByUserId(
       req.user!.id,
       req.user!.sessionId
     );
 
-    return { sessions };
+    return new ApiResponseDto(true, { sessions });
   }
 
   @Post('sessions/revoke/:id')
@@ -165,13 +177,13 @@ export class AuthSessionController {
   async revokeSession(
     @Req() req: RequestWithUser,
     @Param('id', new ParseUUIDPipe()) sessionId: string
-  ) {
+  ): Promise<ApiResponseDto<null>> {
     await this.sessionService.revokeSessionById(
       req.user!.id,
       sessionId,
       req.user!.sessionId // ← передаём текущий ID
     );
-    return { success: true };
+    return new ApiResponseDto(true);
   }
 
   @Post('sessions/revoke-all')
@@ -179,9 +191,9 @@ export class AuthSessionController {
   @ApiSecurity('access-token-cookie')
   @ApiOperation({ summary: 'Close all other sessions except current' })
   @HttpCode(HttpStatus.OK)
-  async revokeAllOtherSessions(@Req() req: RequestWithUser) {
+  async revokeAllOtherSessions(@Req() req: RequestWithUser): Promise<ApiResponseDto<null>> {
     await this.sessionService.revokeAllSessions(req.user!.id, req.user!.sessionId);
-    return { success: true };
+    return new ApiResponseDto(true);
   }
 
   @Post('refresh')
@@ -202,7 +214,7 @@ export class AuthSessionController {
     @Body() refreshDto: RefreshDto,
     @Req() req: RequestWithUser,
     @Res({ passthrough: true }) res: ResponseWithCookies
-  ) {
+  ): Promise<ApiResponseDto<null>> {
     const ipAddress = req.ip || req.socket?.remoteAddress || undefined;
     const { accessToken, refreshToken } = await this.sessionService.refreshSession(
       refreshDto.refreshToken,
@@ -224,7 +236,7 @@ export class AuthSessionController {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    return { success: true };
+    return new ApiResponseDto(true);
   }
 
   @Get('user/:id/public-key')
@@ -238,6 +250,6 @@ export class AuthSessionController {
     if (!publicKey) {
       throw new NotFoundException('User not found');
     }
-    return { publicKey };
+    return new ApiResponseDto(true, { publicKey });
   }
 }

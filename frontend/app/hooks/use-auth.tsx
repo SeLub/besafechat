@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (res.ok) {
         const profile = await res.json();
-        setUser(profile);
+        setUser(profile.data);
       } else if (res.status === 401) {
         clearAuthCookies();
         setUser(null);
