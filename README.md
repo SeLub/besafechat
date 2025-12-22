@@ -47,6 +47,8 @@ BeSafeChat isn’t just another messenger—it’s a **privacy tool for the post
 - **Socket.IO Client** — WebSocket соединения
 - **Sonner** — уведомления
 - **Dexie.js (IndexedDB)** — локальное хранение сообщений и ключей
+- **AES-GCM Encryption** — сквозное шифрование локально хранимых сообщений
+- **StorageService** — централизованный сервис для безопасного хранения данных
 
 ### Деплой
 
@@ -602,7 +604,9 @@ grep access_token cookies.txt | awk '{print $7}'
 - ✅ **Online статус**: Redis-based отслеживание с real-time обновлениями через WebSocket
 - ✅ **Локальное хранение**: IndexedDB (BeSafeDB) для сообщений, контактов и ключей
 - ✅ **Управление хранилищем**: Настройки автоочистки (7/30/90 дней / Всегда), лимит 1000 сообщений на чат
+- ✅ **Шифрование сообщений**: AES-GCM шифрование для защиты локально хранимых сообщений
 - ✅ **Шифрование ключей**: AES-GCM для защиты приватных ключей в IndexedDB
+- ✅ **Централизованный StorageService**: Объединённый сервис для безопасного хранения данных
 - ✅ **Unicode поддержка**: Корректная работа с кириллицей, эмодзи и любыми символами
 - ✅ **Дедупликация сообщений**: ID-based защита от дублирования при множественных WebSocket соединениях
 - ✅ **Персистентность чатов**: Восстановление выбранного чата и истории сообщений после перезагрузки страницы
@@ -614,6 +618,7 @@ grep access_token cookies.txt | awk '{print $7}'
 - ✅ **Username-based Recovery**: Публичный эндпоинт для восстановления аккаунта без предварительной аутентификации
 - ✅ **Profile Management**: Загрузка аватаров, редактирование display name
 - ✅ **Unified Storage API**: Единый `/storage` endpoint для всех типов файлов (аватары, изображения, документы)
+- ✅ **Зашифрованное хранение**: Все сообщения шифруются перед сохранением в IndexedDB
 - ✅ **Public Avatars**: Прямые S3 URL для аватаров без presigned URLs, автоматическое отображение в чатах и контактах
 - ✅ **Device Management**: Просмотр активных сессий, отзыв устройств, QR-код для подключения (mock)
 
@@ -649,6 +654,7 @@ grep access_token cookies.txt | awk '{print $7}'
 - [x] **Device Management**: Управление активными сессиями, multi-device support
 - [x] **Seed-based Recovery**: BIP39 seed phrases with cloud and self-custody options
 - [x] **Enhanced Security**: Temporary seed storage (no persistent IndexedDB storage)
+- [x] Базовое E2EE шифрование локально хранимых сообщений (AES-GCM)
 - [ ] Advanced E2EE шифрование сообщений (Signal Protocol)
 - [ ] Медиа-сообщения (фото/файлы через S3)
 
@@ -670,6 +676,7 @@ grep access_token cookies.txt | awk '{print $7}'
 
 - **Нет привязки к телефону/email** — полная анонимность
 - **E2EE в разработке** — базовое шифрование реализовано, Signal Protocol в процессе
+- **Локальное E2EE** — все сообщения шифруются в IndexedDB с помощью AES-GCM
 - **HttpOnly JWT-куки** — защита от XSS
 - **Ограничение сессий** — макс. 5 устройств
 - **Безопасность seed-фраз** — временно в памяти, не в IndexedDB

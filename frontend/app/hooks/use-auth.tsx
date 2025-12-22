@@ -1,4 +1,5 @@
 import { AuthService } from '@/services/auth.service';
+import { StorageService } from '@/services/storage.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 interface User {
@@ -65,8 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
 
     // Сохраняем публичный ключ в IndexedDB
-    const { storePublicKey } = await import('@/lib/db/key-management');
-    await storePublicKey(publicKeyBase64);
+    await StorageService.storePublicKey(publicKeyBase64);
 
     // Отправка публичного ключа на сервер
     await AuthService.login({ publicKey: publicKeyBase64, deviceId });

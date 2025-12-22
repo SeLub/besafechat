@@ -1,14 +1,9 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Database, Trash2 } from 'lucide-react';
+import { StorageService } from '@/services/storage.service';
+import type { MessageRetentionPeriod } from '@/lib/db/schema';
+import { Database, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { db } from '@/lib/db/db';
-import {
-  getRetentionPeriod,
-  setRetentionPeriod,
-  cleanupOldMessages,
-  type MessageRetentionPeriod,
-} from '@/lib/db/cleanup';
 
 interface StorageSettingsModalProps {
   isOpen: boolean;
@@ -16,7 +11,9 @@ interface StorageSettingsModalProps {
 }
 
 export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalProps) {
-  const [retention, setRetention] = useState<MessageRetentionPeriod>(getRetentionPeriod());
+  const [retention, setRetention] = useState<MessageRetentionPeriod>(
+    StorageService.getRetentionPeriod()
+  );
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -25,10 +22,10 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
   const handleSave = async () => {
     setLoading(true);
     try {
-      setRetentionPeriod(retention);
+      StorageService.setRetentionPeriod(retention);
 
       // Применяем очистку сразу
-      const deleted = await cleanupOldMessages();
+      const deleted = await StorageService.cleanupOldMessagesWithSettings();
 
       if (deleted > 0) {
         toast.success(`Settings saved. ${deleted} old messages deleted.`, { duration: 3000 });
@@ -116,8 +113,8 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
                   onClick={async () => {
                     setLoading(true);
                     try {
-                      const count = await db.messages.count();
-                      await db.messages.clear();
+                      const count = await StorageService.getTotalMessageCount();
+                      await StorageService.clearAllMessages();
                       toast.success(`${count} messages deleted`, { duration: 3000 });
                       setShowConfirm(false);
                       onClose();

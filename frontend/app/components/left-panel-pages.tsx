@@ -11,6 +11,7 @@ import { StorageSettingsModal } from '@/components/storage-settings-modal';
 import { DevicesSettingsModal } from '@/components/devices-settings-modal';
 import { ContactsPage } from '@/components/contacts-page';
 import { useAuth } from '@/hooks/use-auth';
+import { S3Service } from '@/services/s3-service';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -41,7 +42,7 @@ interface LeftPanelPageProps {
 }
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
-  const { logout, checkAuth } = useAuth();
+  const { logout, checkAuth, user } = useAuth();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -76,32 +77,20 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
 
     setUploading(true);
     try {
-      // Get presigned URL (always uploads as PNG)
-      const res = await fetch('http://localhost:4000/storage/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          fileType: 'avatar',
-          contentType: 'image/png',
-        }),
-      });
+      // Use the authenticated user's ID from the auth context
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
 
-      if (!res.ok) throw new Error('Failed to get upload URL');
-
-      const { uploadUrl } = await res.json();
-
-      // Upload to S3
-      await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'image/png' },
-        body: file,
-      });
+      // Use the S3Service uploadAvatar method which properly handles the upload
+      const avatarUrl = await S3Service.uploadAvatar(userId, file);
 
       toast.success('Avatar updated');
       // Force reload with cache bust
       setTimeout(() => checkAuth(), 500);
     } catch (error) {
+      console.error('Failed to upload avatar:', error);
       toast.error('Failed to upload avatar');
     } finally {
       setUploading(false);

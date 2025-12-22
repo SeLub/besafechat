@@ -1,7 +1,12 @@
-import { db } from '../lib/db/db';
-import { CryptoService } from './crypto.service';
-import { StorageService } from './storage.service';
+import {
+  decryptSeedFromCloud,
+  deriveKeyPairFromSeed,
+  encryptSeedForCloud,
+  validateSeedPhrase,
+} from '../lib/crypto';
 import { DeviceService } from './device.service';
+import { StorageService } from './storage.service';
+import { CloudBackupService } from './cloud-backup.service';
 
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
@@ -12,8 +17,8 @@ export class AccountService {
    */
   static async createAccountWithCloud(password: string) {
     // 1. Get current key from IndexedDB
-    const keyRecord = await db.publicKey.get('current');
-    if (!keyRecord) {
+    const publicKey = await StorageService.getPublicKey();
+    if (!publicKey) {
       throw new Error('No key found in IndexedDB');
     }
 
@@ -23,24 +28,23 @@ export class AccountService {
     }
 
     const seed = temporarySeed;
-    const publicKeyBase64 = keyRecord.publicKeyBase64;
+    const publicKeyBase64 = publicKey;
 
     // 3. Encrypt seed for cloud
     console.log('[account-service] Encrypting seed for cloud...');
-    const encrypted = await CryptoService.encryptSeedForCloud(seed, password, publicKeyBase64);
+    const encrypted = await encryptSeedForCloud(seed, password, publicKeyBase64);
     console.log('[account-service] Encrypted data:', encrypted);
 
     // 4. Upload to S3 via storage service
     console.log('[account-service] Uploading to S3...');
-    const uploadResult = await StorageService.uploadEncryptedSeed(encrypted);
+    const uploadResult = await CloudBackupService.backupSeed(encrypted);
     console.log('[account-service] Upload result:', uploadResult);
 
     if (!uploadResult.success) {
       throw new Error(`Upload failed: ${uploadResult.message || 'Unknown error'}`);
     }
 
-    // 5. Update IndexedDB to mark as cloud backup
-    await db.publicKey.update('current', {});
+    // 5. Update IndexedDB to mark as cloud backup (this is not needed anymore since we're using StorageService)
 
     // 6. Download backup file
     AccountService.downloadBackupFile(encrypted, publicKeyBase64);
@@ -54,19 +58,16 @@ export class AccountService {
    */
   static async createAccountWithSeed(seed: string[]) {
     // Validate seed
-    if (!CryptoService.validateSeed(seed)) {
+    const validation = validateSeedPhrase(seed);
+    if (!validation.isValid) {
       throw new Error('Invalid seed phrase');
     }
 
     // Derive keys
-    const { privateKey, publicKey, publicKeyBase64 } = await CryptoService.deriveKeysFromSeed(seed);
+    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
 
     // Save public key to IndexedDB
-    await db.publicKey.put({
-      id: 'current',
-      publicKeyBase64,
-      createdAt: Date.now(),
-    });
+    await StorageService.storePublicKey(publicKeyBase64);
 
     // Store seed temporarily in memory only (not in IndexedDB)
     temporarySeed = [...seed]; // Create a copy to avoid reference issues
@@ -78,37 +79,19 @@ export class AccountService {
    * Recover account with password
    */
   static async recoverWithPassword(username: string, password: string) {
-    // 1. Download encrypted seed from S3 using username (no auth required)
-    console.log('[account-service] Downloading from S3 by username:', username);
-    const response = await StorageService.downloadEncryptedSeedByUsername(username);
+    // 1. Use the CloudBackupService method that handles both download and decryption
+    const cloudService = new CloudBackupService();
+    const seed = await cloudService.restoreAndDecryptSeedByUsername(username, password);
 
-    console.log('[account-service] Download response:', response);
-
-    if (!response.success || !response.data) {
-      throw new Error(response.message || 'No cloud backup found for this username');
+    if (!seed) {
+      throw new Error('No cloud backup found for this username or invalid password');
     }
 
-    const data = response.data;
+    // 2. Derive keys from the recovered seed
+    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
 
-    // 2. Decrypt seed
-    const seed = await CryptoService.decryptSeedFromCloud(
-      data.encrypted,
-      password,
-      data.publicKey,
-      data.salt,
-      data.iv,
-      data.authTag
-    );
-
-    // 3. Derive keys
-    const { privateKey, publicKey, publicKeyBase64 } = await CryptoService.deriveKeysFromSeed(seed);
-
-    // 4. Save to IndexedDB
-    await db.publicKey.put({
-      id: 'current',
-      publicKeyBase64,
-      createdAt: Date.now(),
-    });
+    // 3. Save to IndexedDB
+    await StorageService.storePublicKey(publicKeyBase64);
 
     return { privateKey, publicKey, publicKeyBase64 };
   }

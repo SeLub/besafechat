@@ -8,8 +8,7 @@ import { AuthGuard } from '@/components/auth-guard';
 import { useAuth } from '@/hooks/use-auth';
 import { useChats } from '@/hooks/use-chats';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
-import { saveMessage, loadMessages } from '@/lib/db/message-storage';
-import { cleanupOldMessages } from '@/lib/db/cleanup';
+import { StorageService } from '@/services/storage.service';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -57,7 +56,14 @@ function ChatRouteContent() {
 
     // Save sent message immediately using recipientId as chatId
     console.log('💾 Saving sent message with recipientId:', recipientId);
-    await saveMessage(recipientId, user.id, message, true, messageId);
+    await StorageService.saveEncryptedMessage(
+      recipientId,
+      user.id,
+      message,
+      user.id,
+      true,
+      messageId
+    );
 
     // Update chat last message
     updateChatLastMessage(selectedChatId, `You: ${message}`);
@@ -77,7 +83,7 @@ function ChatRouteContent() {
 
     console.log('📚 Loading messages for userId:', loadKey);
     // Load messages from IndexedDB
-    const loadedMessages = await loadMessages(loadKey);
+    const loadedMessages = user ? await StorageService.loadDecryptedMessages(loadKey, user.id) : [];
     console.log('📚 Loaded', loadedMessages.length, 'messages');
     setMessages(loadedMessages);
   };
@@ -153,7 +159,16 @@ function ChatRouteContent() {
       // Always save to IndexedDB using senderId as chatId (to match sent messages)
       if (message.fromUserId) {
         console.log('💾 Saving received message with senderId:', message.fromUserId);
-        await saveMessage(message.fromUserId, message.fromUserId, message.text, false, message.id);
+        if (user) {
+          await StorageService.saveEncryptedMessage(
+            message.fromUserId,
+            message.fromUserId,
+            message.text,
+            user.id,
+            false,
+            message.id
+          );
+        }
       }
     },
     [selectedChatId]
@@ -190,7 +205,7 @@ function ChatRouteContent() {
 
   // Cleanup old messages on app start
   useEffect(() => {
-    cleanupOldMessages();
+    StorageService.cleanupOldMessagesWithSettings();
   }, []);
 
   // Restore selected chat on page load

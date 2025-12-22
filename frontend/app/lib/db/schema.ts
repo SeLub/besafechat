@@ -1,28 +1,52 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/lib/db/schema.ts
+
 export interface Message {
   id: string;
   chatId: string;
   senderId: string;
   contentType: 'text' | 'image' | 'file';
-  encryptedContent: Uint8Array;
-  encryptedKey?: Uint8Array;
+
+  // Шифрованные данные
+  encryptedContent: ArrayBuffer; // Зашифрованное содержимое (ArrayBuffer для IndexedDB)
+  salt: ArrayBuffer; // Соль для деривации ключа
+  iv: ArrayBuffer; // Вектор инициализации
+
+  // Метаданные
   timestamp: number;
   isOwn: boolean;
+
+  // Опциональные поля
+  authTag?: ArrayBuffer; // Тег аутентификации (для AES-GCM)
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  editedAt?: number;
+  replyToId?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface Contact {
-  id: string;
-  displayName?: string;
-  isPinned: boolean;
+  displayName: string;
+  contactId: string; // Contact ID
+  userId: string; // UUID of contragent
 }
 
-export interface publicKey {
-  id: string; // "current"
-  publicKeyBase64: string; // Публичный ключ в base64
+export interface PublicKey {
+  id: string; // Всегда "current" (только один ключ на устройство)
+  publicKeyBase64: string; // Ed25519 публичный ключ в base64 (44 символа)
   createdAt: number;
 }
 
+export type MessageRetentionPeriod = '7' | '30' | '90' | 'forever';
+
+// Dexie схема
 export const SCHEMA = {
   messages: 'id, chatId, timestamp',
-  contacts: '++id',
+  contacts: '++contactId, userId',
   publicKey: 'id',
 };
+
+export type MigrationStep = {
+  version: number;
+  description: string;
+  migrate: (db: any) => Promise<void>;
+};
+

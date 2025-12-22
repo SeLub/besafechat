@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { db } from '@/lib/db/db';
-import { UsernameSelection } from '@/components/auth/username-selection';
 import { MethodSelection } from '@/components/auth/method-selection';
-import { SeedDisplay } from '@/components/auth/seed-display';
-import { SeedVerification } from '@/components/auth/seed-verification';
 import { PasswordCreation } from '@/components/auth/password-creation';
 import { RecoveryOptions } from '@/components/auth/recovery-options';
-import { CryptoService } from '@/services/crypto.service';
+import { SeedDisplay } from '@/components/auth/seed-display';
+import { SeedVerification } from '@/components/auth/seed-verification';
+import { UsernameSelection } from '@/components/auth/username-selection';
+import { Button } from '@/components/ui/button';
+import { generateSeedPhrase } from '@/lib/crypto';
 import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
+import { StorageService } from '@/services/storage.service';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 type AuthStep =
   | 'main'
@@ -33,8 +33,8 @@ export default function AuthRoute() {
 
   useEffect(() => {
     const checkKey = async () => {
-      const key = await db.publicKey.get('current');
-      setHasKey(!!key);
+      const hasKey = await StorageService.hasStoredPublicKey();
+      setHasKey(hasKey);
     };
     checkKey();
   }, []);
@@ -48,9 +48,9 @@ export default function AuthRoute() {
     setStep('method-selection');
   };
 
-  const handleMethodSelect = (selectedMethod: 'cloud' | 'self-custody') => {
+  const handleMethodSelect = async (selectedMethod: 'cloud' | 'self-custody') => {
     setMethod(selectedMethod);
-    const newSeed = CryptoService.generateSeed();
+    const newSeed = await generateSeedPhrase();
     setSeed(newSeed);
 
     if (selectedMethod === 'cloud') {
@@ -116,10 +116,7 @@ export default function AuthRoute() {
   };
 
   const setUsernameOnBackend = async (usernameValue: string) => {
-    await AuthService.setUsername({
-      username: usernameValue,
-      isSearchable: 'yes',
-    });
+    await AuthService.setUsername(usernameValue);
   };
 
   const loginToBackend = async (publicKeyBase64: string) => {
@@ -133,12 +130,12 @@ export default function AuthRoute() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const record = await db.publicKey.get('current');
-      if (!record) {
+      const publicKey = await StorageService.getPublicKey();
+      if (!publicKey) {
         toast.error('No stored key found');
         return;
       }
-      await loginToBackend(record.publicKeyBase64);
+      await loginToBackend(publicKey);
       window.location.href = '/';
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
@@ -148,7 +145,7 @@ export default function AuthRoute() {
   };
 
   const handleClearKey = async () => {
-    await db.publicKey.delete('current');
+    await StorageService.clearStoredKey();
     AccountService.clearTemporarySeed(); // Also clear temporary seed storage
     setHasKey(false);
     toast.success('Key cleared');

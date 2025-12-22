@@ -1,6 +1,6 @@
-import { CryptoService } from './crypto.service';
+import { decryptSeedFromCloud, encryptSeedForCloud, deriveKeyPairFromSeed } from '../lib/crypto';
 import { UserService } from './user.service';
-import type { EncryptedSeedData, KeyPair } from './crypto.service';
+import type { EncryptedSeedData, KeyPair } from '../lib/crypto/types';
 
 // ============================================================================
 // Types
@@ -294,7 +294,7 @@ export class CloudBackupService {
 
     // 3. Decrypt the seed
     try {
-      const seed = await CryptoService.decryptSeedFromCloud(encryptedSeed, password, userId);
+      const seed = await decryptSeedFromCloud(encryptedSeed, password, userId);
       return seed;
     } catch (error) {
       console.error('Decryption failed:', error);
@@ -334,7 +334,7 @@ export class CloudBackupService {
         throw new Error('Could not retrieve seed for update');
       }
 
-      const encryptedSeed = await CryptoService.encryptSeedForCloud(
+      const encryptedSeed = await encryptSeedForCloud(
         seedToEncrypt,
         newPassword,
         userId
@@ -550,7 +550,7 @@ export class CloudBackupService {
     const profile = await UserService.getProfile();
     const { userId } = profile;
 
-    const encryptedSeed = await CryptoService.encryptSeedForCloud(seedWords, password, userId);
+    const encryptedSeed = await encryptSeedForCloud(seedWords, password, userId);
 
     return CloudBackupService.backupSeed(encryptedSeed, username);
   }
@@ -566,7 +566,7 @@ export class CloudBackupService {
       throw new Error('Failed to restore seed from backup');
     }
 
-    const keyPair = await CryptoService.deriveKeyPairFromSeed(seedWords);
+    const keyPair = await deriveKeyPairFromSeed(seedWords);
 
     return keyPair;
   }

@@ -176,7 +176,7 @@ export class S3Service {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          path: `users/${userId}`,
+          path: '', // Empty path - backend will construct as users/{userId}/filename
           filename: 'avatar.png',
           fileType: 'avatar',
           contentType: 'image/png',
@@ -204,7 +204,7 @@ export class S3Service {
 
       // 4. Возвращаем прямой URL к аватару с временным параметром для обновления кэша
       const timestamp = Date.now();
-      return `${this.s3BucketUrl}/users/${userId}/avatar.png?t=${timestamp}`;
+      return `${this.s3BucketUrl}/users/${userId}/avatar.png?v=${timestamp}`;
     }, 'uploadAvatar');
   }
 
@@ -214,7 +214,7 @@ export class S3Service {
    */
   static getAvatarUrl(userId: string): string {
     const timestamp = Date.now();
-    return `${this.s3BucketUrl}/users/${userId}/avatar.png?t=${timestamp}`;
+    return `${this.s3BucketUrl}/users/${userId}/avatar.png?v=${timestamp}`;
   }
 
   /**

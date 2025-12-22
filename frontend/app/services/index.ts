@@ -1,6 +1,6 @@
 export { DeviceService } from './device.service';
 export { API_CONFIG } from './api-config';
-export { CryptoService } from './crypto.service';
+// CryptoService has been removed - use functions from '@/lib/crypto' instead
 export { AuthService } from './auth.service';
 export { AccountService } from './account.service';
 export { StorageService } from './storage.service';
