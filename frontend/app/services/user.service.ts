@@ -7,7 +7,7 @@ import { handleApiResponse } from './api-utils';
 export class UserService {
   static async getProfile(): Promise<ProfileResponse> {
     console.log('UserService.getProfile: Calling API...');
-    const res = await fetch(`${API_CONFIG.BASE_URL}/profile`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/auth/profile`, {
       credentials: 'include',
     });
     console.log('UserService.getProfile: Response received', { status: res.status, ok: res.ok });
@@ -15,7 +15,7 @@ export class UserService {
     const result = await handleApiResponse<ProfileResponse>(res);
     console.log('UserService.getProfile: Profile data received', result);
     return result;
-  }
+ }
 
   static async updateDisplayName(displayName: string): Promise<void> {
     const res = await fetch(`${API_CONFIG.BASE_URL}/profile/display-name`, {
@@ -49,7 +49,7 @@ export class UserService {
   static async checkUsernameAvailable(username: string): Promise<boolean> {
     try {
       const res = await fetch(
-        `${API_CONFIG.BASE_URL}/profile/username/search/${encodeURIComponent(username)}`,
+        `${API_CONFIG.BASE_URL}/username/search/${encodeURIComponent(username)}`,
         { credentials: 'include' }
       );
 
@@ -58,7 +58,7 @@ export class UserService {
         return true;
       }
 
-      // Если статус 200 - username занят
+      // Если статус 20 - username занят
       if (res.status === 200) {
         return false;
       }
@@ -78,7 +78,7 @@ export class UserService {
   static async getUserByUsername(username: string): Promise<ProfileResponse | null> {
     try {
       const res = await fetch(
-        `${API_CONFIG.BASE_URL}/profile/username/search/${encodeURIComponent(username)}`,
+        `${API_CONFIG.BASE_URL}/username/search/${encodeURIComponent(username)}`,
         { credentials: 'include' }
       );
 
@@ -88,7 +88,7 @@ export class UserService {
 
       if (res.status === 200) {
         const data = await res.json();
-        return data.data;
+        return data; // Updated to return the data directly instead of data.data
       }
 
       return null;
