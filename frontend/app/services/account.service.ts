@@ -78,37 +78,9 @@ export class AccountService {
   /**
    * Recover account with password
    */
-  static async recoverWithPassword(username: string, password: string) {
-    const cloudService = new CloudBackupService();
-
-    // 1. Get userId by looking up the username using the new endpoint
-    const apiBaseUrl = 'http://localhost:4000'; // This should match the CloudBackupService default
-    const userResponse = await fetch(
-      `${apiBaseUrl}/username/search/${encodeURIComponent(username)}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      }
-    );
-
-    if (!userResponse.ok) {
-      if (userResponse.status === 404) {
-        throw new Error('Username not found. Please check the spelling and try again.');
-      }
-      throw new Error('Failed to look up username. Please try again.');
-    }
-
-    const userData = await userResponse.json();
-    // Backend returns { id, publicKey, displayName }
-    const userId = userData.id;
-
-    if (!userId) {
-      throw new Error('Account not found for this username');
-    }
-
+  static async recoverWithPassword(password: string) {
     // 2. Use the CloudBackupService method that handles both download and decryption
-    const seed = await cloudService.restoreAndDecryptSeedByUserId(userId, password);
+    const seed = await CloudBackupService.restoreAndDecryptSeedByPassword(password);
 
     if (!seed) {
       throw new Error('No cloud backup found for this user or invalid password');
