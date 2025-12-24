@@ -116,7 +116,7 @@ export class S3Service {
   }
 
   /**
-   * Validates and constructs the file path ensuring user ownership
+   * Validates and constructs the file path ensuring user ownership for regular files
    */
   validateAndConstructPath(path: string, filename: string, userId: string): string {
     // Sanitize inputs to prevent path traversal attacks
@@ -129,9 +129,18 @@ export class S3Service {
       throw new BadRequestException('Invalid path or filename');
     }
 
-    // Ensure the path starts with the user's directory for security
+    // For seed storage paths, bypass user validation completely
+    if (path.startsWith('seeds/')) {
+      // Allow seed paths without user prefix validation
+      const fileKey = path ? `${path}/${filename}` : filename;
+      return fileKey;
+    }
+
+    // For all other paths, ensure they start with the user's directory for security
     if (!path.startsWith(`users/${userId}/`)) {
-      path = `users/${userId}/${path}`;
+      if (!path.startsWith(`users/${userId}`)) {
+        path = `users/${userId}/${path}`;
+      }
     }
 
     // Ensure path doesn't end with slash unless it's empty
@@ -145,10 +154,4 @@ export class S3Service {
     return fileKey;
   }
 
-  /**
-   * Verifies that a file belongs to a specific user
-   */
-  verifyFileOwnership(key: string, userId: string): boolean {
-    return key.startsWith(`users/${userId}/`);
-  }
 }

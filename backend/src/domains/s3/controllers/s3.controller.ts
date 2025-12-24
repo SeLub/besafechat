@@ -77,6 +77,12 @@ export class S3Controller {
       // Validate and construct the file key
       const fileKey = this.s3Service.validateAndConstructPath(path, filename, userId);
 
+      // For seed uploads, we may want to add additional validation or logging
+      if (fileKey.startsWith('seeds/')) {
+        // Add logging for seed operations to track them separately if needed
+        console.log(`Seed operation: ${fileKey} for user ${userId}`);
+      }
+
       const uploadUrl = await this.s3Service.getPresignedUrlForUpload(fileKey, contentType);
 
       return new ApiResponseDto(true, { uploadUrl, fileKey });
@@ -114,8 +120,11 @@ export class S3Controller {
       // Validate and construct the file key
       const fileKey = this.s3Service.validateAndConstructPath(path, filename, userId);
 
-      // Verify user owns the file
-      if (!this.s3Service.verifyFileOwnership(fileKey, userId)) {
+      // For seed operations, we skip ownership verification
+      if (fileKey.startsWith('seeds/')) {
+        // Add logging for seed operations to track them separately if needed
+        console.log(`Seed download operation: ${fileKey} for user ${userId}`);
+      } else if (!fileKey.startsWith(`users/${userId}/`)) {
         return new ApiResponseDto<DownloadResponseData>(
           false,
           undefined,
@@ -160,8 +169,11 @@ export class S3Controller {
       // Validate and construct the file key
       const fileKey = this.s3Service.validateAndConstructPath(path, filename, userId);
 
-      // Verify user owns the file
-      if (!this.s3Service.verifyFileOwnership(fileKey, userId)) {
+      // For seed operations, we skip ownership verification
+      if (fileKey.startsWith('seeds/')) {
+        // Add logging for seed operations to track them separately if needed
+        console.log(`Seed delete operation: ${fileKey} for user ${userId}`);
+      } else if (!fileKey.startsWith(`users/${userId}/`)) {
         return new ApiResponseDto<DeleteResponseData>(
           false,
           undefined,
