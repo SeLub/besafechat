@@ -77,21 +77,11 @@ export default function AuthRoute() {
   const handlePasswordCreated = async (password: string) => {
     setLoading(true);
     try {
-      // 1. Derive keys and save to IndexedDB
-      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
+      // Use the unified account creation flow with cloud backup
+      const result = await AccountService.createAccountWithCloud(password);
 
-      // 2. Register to backend and get userId
-      const registrationResult = await loginToBackend(publicKeyBase64);
-      if (!registrationResult || !registrationResult.userId) {
-        throw new Error('Registration failed: No userId returned');
-      }
-      const userId = registrationResult.userId;
-
-      // 3. Set username
+      // Set username
       await setUsernameOnBackend(username);
-
-      // 4. Upload encrypted seed to S3
-      await AccountService.createAccountWithCloud(password, userId);
 
       setStep('complete');
       toast.success('Account created with cloud backup!');
@@ -106,8 +96,9 @@ export default function AuthRoute() {
   const finalizeSelfCustody = async () => {
     setLoading(true);
     try {
-      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
-      await loginOnly(publicKeyBase64);
+      // Use the unified account creation flow with self-custody
+      const result = await AccountService.createAccountWithSelfCustody();
+      await loginOnly(result.publicKeyBase64);
       await setUsernameOnBackend(username);
       setStep('complete');
       toast.success('Account created!');
