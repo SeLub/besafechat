@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { UserService } from '@/services/user.service';
 
 interface UsernameSelectionProps {
   onUsernameSelected: (username: string) => void;
@@ -26,14 +27,18 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
     setAvailable(false);
 
     try {
-      const response = await fetch(`http://localhost:4000/username/search/${value}`);
-      if (response.ok) {
+      const isAvailable = await UserService.checkUsernameAvailable(value);
+
+      if (isAvailable) {
+        // Username is available
+        setAvailable(true);
+      } else {
+        // Username is taken
         setError('Username is already taken');
         setAvailable(false);
-      } else {
-        setAvailable(true);
       }
     } catch (err) {
+      // Network errors or other issues - assume available
       setAvailable(true);
     } finally {
       setChecking(false);
