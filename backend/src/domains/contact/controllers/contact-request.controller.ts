@@ -112,7 +112,10 @@ export class ContactRequestController {
     @Param('userId', ParseUUIDPipe) userId: string
   ) {
     const status = await this.contactRequestService.checkRequestStatus(req.user!.id, userId);
-    return { status };
+    return {
+      success: true,
+      data: { status },
+    };
   }
 
   @Get()

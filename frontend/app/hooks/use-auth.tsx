@@ -1,14 +1,8 @@
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
+import { UserService } from '@/services/user.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-
-interface User {
-  id: string;
-  publicKey: string;
-  displayName?: string;
-  username?: string;
-  // Приватный ключ НЕ хранится в этом объекте — он остаётся в зашифрованной Dexie-БД
-}
+import type { User } from '~/types';
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +11,7 @@ interface AuthContextType {
   login: (publicKey: string, deviceId: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,8 +98,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Обновление данных пользователя без перезагрузки страницы
+  const refreshUser = async () => {
+    try {
+      const res = await fetch('http://localhost:4000/auth/profile', {
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const profile = await res.json();
+        setUser(profile.data);
+        console.log('User profile refreshed successfully', profile.data);
+      } else if (res.status === 401) {
+        clearAuthCookies();
+        setUser(null);
+        console.log('User session expired, cleared auth');
+      } else {
+        console.error('Failed to refresh user profile:', res.status);
+      }
+    } catch (error) {
+      console.error('User refresh error:', error);
+    }
+ };
+
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout, checkAuth }}>
+    <AuthContext.Provider
+      value={{ user, loading, register, login, logout, checkAuth, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
