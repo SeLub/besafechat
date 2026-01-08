@@ -1,8 +1,8 @@
-import { IsUUID, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class SendRequestDto {
   @IsUUID()
-  toUserId!: string;
+  toIdentityId!: string;
 
   @IsOptional()
   @IsString()

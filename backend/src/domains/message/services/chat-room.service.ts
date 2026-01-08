@@ -14,34 +14,70 @@ export class ChatRoomService {
     private chatMemberRepository: Repository<ChatMember>
   ) {}
 
-  async findOrCreatePrivateChat(senderId: string, recipientId: string) {
-    if (!senderId || !recipientId) {
-      console.log('senderId :', senderId, 'recipientId :', recipientId);
-      throw new Error('Both senderId and recipientId are required');
+  // Обновленный метод в ChatRoomService
+  async findOrCreatePrivateChat(userHandleId: string, otherHandleId: string): Promise<Chat> {
+    // Проверяем существующий чат через ChatMember
+    const existingChat = await this.findExistingPrivateChat(userHandleId, otherHandleId);
+
+    if (existingChat) {
+      return existingChat;
     }
 
-    const [first, second] = [senderId, recipientId].sort();
+    // Создаем новый чат
+    const chat = this.chatRepository.create({
+      type: 'private',
+      // Добавляем поля для E2EE если нужно
+    });
 
-    // Поиск существующего чата
-    const chat = await this.chatRepository
-      .createQueryBuilder('chat')
-      .innerJoin('chat.members', 'member1', 'member1.userId = :first', { first })
-      .innerJoin('chat.members', 'member2', 'member2.userId = :second', { second })
-      .where('chat.type = :type', { type: 'private' })
-      .getOne();
+    await this.chatRepository.save(chat);
 
-    if (chat) return chat;
-
-    // Создание нового чата
-    const newChat = this.chatRepository.create({ type: 'private' });
-    await this.chatRepository.save(newChat);
-
-    // ✅ Правильное добавление ОБОИХ участников
-    await this.chatMemberRepository.save([
-      { chatId: newChat.id, userId: first },
-      { chatId: newChat.id, userId: second }, // ← recipientId, а не chatId!
+    // Создаем участников чата
+    await Promise.all([
+      this.chatMemberRepository.save({
+        chatId: chat.id,
+        memberHandleId: userHandleId,
+        role: 'member',
+        canSendMessages: true,
+        joinedAt: new Date(),
+      }),
+      this.chatMemberRepository.save({
+        chatId: chat.id,
+        memberHandleId: otherHandleId,
+        role: 'member',
+        canSendMessages: true,
+        joinedAt: new Date(),
+      }),
     ]);
 
-    return newChat;
+    return chat;
+  }
+
+  private async findExistingPrivateChat(
+    userHandleId: string,
+    otherHandleId: string
+  ): Promise<Chat | null> {
+    // Находим общий чат через ChatMember
+    const userChats = await this.chatMemberRepository.find({
+      where: { memberHandleId: userHandleId },
+      select: ['chatId'],
+    });
+
+    const otherChats = await this.chatMemberRepository.find({
+      where: { memberHandleId: otherHandleId },
+      select: ['chatId'],
+    });
+
+    const userChatIds = userChats.map((c) => c.chatId);
+    const otherChatIds = otherChats.map((c) => c.chatId);
+
+    const commonChatIds = userChatIds.filter((id) => otherChatIds.includes(id));
+
+    if (commonChatIds.length > 0) {
+      return this.chatRepository.findOne({
+        where: { id: commonChatIds[0] },
+      });
+    }
+
+    return null;
   }
 }

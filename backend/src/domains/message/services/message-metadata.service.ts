@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MessageMetadata } from '../message-metadata.entity';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
-import { User } from '../../user/user.entity';
+import { Identity } from '../../identity/identity.entity';
 import { Chat } from '../../chat/chat.entity';
 import { ChatRoomService } from './chat-room.service';
 
@@ -24,8 +24,8 @@ export class MessageMetadataService {
 
     // 2. Сохранить метаданные
     const metadata = this.messageMetadataRepository.create({
-      sender: { id: senderId } as User,
-      chat: { id: chat.id } as Chat,
+      senderHandleId: senderId,
+      chatId: chat.id,
       type: payload.type,
       encryptedKey: Buffer.from(payload.encryptedKey, 'base64'),
       timestamp: new Date(payload.timestamp),

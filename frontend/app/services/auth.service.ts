@@ -1,17 +1,10 @@
-import type {
-  LoginCredentials,
-  ApiResponse,
-  LoginResponse,
-  ProfileResponse,
-  UsernameCheckResponse,
-} from '@/types';
+import type { ApiResponse, LoginCredentials, LoginResponse, ProfileResponse } from '@/types';
 
 import type {
-  OnlineStatusResponse,
   BulkOnlineStatusResponse,
-  Session,
+  OnlineStatusResponse,
   RefreshTokenResponse,
-  PublicKeyResponse,
+  Session,
 } from '@/types/account';
 
 /**
@@ -306,32 +299,6 @@ export class AuthService {
     const data: ApiResponse = await res.json();
     if (!data.success) {
       throw new Error(data.error || 'Failed to set username');
-    }
-  }
-
-  /**
-   * Проверка доступности username
-   */
-  static async checkUsernameAvailable(username: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.API_BASE}/username/search/${encodeURIComponent(username)}`, {
-        credentials: 'include',
-      });
-
-      // If status is 404, username is available
-      if (res.status === 404) {
-        return true;
-      }
-
-      // If status is 20, username exists (not available)
-      if (res.status === 200) {
-        return false;
-      }
-
-      // For any other status, return false (not available)
-      return false;
-    } catch {
-      return false;
     }
   }
 

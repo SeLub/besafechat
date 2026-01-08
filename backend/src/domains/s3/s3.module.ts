@@ -1,12 +1,17 @@
 // src/domains/s3/s3.module.ts
 import { Module, forwardRef } from '@nestjs/common';
-import { S3Service } from './s3.service';
+import { HandleModule } from '../handle/handle.module';
+import { IdentityModule } from '../identity/identity.module';
+import { SessionModule } from '../session/session.module';
 import { S3Controller } from './controllers/s3.controller';
-import { UserModule } from '../user/user.module';
-import { UsernameModule } from '../username/username.module';
+import { S3Service } from './s3.service';
 
 @Module({
-  imports: [forwardRef(() => UserModule), forwardRef(() => UsernameModule)],
+  imports: [
+    forwardRef(() => IdentityModule),
+    forwardRef(() => HandleModule),
+    forwardRef(() => SessionModule),
+  ],
   controllers: [S3Controller],
   providers: [S3Service],
   exports: [S3Service],

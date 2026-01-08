@@ -41,10 +41,10 @@ export class UserService {
   }
 
   /**
-   * Проверить доступность username
-   * Сервер возвращает:
-   * - 200 с данными пользователя если username занят
-   * - 404 если username свободен
+   * Check if username is available
+   * Server returns:
+   * - 200 with { available: true } if username is available
+   * - 200 with { available: false, user: userInfo } if username exists
    */
   static async checkUsernameAvailable(username: string): Promise<boolean> {
     try {
@@ -55,9 +55,10 @@ export class UserService {
         }
       );
 
+      // Return true if username is available, false if taken
       return result.available;
     } catch (error) {
-      // При ошибке сети считаем что не доступен
+      // On network error, consider as not available
       console.error('Error checking username availability:', error);
       return false;
     }

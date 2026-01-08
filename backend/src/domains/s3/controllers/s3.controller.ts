@@ -15,7 +15,7 @@ import {
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import { JwtSessionGuard } from '../../user/guards/jwt-session.guard';
+import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { UnifiedDeleteDto } from '../dto/unified-delete.dto';
 import { UnifiedDownloadDto } from '../dto/unified-download.dto';
 import { UnifiedUploadDto } from '../dto/unified-upload.dto';
