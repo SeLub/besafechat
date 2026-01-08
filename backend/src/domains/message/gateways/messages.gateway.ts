@@ -1,14 +1,14 @@
 // src/domains/message/gateways/messages.gateway.ts
 import {
-  WebSocketGateway,
-  WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { SessionService } from '../../user/services/session.service';
 import { RedisService } from '../../../common/redis.service';
+import { SessionService } from '../../session/services/session.service';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { MessageMetadataService } from '../services/message-metadata.service';
 
@@ -56,18 +56,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
 
       // 3. Сохраняем данные в сокет
-      client.data.userId = session.user.id;
+      client.data.identityId = session.identity.id;
       client.data.sessionId = session.id;
 
       // 4. Подключаем к комнате пользователя (для 1:1 и групп)
-      await client.join(`user:${session.user.id}`);
+      await client.join(`user:${session.identity.id}`);
 
       // 5. Обновляем онлайн-статус
       const redis = this.redisService.getClient();
-      await redis.setex(`online:${session.user.id}`, 60, '1');
+      await redis.setex(`online:${session.identity.id}`, 60, '1');
 
       // 6. Уведомляем контакты о том, что пользователь онлайн
-      await this.notifyContactsUserOnline(session.user.id);
+      await this.notifyContactsUserOnline(session.identity.id);
     } catch (error) {
       console.error('❌ WebSocket connection error:', error);
       client.disconnect(true);
@@ -75,11 +75,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async handleDisconnect(client: Socket) {
-    if (client.data?.userId) {
-      const userId = client.data.userId;
+    if (client.data?.identityId) {
+      const identityId = client.data.identityId;
       const redis = this.redisService.getClient();
-      await redis.del(`online:${userId}`);
-      await this.notifyContactsUserOffline(userId);
+      await redis.del(`online:${identityId}`);
+      await this.notifyContactsUserOffline(identityId);
     }
   }
 
@@ -89,11 +89,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       const { to, type, encryptedContent, encryptedKey, timestamp } = payload;
 
       // Сохраняем метаданные и получаем ID чата
-      const chatId = await this.messageMetadataService.save(client.data.userId, to, payload);
+      const chatId = await this.messageMetadataService.save(client.data.identityId, to, payload);
 
       // Отправляем сообщение всем онлайн-сокетам получателя
       this.server.to(`user:${to}`).emit('message:new', {
-        from: client.data.userId,
+        from: client.data.identityId,
         chatId,
         type,
         encryptedContent,
@@ -107,37 +107,42 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   // Contact request notifications
-  async notifyContactRequest(toUserId: string, fromUser: any, requestId: string, message?: string) {
-    this.server.to(`user:${toUserId}`).emit('contact_request_received', {
+  async notifyContactRequest(
+    toIdentityId: string,
+    fromIdentity: any,
+    requestId: string,
+    message?: string
+  ) {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_received', {
       requestId,
       fromUser: {
-        id: fromUser.id,
-        displayName: fromUser.displayName,
-        username: fromUser.username?.username,
+        id: fromIdentity.id,
+        displayName: fromIdentity.profiles?.[0]?.displayName,
+        handle: fromIdentity.handles?.[0]?.value,
       },
       message,
       timestamp: new Date().toISOString(),
     });
   }
 
-  async notifyRequestAccepted(toUserId: string, byUser: any, chatId?: string) {
-    this.server.to(`user:${toUserId}`).emit('contact_request_accepted', {
+  async notifyRequestAccepted(toIdentityId: string, byIdentity: any, chatId?: string) {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_accepted', {
       byUser: {
-        id: byUser.id,
-        displayName: byUser.displayName,
-        username: byUser.username?.username,
+        id: byIdentity.id,
+        displayName: byIdentity.profiles?.[0]?.displayName,
+        handle: byIdentity.handles?.[0]?.value,
       },
       chatId,
       timestamp: new Date().toISOString(),
     });
   }
 
-  async notifyRequestRejected(toUserId: string, byUser: any) {
-    this.server.to(`user:${toUserId}`).emit('contact_request_rejected', {
+  async notifyRequestRejected(toIdentityId: string, byIdentity: any) {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_rejected', {
       byUser: {
-        id: byUser.id,
-        displayName: byUser.displayName,
-        username: byUser.username?.username,
+        id: byIdentity.id,
+        displayName: byIdentity.profiles?.[0]?.displayName,
+        handle: byIdentity.handles?.[0]?.value,
       },
       timestamp: new Date().toISOString(),
     });
@@ -146,30 +151,30 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Heartbeat для поддержания онлайн-статуса
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(client: Socket) {
-    if (client.data?.userId) {
+    if (client.data?.identityId) {
       const redis = this.redisService.getClient();
-      await redis.setex(`online:${client.data.userId}`, 60, '1');
+      await redis.setex(`online:${client.data.identityId}`, 60, '1');
     }
   }
 
   // Уведомление контактов о статусе онлайн
-  private async notifyContactsUserOnline(userId: string) {
+  private async notifyContactsUserOnline(identityId: string) {
     const sockets = await this.server.fetchSockets();
     sockets.forEach((socket) => {
-      const socketUserId = (socket as any).data?.userId;
-      if (socketUserId && socketUserId !== userId) {
-        this.server.to(`user:${socketUserId}`).emit('user_online', { userId });
+      const socketIdentityId = (socket as any).data?.identityId;
+      if (socketIdentityId && socketIdentityId !== identityId) {
+        this.server.to(`user:${socketIdentityId}`).emit('user_online', { identityId });
       }
     });
   }
 
   // Уведомление контактов о статусе оффлайн
-  private async notifyContactsUserOffline(userId: string) {
+  private async notifyContactsUserOffline(identityId: string) {
     const sockets = await this.server.fetchSockets();
     sockets.forEach((socket) => {
-      const socketUserId = (socket as any).data?.userId;
-      if (socketUserId && socketUserId !== userId) {
-        this.server.to(`user:${socketUserId}`).emit('user_offline', { userId });
+      const socketIdentityId = (socket as any).data?.identityId;
+      if (socketIdentityId && socketIdentityId !== identityId) {
+        this.server.to(`user:${socketIdentityId}`).emit('user_offline', { identityId });
       }
     });
   }

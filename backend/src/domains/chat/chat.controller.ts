@@ -1,11 +1,12 @@
-import { Controller, Get, Param, Post, Body, UseGuards } from '@nestjs/common';
+// /home/selub/Documents/progs/besafechat/backend/src/domains/chat/chat.controller.ts
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Chat } from './chat.entity';
-import { ChatMember } from './chat-member.entity';
-import { JwtSessionGuard } from '../user/guards/jwt-session.guard';
-import { CurrentUser } from '../user/decorators/current-user.decorator';
 import { ChatRoomService } from '../message/services/chat-room.service';
+import { CurrentUser } from '../session/decorators/current-user.decorator';
+import { JwtSessionGuard } from '../session/guards/jwt-session.guard';
+import { ChatMember } from './chat-member.entity';
+import { Chat } from './chat.entity';
 
 @Controller('chats')
 @UseGuards(JwtSessionGuard)
@@ -20,27 +21,56 @@ export class ChatController {
 
   @Get(':id')
   async getChatById(@Param('id') chatId: string, @CurrentUser() user: any) {
+    // Получаем чат
     const chat = await this.chatRepository.findOne({
       where: { id: chatId },
-      relations: ['members', 'members.user', 'members.user.username'],
     });
 
     if (!chat) {
       return { error: 'Chat not found' };
     }
 
-    // Check if user is member of this chat
-    const isMember = chat.members.some((member) => member.userId === user.id);
-    if (!isMember) {
+    // Проверяем, является ли пользователь участником чата через ChatMember
+    const membership = await this.chatMemberRepository.findOne({
+      where: {
+        chatId: chatId,
+        memberHandleId: user.handleId, // Используем handleId из сессии
+      },
+    });
+
+    if (!membership) {
       return { error: 'Access denied' };
     }
 
-    return chat;
+    // Получаем участников чата
+    const members = await this.chatMemberRepository.find({
+      where: { chatId: chatId },
+      relations: ['memberHandle'],
+    });
+
+    // Формируем ответ с участниками
+    return {
+      ...chat,
+      members: members.map((member) => ({
+        handleId: member.memberHandleId,
+        role: member.role,
+        canSendMessages: member.canSendMessages,
+        joinedAt: member.joinedAt,
+        handle: {
+          value: member.memberHandle?.value,
+          alias: member.memberHandle?.alias,
+        },
+      })),
+    };
   }
 
   @Post('find-or-create')
-  async findOrCreateChat(@Body() body: { otherUserId: string }, @CurrentUser() user: any) {
-    const chat = await this.chatRoomService.findOrCreatePrivateChat(user.id, body.otherUserId);
+  async findOrCreateChat(@Body() body: { otherHandleId: string }, @CurrentUser() user: any) {
+    // Используем handleId вместо identityId
+    const chat = await this.chatRoomService.findOrCreatePrivateChat(
+      user.handleId, // Handle текущего пользователя
+      body.otherHandleId // Handle другого пользователя
+    );
     return { chatId: chat.id };
   }
 }

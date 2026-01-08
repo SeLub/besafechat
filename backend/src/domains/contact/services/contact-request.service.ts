@@ -1,47 +1,50 @@
 import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
   BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ContactRequest, ContactRequestStatus } from '../contact-request.entity';
-import { User } from '../../user/user.entity';
+import { Handle } from '../../handle/handle.entity';
+import { Identity } from '../../identity/identity.entity';
 import { MessagesGateway } from '../../message/gateways/messages.gateway';
 import { ChatRoomService } from '../../message/services/chat-room.service';
+import { ContactRequest, ContactRequestStatus } from '../contact-request.entity';
 
 @Injectable()
 export class ContactRequestService {
   constructor(
     @InjectRepository(ContactRequest)
     private contactRequestRepository: Repository<ContactRequest>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @InjectRepository(Identity)
+    private identityRepository: Repository<Identity>,
+    @InjectRepository(Handle)
+    private handleRepository: Repository<Handle>,
     private messagesGateway: MessagesGateway,
     private chatRoomService: ChatRoomService
   ) {}
 
-  async sendRequest(fromUserId: string, toUserId: string, message?: string) {
-    // Check if users exist
-    const [fromUser, toUser] = await Promise.all([
-      this.userRepository.findOne({ where: { id: fromUserId }, relations: ['username'] }),
-      this.userRepository.findOne({ where: { id: toUserId } }),
+  async sendRequest(fromHandleId: string, toHandleId: string, message?: string) {
+    // Check if handles exist
+    const [fromHandle, toHandle] = await Promise.all([
+      this.handleRepository.findOne({ where: { id: fromHandleId }, relations: ['ownerIdentity'] }),
+      this.handleRepository.findOne({ where: { id: toHandleId }, relations: ['ownerIdentity'] }),
     ]);
 
-    if (!fromUser || !toUser) {
-      throw new NotFoundException('User not found');
+    if (!fromHandle || !toHandle) {
+      throw new NotFoundException('Handle not found');
     }
 
-    if (fromUserId === toUserId) {
+    if (fromHandleId === toHandleId) {
       throw new BadRequestException('Cannot send request to yourself');
     }
 
     // Check if request already exists
     const existingRequest = await this.contactRequestRepository.findOne({
       where: [
-        { fromUserId, toUserId },
-        { fromUserId: toUserId, toUserId: fromUserId },
+        { fromHandleId, toHandleId },
+        { fromHandleId: toHandleId, toHandleId: fromHandleId },
       ],
     });
 
@@ -51,8 +54,8 @@ export class ContactRequestService {
 
     // Create new request
     const request = this.contactRequestRepository.create({
-      fromUserId,
-      toUserId,
+      fromHandleId,
+      toHandleId,
       message: message?.trim(),
       status: ContactRequestStatus.PENDING,
     });
@@ -61,8 +64,8 @@ export class ContactRequestService {
 
     // Send WebSocket notification
     await this.messagesGateway.notifyContactRequest(
-      toUserId,
-      fromUser,
+      toHandle.ownerIdentity.id,
+      fromHandle.ownerIdentity,
       savedRequest.id,
       message?.trim()
     );
@@ -70,26 +73,26 @@ export class ContactRequestService {
     return savedRequest;
   }
 
-  async getIncomingRequests(userId: string) {
+  async getIncomingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
-      where: { toUserId: userId, status: ContactRequestStatus.PENDING },
-      relations: ['fromUser', 'fromUser.username'],
+      where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
+      relations: ['fromHandle', 'fromHandle.ownerIdentity'],
       order: { createdAt: 'DESC' },
     });
   }
 
-  async getOutgoingRequests(userId: string) {
+  async getOutgoingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
-      where: { fromUserId: userId },
-      relations: ['toUser', 'toUser.username'],
+      where: { fromHandleId: handleId },
+      relations: ['toHandle', 'toHandle.ownerIdentity'],
       order: { createdAt: 'DESC' },
     });
   }
 
-  async acceptRequest(requestId: string, userId: string) {
+  async acceptRequest(requestId: string, handleId: string) {
     const request = await this.contactRequestRepository.findOne({
-      where: { id: requestId, toUserId: userId, status: ContactRequestStatus.PENDING },
-      relations: ['fromUser', 'toUser', 'toUser.username'],
+      where: { id: requestId, toHandleId: handleId, status: ContactRequestStatus.PENDING },
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle.ownerIdentity'],
     });
 
     if (!request) {
@@ -101,20 +104,24 @@ export class ContactRequestService {
 
     // Create chat between users
     const chat = await this.chatRoomService.findOrCreatePrivateChat(
-      request.fromUserId,
-      request.toUserId
+      request.fromHandleId,
+      request.toHandleId
     );
 
     // Send WebSocket notification to request sender
-    await this.messagesGateway.notifyRequestAccepted(request.fromUserId, request.toUser, chat.id);
+    await this.messagesGateway.notifyRequestAccepted(
+      request.fromHandle.ownerIdentity.id,
+      request.toHandle.ownerIdentity,
+      chat.id
+    );
 
     return { success: true, chatId: chat.id };
   }
 
-  async rejectRequest(requestId: string, userId: string) {
+  async rejectRequest(requestId: string, handleId: string) {
     const request = await this.contactRequestRepository.findOne({
-      where: { id: requestId, toUserId: userId, status: ContactRequestStatus.PENDING },
-      relations: ['toUser', 'toUser.username'],
+      where: { id: requestId, toHandleId: handleId, status: ContactRequestStatus.PENDING },
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle', 'toHandle.ownerIdentity'],
     });
 
     if (!request) {
@@ -125,16 +132,19 @@ export class ContactRequestService {
     await this.contactRequestRepository.save(request);
 
     // Send WebSocket notification to request sender
-    await this.messagesGateway.notifyRequestRejected(request.fromUserId, request.toUser);
+    await this.messagesGateway.notifyRequestRejected(
+      request.fromHandle.ownerIdentity.id,
+      request.toHandle.ownerIdentity
+    );
 
     return { success: true };
   }
 
-  async checkRequestStatus(userId: string, otherUserId: string) {
+  async checkRequestStatus(handleId: string, otherHandleId: string) {
     const request = await this.contactRequestRepository.findOne({
       where: [
-        { fromUserId: userId, toUserId: otherUserId },
-        { fromUserId: otherUserId, toUserId: userId },
+        { fromHandleId: handleId, toHandleId: otherHandleId },
+        { fromHandleId: otherHandleId, toHandleId: handleId },
       ],
     });
 
@@ -146,33 +156,33 @@ export class ContactRequestService {
       return 'connected'; // Already contacts
     }
 
-    if (request.fromUserId === userId) {
+    if (request.fromHandleId === handleId) {
       return 'sent'; // User sent request
     } else {
       return 'received'; // User received request
     }
   }
 
-  async getAcceptedContacts(userId: string) {
+  async getAcceptedContacts(handleId: string) {
     const requests = await this.contactRequestRepository.find({
       where: [
-        { fromUserId: userId, status: ContactRequestStatus.ACCEPTED },
-        { toUserId: userId, status: ContactRequestStatus.ACCEPTED },
+        { fromHandleId: handleId, status: ContactRequestStatus.ACCEPTED },
+        { toHandleId: handleId, status: ContactRequestStatus.ACCEPTED },
       ],
-      relations: ['fromUser', 'toUser', 'fromUser.username', 'toUser.username'],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle.ownerIdentity'],
       order: { updatedAt: 'DESC' },
     });
 
     return requests.map((request) => {
       // Get the other user (not the current user)
-      const otherUser = request.fromUserId === userId ? request.toUser : request.fromUser;
+      const otherHandle = request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
 
       return {
         id: request.id,
         user: {
-          id: otherUser.id,
-          displayName: otherUser.displayName,
-          username: otherUser.username?.username,
+          id: otherHandle.ownerIdentity.id,
+          displayName: otherHandle.ownerIdentity.profiles?.[0]?.displayName,
+          handle: otherHandle.value,
         },
         acceptedAt: request.updatedAt,
       };

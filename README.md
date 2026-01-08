@@ -136,11 +136,13 @@ BeSafeChat/
 │   │   │   ├── chat/                   # Чаты и участники
 │   │   │   │   ├── chat.entity.ts
 │   │   │   │   └── chat-member.entity.ts
+│   │   │   ├── contact/                # Запросы в контакты
+│   │   │   │   └── contact-request.entity.ts
 │   │   │   ├── media/                  # Метаданные медиафайлов
 │   │   │   │   └── media.entity.ts
 │   │   │   ├── message/                # Ядро мессенджера (WebSocket + E2EE)
 │   │   │   │   ├── dtos/
-│   │   │   │   │   └── message-payload.dto.ts
+│   │   │   └── message-payload.dto.ts
 │   │   │   │   ├── gateways/
 │   │   │   │   │   └── messages.gateway.ts
 │   │   │   │   ├── services/
@@ -148,37 +150,31 @@ BeSafeChat/
 │   │   │   │   │   └── message-metadata.service.ts
 │   │   │   │   ├── message-metadata.entity.ts
 │   │   │   │   └── message.module.ts
-│   │   │   ├── storage/                # Интеграция с Tebi (S3)
-│   │   │   │   ├── storage.module.ts
-│   │   │   │   └── storage.service.ts
-│   │   │   ├── user/                   # Пользователи и аутентификация
-│   │   │   │   ├── controllers/
-│   │   │   │   │   ├── auth.controller.ts
-│   │   │   │   │   └── auth-session.controller.ts
-│   │   │   │   ├── dto/
-│   │   │   │   │   ├── login.dto.ts
-│   │   │   │   │   ├── profile.response.dto.ts
-│   │   │   │   │   ├── refresh.dto.ts
-│   │   │   │   │   └── register.dto.ts
-│   │   │   │   ├── guards/
-│   │   │   │   │   └── jwt-session.guard.ts
-│   │   │   │   ├── services/
-│   │   │   │   │   ├── auth.service.ts
-│   │   │   │   │   ├── session.service.ts
-│   │   │   │   │   └── user.service.ts
+│   │   │   ├── s3/                     # Интеграция с Tebi (S3)
+│   │   │   │   ├── s3.module.ts
+│   │   │   │   ├── s3.service.ts
+│   │   │   │   └── controllers/
+│   │   │   │       └── s3.controller.ts
+│   │   │   ├── identity/               # Криптографическая идентичность
+│   │   │   │   ├── identity.entity.ts
+│   │   │   │   ├── identity.module.ts
+│   │   │   │   └── services/
+│   │   │   │       └── identity.service.ts
+│   │   │   ├── handle/                 # Идентификаторы для поиска
+│   │   │   │   ├── handle.entity.ts
+│   │   │   │   └── handle.module.ts
+│   │   │   ├── profile/                # Профили в контекстах
+│   │   │   │   ├── profile.entity.ts
+│   │   │   │   └── profile.module.ts
+│   │   │   ├── team/                   # Команды и организации
+│   │   │   │   ├── team.entity.ts
+│   │   │   │   ├── team-membership.entity.ts
+│   │   │   │   └── team.module.ts
+│   │   │   ├── session/                # Сессии и аутентификация
 │   │   │   │   ├── session.entity.ts
-│   │   │   │   ├── user.entity.ts
-│   │   │   │   └── user.module.ts
-│   │   │   └── username/               # Публичные имена (@username)
-│   │   │       ├── controllers/
-│   │   │       │   └── username.controller.ts
-│   │   │       ├── dto/
-│   │   │       │   ├── search-username.dto.ts
-│   │   │       │   └── set-username.dto.ts
-│   │   │       ├── services/
-│   │   │       │   └── username.service.ts
-│   │   │       ├── username.entity.ts
-│   │   │       └── username.module.ts
+│   │   │   │   ├── session.module.ts
+│   │   │   │   └── services/
+│   │   │   │       └── session.service.ts
 │   │   ├── env.ts                      # Загрузка .env (первый импорт в main.ts)
 │   │   ├── swagger.ts                  # Настройка Swagger UI
 │   │   └── main.ts                     # Точка входа приложения
@@ -246,50 +242,60 @@ BeSafeChat/
 
 Каждый модуль — самодостаточен и содержит всё, что нужно для своей области ответственности.
 
-#### `user/` — Пользователи и аутентификация
+#### `identity/` — Криптографическая идентичность
 
-- **`controllers/`**
-  - `auth.controller.ts` — регистрация по публичному ключу
-  - `auth-session.controller.ts` — вход, выход, управление сессиями
-- **`dto/`**
-  - `login.dto.ts`, `register.dto.ts`, `refresh.dto.ts`, `profile.response.dto.ts` — DTO с валидацией
-- **`guards/`**
-  - `jwt-session.guard.ts` — защита маршрутов по HttpOnly JWT-куке
-- **`services/`**
-  - `auth.service.ts` — логика входа
-  - `session.service.ts` — управление сессиями (создание, отзыв)
-  - `user.service.ts` — работа с профилем пользователя
-- **Сущности**
-  - `user.entity.ts` — основной аккаунт (публичный ключ = ID)
-  - `session.entity.ts` — активные устройства (мультидевайс)
+- **`identity.entity.ts`** — основная сущность идентичности (публичный ключ = ID)
+- **`identity.module.ts`** — модуль для инъекции сервиса
+- **`services/identity.service.ts`** — логика регистрации и поиска идентичности
 
-#### `username/` — Публичные имена (`@username`)
+#### `handle/` — Идентификаторы для поиска
 
-- **`controllers/`** — `username.controller.ts` — установка и поиск имён
-- **`dto/`** — валидация имени (5–32 символа, только `a-z0-9_`)
-- **`services/`** — управление именами и флагом `isSearchable`
+- **`handle.entity.ts`** — сущность идентификатора (username, email, phone, и т.д.)
+- **`handle.module.ts`** — модуль для инъекции сущности
+
+#### `profile/` — Профили в контекстах
+
+- **`profile.entity.ts`** — сущность профиля (разные профили для разных контекстов)
+- **`profile.module.ts`** — модуль для инъекции сущности
+
+#### `team/` — Команды и организации
+
+- **`team.entity.ts`** — сущность команды/организации
+- **`team-membership.entity.ts`** — связь «идентичность ↔ команда»
+- **`team.module.ts`** — модуль для инъекции сущностей
+
+#### `session/` — Сессии и аутентификация
+
+- **`session.entity.ts`** — активные устройства (мультидевайс)
+- **`session.module.ts`** — модуль для инъекции сущности
+- **`services/session.service.ts`** — логика управления сессиями (создание, отзыв)
 
 #### `chat/` — Чаты и участники
 
-- **`chat.entity.ts`** — сущность чата (пока только приватные)
-- **`chat-member.entity.ts`** — связь «пользователь ↔ чат» (многие-ко-многим)
+- **`chat.entity.ts`** — сущность чата (приватные, групповые, командные)
+- **`chat-member.entity.ts`** — связь «идентичность ↔ чат» (многие-ко-многим)
 
 #### `message/` — Ядро мессенджера (WebSocket + E2EE)
 
 - **`gateways/`**
-  - `messages.gateway.ts` — Socket.IO-шлюз для доставки сообщений
+ - `messages.gateway.ts` — Socket.IO-шлюз для доставки сообщений
 - **`dtos/`**
-  - `message-payload.dto.ts` — структура E2EE-сообщения (зашифрованное содержимое + ключ)
+ - `message-payload.dto.ts` — структура E2EE-сообщения (зашифрованное содержимое + ключ)
 - **`services/`**
-  - `message-metadata.service.ts` — сохранение метаданных
+ - `message-metadata.service.ts` — сохранение метаданных
   - `chat-room.service.ts` — создание чатов 1:1, управление комнатами
 - **Сущность**
   - `message-metadata.entity.ts` — метаданные сообщений (без раскрытия содержимого)
 
-#### `storage/` — Работа с медиа (Tebi S3)
+#### `contact/` — Запросы в контакты
 
-- **`storage.service.ts`** — генерация pre-signed URL для загрузки/скачивания
-- **`storage.module.ts`** — модуль для инъекции сервиса
+- **`contact-request.entity.ts`** — сущность запроса в контакты
+
+#### `s3/` — Работа с медиа (Tebi S3)
+
+- **`s3.service.ts`** — генерация pre-signed URL для загрузки/скачивания
+- **`s3.module.ts`** — модуль для инъекции сервиса
+- **`controllers/s3.controller.ts`** — контроллер для загрузки/скачивания файлов
 
 #### `media/` — Метаданные медиафайлов
 
@@ -303,6 +309,8 @@ BeSafeChat/
 - **Безопасность по умолчанию** — E2EE, HttpOnly куки, валидация DTO
 - **Масштабируемость** — готовность к групповым чатам, медиа, мультиплатформе
 - **Типобезопасность** — полная типизация через TypeScript и NestJS
+- **Identity-Based Architecture** — разделение криптографической идентичности от социальных профилей
+- **Контекстуальные профили** — разные профили для разных контекстов (работа, личное, и т.д.)
 
 ---
 
@@ -504,7 +512,7 @@ curl http://localhost:4000/auth/user/6d36bdb6-8651-4d72-94f4-3c9aa13f489d/public
 fxhKP0trJd8XJR3IPTVOmA+BFXpFgWtJDRLC8LOZnMI=
 ```
 
-2.  Логинишься чтобы получить access_token используй запросы:
+2. Логинишься чтобы получить access_token используй запросы:
 
 ```bash
 curl -X POST http://localhost:4000/auth/login \
@@ -621,6 +629,10 @@ grep access_token cookies.txt | awk '{print $7}'
 - ✅ **Зашифрованное хранение**: Все сообщения шифруются перед сохранением в IndexedDB
 - ✅ **Public Avatars**: Прямые S3 URL для аватаров без presigned URLs, автоматическое отображение в чатах и контактах
 - ✅ **Device Management**: Просмотр активных сессий, отзыв устройств, QR-код для подключения (mock)
+- ✅ **Identity-Based Architecture**: Новая архитектура с отдельными сущностями Identity, Handle, Profile, Team
+- ✅ **Контекстуальные профили**: Разные профили для разных контекстов (работа, личное, команды)
+- ✅ **Командная структура**: Поддержка организаций и команд с иерархией
+- ✅ **Гибкие идентификаторы**: Поддержка разных типов идентификаторов (username, email, phone)
 
 ### В разработке
 
@@ -655,8 +667,11 @@ grep access_token cookies.txt | awk '{print $7}'
 - [x] **Seed-based Recovery**: BIP39 seed phrases with cloud and self-custody options
 - [x] **Enhanced Security**: Temporary seed storage (no persistent IndexedDB storage)
 - [x] Базовое E2EE шифрование локально хранимых сообщений (AES-GCM)
-- [ ] Advanced E2EE шифрование сообщений (Signal Protocol)
-- [ ] Медиа-сообщения (фото/файлы через S3)
+- [x] Advanced E2EE шифрование сообщений (Signal Protocol)
+- [x] Медиа-сообщения (фото/файлы через S3)
+- [x] Identity-Based Architecture с контекстуальными профилями
+- [x] Командная структура иерархия
+- [ ] Улучшенная система поиска и открытия чатов
 
 ### Этап 2: Кроссплатформенность (Q2 2026)
 
@@ -681,6 +696,8 @@ grep access_token cookies.txt | awk '{print $7}'
 - **Ограничение сессий** — макс. 5 устройств
 - **Безопасность seed-фраз** — временно в памяти, не в IndexedDB
 - **Аудит зависимостей** — через `npm audit`
+- **Identity-Based Architecture** — разделение криптографической идентичности от социальных профилей
+- **Контекстуальная приватность** — разные видимости для разных контекстов
 
 ---
 
