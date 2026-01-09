@@ -5,16 +5,26 @@ import {
   Delete,
   HttpStatus,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiSecurity, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { UnifiedDeleteDto } from '../dto/unified-delete.dto';
 import { UnifiedDownloadDto } from '../dto/unified-download.dto';
 import { UnifiedUploadDto } from '../dto/unified-upload.dto';
 import { S3Service } from '../s3.service';
+
+// Define interface for request with user property
+interface RequestWithUser {
+  user?: {
+    id: string;
+    sessionId: string;
+    publicKey: Buffer;
+  };
+  url: string;
+}
 
 class UploadResponseData {
   uploadUrl!: string;
@@ -49,11 +59,11 @@ export class S3Controller {
     description: 'Invalid request',
   })
   async getUploadUrl(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithUser,
     @Body() dto: UnifiedUploadDto
   ): Promise<ApiResponseDto<UploadResponseData>> {
     try {
-      const userId = identity.id;
+      const userId = req.user!.id;
       const { contentType, path, filename, fileType } = dto;
 
       // Validate content type
@@ -95,11 +105,11 @@ export class S3Controller {
     description: 'Invalid request or access denied',
   })
   async getDownloadUrl(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithUser,
     @Body() dto: UnifiedDownloadDto
   ): Promise<ApiResponseDto<DownloadResponseData>> {
     try {
-      const userId = identity.id;
+      const userId = req.user!.id;
       const { path, filename } = dto;
 
       // Validate and construct the file key
@@ -144,11 +154,11 @@ export class S3Controller {
     description: 'Invalid request or file not found',
   })
   async deleteFile(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithUser,
     @Body() dto: UnifiedDeleteDto
   ): Promise<ApiResponseDto<DeleteResponseData>> {
     try {
-      const userId = identity.id;
+      const userId = req.user!.id;
       const { path, filename } = dto;
 
       // Validate and construct the file key
