@@ -1,5 +1,6 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/chat/chat.controller.ts
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatRoomService } from '../message/services/chat-room.service';
@@ -20,6 +21,14 @@ export class ChatController {
   ) {}
 
   @Get(':id')
+  @ApiParam({
+    name: 'id',
+    description: 'Chat ID',
+    type: String,
+    example: 'abc123-def456-ghi789',
+  })
+  @ApiOperation({ summary: 'Get chat by ID' })
+  @ApiResponse({ status: 200, description: 'Chat retrieved successfully' })
   async getChatById(@Param('id') chatId: string, @CurrentUser() user: any) {
     // Получаем чат
     const chat = await this.chatRepository.findOne({

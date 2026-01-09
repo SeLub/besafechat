@@ -1,7 +1,4 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/handle/handle.entity.ts
-
-// Примечание: В ТЗ указано, что alias можно менять, а value - никогда. Это логика должна быть реализована на уровне сервиса/бизнес-логики, так как TypeORM не предоставляет прямого способа сделать поле неизменяемым после создания.
-
 import {
   Column,
   CreateDateColumn,
@@ -9,11 +6,16 @@ import {
   Index,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Identity } from '../identity/identity.entity';
 import { TeamInvite } from '../team/team-invite.entity';
 import { TeamMembership } from '../team/team-membership.entity';
+import { Profile } from '../profile/profile.entity';
+import { ChatMember } from '../chat/chat-member.entity';
+import { ContactRequest } from '../contact/contact-request.entity';
+import { MessageMetadata } from '../message/message-metadata.entity';
 
 export type HandleType = 'account' | 'team' | 'channel';
 
@@ -25,7 +27,7 @@ export class Handle {
   id!: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
-  value!: string; // Технический уникальный идентификатор (никогда не меняется)
+  value!: string;
 
   @Column({
     type: 'varchar',
@@ -35,18 +37,18 @@ export class Handle {
   type!: HandleType;
 
   @Column({ type: 'varchar', length: 255, unique: true, nullable: true })
-  alias?: string; // Красивое имя для поиска и отображения
+  alias?: string | null;
 
   @Column({ type: 'boolean', default: false })
-  isSearchable!: boolean; // Доступен для глобального поиска
+  isSearchable!: boolean;
 
   @Column({ type: 'boolean', default: false })
-  isPrimary!: boolean; // Основной хэндл для отображения
+  isPrimary!: boolean;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  // Связи
+  // Связь с Identity (владелец)
   @ManyToOne(() => Identity, (identity) => identity.handles, {
     onDelete: 'CASCADE',
     nullable: false,
@@ -54,9 +56,16 @@ export class Handle {
   ownerIdentity!: Identity;
 
   @Column({ type: 'uuid' })
-  ownerIdentityId!: string; // Владелец (создатель) Handle
+  ownerIdentityId!: string;
 
-  // Связи для команд (только для type='account')
+  // Связь 1:1 с Profile (только для type='account')
+  @OneToOne(() => Profile, (profile) => profile.handle, {
+    nullable: true,
+    cascade: true,
+  })
+  profile?: Profile;
+
+  // Связи для команд
   @OneToMany(() => TeamMembership, (membership) => membership.memberHandle)
   teamMemberships!: TeamMembership[];
 
@@ -65,4 +74,17 @@ export class Handle {
 
   @OneToMany(() => TeamInvite, (invite) => invite.inviterHandle)
   teamInvitesSent!: TeamInvite[];
+
+  // Дополнительные связи
+  @OneToMany(() => ChatMember, (member) => member.memberHandle)
+  chatMemberships!: ChatMember[];
+
+  @OneToMany(() => ContactRequest, (req) => req.fromHandle)
+  sentContactRequests!: ContactRequest[];
+
+  @OneToMany(() => ContactRequest, (req) => req.toHandle)
+  receivedContactRequests!: ContactRequest[];
+
+  @OneToMany(() => MessageMetadata, (msg) => msg.senderHandle)
+  sentMessages!: MessageMetadata[];
 }

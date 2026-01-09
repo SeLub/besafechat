@@ -6,58 +6,66 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  ManyToOne,
+  JoinColumn,
+  OneToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { Identity } from '../identity/identity.entity';
+import { Handle } from '../handle/handle.entity';
 
 @Entity('profiles')
-@Index('idx_profiles_identity', ['identityId'])
+@Index('idx_profiles_handle', ['handleId'])
 export class Profile {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid' })
-  identityId!: string;
-
-  @ManyToOne(() => Identity, (identity) => identity.profiles, {
+  // Связь 1:1 с Handle типа 'account'
+  @OneToOne(() => Handle, (handle) => handle.profile, {
     onDelete: 'CASCADE',
     nullable: false,
   })
-  identity!: Identity;
+  @JoinColumn({ name: 'handleId' })
+  handle!: Handle;
 
-  // Персональные данные
+  @Column({ type: 'uuid', unique: true })
+  handleId!: string; // Ссылка на Handle типа 'account'
+
+  // ... остальные поля без изменений
   @Column({ type: 'varchar', length: 100 })
-  displayName!: string; // Отображаемое имя (обязательное)
+  displayName!: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  firstName?: string; // Реальное имя
+  firstName?: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  lastName?: string; // Фамилия
+  lastName?: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  email?: string; // Контактные данные (приватные, не для поиска)
+  email?: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  phone?: string; // Контактные данные (приватные, не для поиска)
+  phone?: string;
 
   @Column({ type: 'text', nullable: true })
-  avatarUrl?: string; // Ссылка на аватар в Tebi S3
+  avatarUrl?: string;
 
   @Column({ type: 'text', nullable: true })
-  bio?: string; // Описание/статус
+  bio?: string;
 
-  // Настройки
   @Column({ type: 'jsonb', default: {} })
   settings!: {
-    // Настройки видимости и поведения
     showEmail?: boolean;
     showPhone?: boolean;
     showPresence?: boolean;
-    [key: string]: any; // Другие настройки
+    [key: string]: any;
   };
+
+  @Column({ type: 'jsonb', default: {} })
+  metadata!: Record<string, any>;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt!: Date;
 }
