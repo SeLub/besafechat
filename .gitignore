@@ -61,7 +61,6 @@ Thumbs.db
 ```
 
 mcp*.*
-tsconfig.build.*
-tsconfig.build.tsbuildinfo
+*.tsbuildinfo
 tests/*
 .kilocode/
