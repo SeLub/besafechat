@@ -4,11 +4,13 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Identity } from '../identity/identity.entity';
+import { Handle } from '../handle/handle.entity';
 
 @Entity('sessions')
 @Index('idx_sessions_identity', ['identityId', 'isActive'])
@@ -27,12 +29,20 @@ export class Session {
   @Column({ type: 'uuid' })
   identityId!: string;
 
-  // Информация об устройстве (из DeviceService)
+  // Активный Handle для этой сессии
+  @ManyToOne(() => Handle, { nullable: true })
+  @JoinColumn({ name: 'activeHandleId' })
+  activeHandle?: Handle;
+
+  @Column({ type: 'uuid', nullable: true })
+  activeHandleId?: string;
+
+  // Информация об устройстве
   @Column({ type: 'varchar', length: 100 })
-  deviceName!: string; // Например: "iPhone 13", "Windows"
+  deviceName!: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  deviceType?: 'mobile' | 'desktop' | 'web'; // Тип устройства
+  deviceType?: 'mobile' | 'desktop' | 'web';
 
   @Column({ type: 'bytea', nullable: true })
   devicePublicKey?: Buffer; // Для будущей E2EE
@@ -43,25 +53,24 @@ export class Session {
   @Column({ type: 'text', nullable: true })
   userAgent?: string;
 
-  // Система токенов (существующая функциональность)
+  // Система токенов
   @Column({ type: 'text', unique: true })
-  accessTokenHash!: string; // Хеш access token (для проверки при отзыве)
+  accessTokenHash!: string;
 
   @Column({ type: 'text', unique: true })
-  refreshToken!: string; // Refresh token (длинный, случайный)
+  refreshToken!: string;
 
   @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
-  // Статус сессии
   @Column({ type: 'boolean', default: true })
-  isActive!: boolean; // Активна ли сессия
+  isActive!: boolean;
 
   @Column({ type: 'boolean', default: false })
-  revoked!: boolean; // Признак отозванной сессии
+  revoked!: boolean;
 
   @Column({ type: 'timestamptz', nullable: true })
-  lastActiveAt?: Date; // Время последней активности
+  lastActiveAt?: Date;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

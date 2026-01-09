@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/backend/src/domains/handle/controllers/handle.controller.ts
 import {
   Body,
   Controller,
@@ -6,44 +7,240 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
+  Delete,
   UseGuards,
   UsePipes,
   ValidationPipe,
-  NotFoundException,
+  Query,
   Req,
+  ParseUUIDPipe,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import { CurrentUser } from '../../session/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  CurrentIdentity,
+  CurrentHandle,
+} from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { HandleService } from '../services/handle.service';
 import { SetUsernameDto } from '../dto/set-username.dto';
+import { CreateHandleDto } from '../dto/create-handle.dto';
+import { UpdateHandleDto } from '../dto/update-handle.dto';
 import { AuthenticatedRequest } from '../../../common/types/authenticated-request';
+import { Handle } from '../handle.entity';
 
-@ApiTags('handle')
-@Controller('username')
+@ApiTags('handles')
+@Controller('handles')
+@ApiBearerAuth()
 export class HandleController {
   constructor(private handleService: HandleService) {}
 
-  @Get('search/:username')
+  @Get('username/search/:username')
   @ApiOperation({ summary: 'Check if username is available or get user info if exists' })
-  @ApiParam({ name: 'username', description: 'Username to search for', example: 'john_doe' })
+  @ApiParam({
+    name: 'username',
+    description: 'Username to search for',
+    example: 'john_doe',
+    type: String,
+  })
   @ApiResponse({ status: 200, description: 'Username availability checked', type: ApiResponseDto })
   async searchByUsername(@Param('username') username: string) {
     const result = await this.handleService.searchByUsername(username);
-
-    // Return the availability result in a consistent format
-    // Instead of throwing 404 when available, return success response
     return new ApiResponseDto(true, result);
   }
 
-  @Post('set')
+  @Post('username/set')
   @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Set or update username' })
+  @ApiBody({ type: SetUsernameDto })
   async setUsername(@Req() req: AuthenticatedRequest, @Body() dto: SetUsernameDto) {
     const isSearchable = dto.isSearchable === 'yes';
-    await this.handleService.setUsername(req.user!.id, dto.username, isSearchable);
+    // Используем identityId из JWT Guard
+    const identityId = req.identity?.id || req.user?.identityId;
+
+    if (!identityId) {
+      throw new UnauthorizedException('Identity not found');
+    }
+
+    await this.handleService.setUsername(identityId, dto.username, isSearchable);
     return { success: true, message: 'Username updated successfully' };
+  }
+
+  @Get()
+  @UseGuards(JwtSessionGuard)
+  @ApiOperation({ summary: 'Get all handles for current identity' })
+  @ApiResponse({ status: 200, description: 'List of handles', type: [Handle] })
+  async getMyHandles(@CurrentIdentity() identity: any) {
+    return this.handleService.getHandlesByIdentity(identity.id);
+  }
+
+  @Post()
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Create a new handle' })
+  @ApiBody({ type: CreateHandleDto })
+  async createHandle(@CurrentIdentity() identity: any, @Body() dto: CreateHandleDto) {
+    const handle = await this.handleService.createHandle({
+      value: dto.value,
+      type: dto.type,
+      ownerIdentityId: identity.id,
+      alias: dto.alias,
+      isSearchable: dto.isSearchable,
+      isPrimary: dto.isPrimary,
+    });
+
+    return {
+      success: true,
+      message: 'Handle created successfully',
+      data: handle,
+    };
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search for handles' })
+  @ApiQuery({ name: 'q', description: 'Search query', required: true })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Maximum number of results',
+    required: false,
+    type: Number,
+  })
+  async searchHandles(@Query('q') query: string, @Query('limit') limit?: number) {
+    const handles = await this.handleService.searchHandles(
+      query,
+      limit ? parseInt(limit.toString()) : 20
+    );
+    return new ApiResponseDto(true, { handles });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get handle by ID' })
+  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
+  async getHandleById(@Param('id', ParseUUIDPipe) id: string) {
+    const handle = await this.handleService.findById(id);
+    return new ApiResponseDto(true, { handle });
+  }
+
+  @Put(':id')
+  @UseGuards(JwtSessionGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Update handle' })
+  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
+  @ApiBody({ type: UpdateHandleDto })
+  async updateHandle(
+    @CurrentIdentity() identity: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateHandleDto
+  ) {
+    // Проверяем что handle принадлежит identity
+    const handle = await this.handleService.findById(id);
+    if (handle.ownerIdentityId !== identity.id) {
+      throw new NotFoundException('Handle not found');
+    }
+
+    const updatedHandle = await this.handleService.updateHandle(id, dto);
+    return {
+      success: true,
+      message: 'Handle updated successfully',
+      data: updatedHandle,
+    };
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete handle' })
+  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
+  async deleteHandle(@CurrentIdentity() identity: any, @Param('id', ParseUUIDPipe) id: string) {
+    // Проверяем что handle принадлежит identity
+    const handle = await this.handleService.findById(id);
+    if (handle.ownerIdentityId !== identity.id) {
+      throw new NotFoundException('Handle not found');
+    }
+
+    await this.handleService.deleteHandle(id);
+    return { success: true, message: 'Handle deleted successfully' };
+  }
+
+  @Post(':id/alias')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set or remove alias for handle' })
+  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
+  @ApiBody({ schema: { properties: { alias: { type: 'string', nullable: true } } } })
+  async setHandleAlias(
+    @CurrentIdentity() identity: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('alias') alias?: string | null
+  ) {
+    // Проверяем что handle принадлежит identity
+    const handle = await this.handleService.findById(id);
+    if (handle.ownerIdentityId !== identity.id) {
+      throw new NotFoundException('Handle not found');
+    }
+
+    const updatedHandle = await this.handleService.setAlias(id, alias);
+    return {
+      success: true,
+      message: alias ? 'Alias set successfully' : 'Alias removed successfully',
+      data: updatedHandle,
+    };
+  }
+
+  @Post(':id/searchable')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set handle searchable status' })
+  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
+  @ApiBody({ schema: { properties: { isSearchable: { type: 'boolean' } } } })
+  async setHandleSearchable(
+    @CurrentIdentity() identity: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('isSearchable') isSearchable: boolean
+  ) {
+    // Проверяем что handle принадлежит identity
+    const handle = await this.handleService.findById(id);
+    if (handle.ownerIdentityId !== identity.id) {
+      throw new NotFoundException('Handle not found');
+    }
+
+    const updatedHandle = await this.handleService.setSearchable(id, isSearchable);
+    return {
+      success: true,
+      message: `Handle is now ${isSearchable ? 'searchable' : 'not searchable'}`,
+      data: updatedHandle,
+    };
+  }
+
+  @Post('primary/:id')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch primary handle' })
+  @ApiParam({ name: 'id', description: 'New primary handle ID', type: String, example: 'abc123-def456-ghi789' })
+  async switchPrimaryHandle(
+    @CurrentIdentity() identity: any,
+    @Param('id', ParseUUIDPipe) id: string
+  ) {
+    const updatedHandle = await this.handleService.switchPrimaryHandle(identity.id, id);
+    return {
+      success: true,
+      message: 'Primary handle switched successfully',
+      data: updatedHandle,
+    };
   }
 }

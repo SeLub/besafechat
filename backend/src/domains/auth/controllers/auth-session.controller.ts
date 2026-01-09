@@ -1,9 +1,12 @@
+// /home/selub/Documents/progs/besafechat/backend/src/domains/auth/controllers/auth-session.controller.ts
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Req,
   Res,
@@ -11,30 +14,29 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import { CurrentUser } from '../../session/decorators/current-user.decorator';
+import {
+  AuthenticatedRequest,
+  AuthenticatedUser,
+} from '../../../common/types/authenticated-request';
+import { ResponseWithCookies } from '../../../common/types/response-with-cookies';
+import {
+  CurrentHandle,
+  CurrentIdentity,
+  CurrentSession,
+  CurrentUser,
+} from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
-import { LoginDto } from '../dto/login.dto';
+import { LoginDto, RegisterWithHandleDto } from '../dto/login.dto';
 import { AuthService } from '../services/auth.service';
-
-// Define interface for request with cookies
-interface RequestWithCookies {
-  ip?: string;
-  cookies?: {
-    [key: string]: string;
-  };
-  url: string;
-}
-
-// Define interface for response with cookie methods
-interface ResponseWithCookies {
-  cookie(name: string, value: any, options?: any): this;
-  clearCookie(name: string, options?: any): this;
-  status(code: number): this;
-  json(body: any): this;
-  send(body: any): this;
-}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -43,47 +45,59 @@ export class AuthSessionController {
 
   @Post('register')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Register new identity' })
-  @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Identity registered and session created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid public key format' })
+  @ApiOperation({ summary: 'Register new identity with handle (complete registration)' })
+  @ApiBody({ type: RegisterWithHandleDto })
+  @ApiResponse({ status: 200, description: 'Identity registered with handle successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid data or handle already taken' })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiResponse({
-    status: 200,
-    description: 'Registration successful',
-    type: ApiResponseDto<{ userId: string }>,
-  })
   async register(
-    @Body() loginDto: LoginDto,
-    @Req() req: RequestWithCookies,
+    @Body() dto: RegisterWithHandleDto,
+    @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
-    const { publicKey, deviceId, deviceModel } = loginDto;
+    const { publicKey, handle, displayName, deviceName, deviceType, userAgent, isSearchable } = dto;
     const ipAddress = req.ip || 'unknown';
 
-    const result = await this.authService.registerIdentity(
+    // Проверяем, соответствует ли handle формату, генерируемому из публичного ключа
+    const generatedHandle = this.authService['generateHandleFromPublicKey'](publicKey);
+
+    // Если предоставленный handle не соответствует формату генерации, проверяем его уникальность
+    if (!handle.startsWith('user_') && handle !== generatedHandle) {
+      // Проверяем доступность handle
+      const handleCheck = await this.authService['handleService'].searchByUsername(handle);
+      if (!handleCheck.available) {
+        throw new BadRequestException('Handle is already taken');
+      }
+    }
+
+    const result = await this.authService.registerWithHandle(
       publicKey,
-      deviceId,
-      deviceModel,
-      ipAddress
+      handle,
+      displayName,
+      deviceName,
+      deviceType,
+      ipAddress,
+      userAgent
     );
 
+    // Устанавливаем searchable статус
+    if (isSearchable === 'yes') {
+      await this.authService['handleService'].setSearchable(result.handle.id, true);
+    }
+
     // Set HttpOnly cookies for security
-    res.cookie('access_token', result.tokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 60 * 1000, // 30 minutes
-      sameSite: 'strict',
-    });
+    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
 
-    res.cookie('refresh_token', result.tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 1000, // 30 days
-      sameSite: 'strict',
+    return new ApiResponseDto(true, {
+      identityId: result.identity.id,
+      handleId: result.handle.id,
+      handleValue: result.handle.value,
+      sessionId: result.session.id,
+      profile: {
+        displayName: result.profile.displayName,
+      },
+      hasHandle: true,
     });
-
-    return new ApiResponseDto(true, { userId: result.session.identityId });
   }
 
   @Post('login')
@@ -93,53 +107,40 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful',
-    type: ApiResponseDto<{ userId: string }>,
-  })
   async login(
     @Body() loginDto: LoginDto,
-    @Req() req: RequestWithCookies,
+    @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
-    const { publicKey, deviceId, deviceModel } = loginDto;
+    const { publicKey, deviceName, deviceType, userAgent } = loginDto;
     const ipAddress = req.ip || 'unknown';
 
     const result = await this.authService.loginWithPublicKey(
       publicKey,
-      deviceId,
-      deviceModel,
-      ipAddress
+      deviceName,
+      deviceType,
+      ipAddress,
+      userAgent
     );
 
     // Set HttpOnly cookies for security
-    res.cookie('access_token', result.tokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 60 * 1000, // 30 minutes
-      sameSite: 'strict',
-    });
+    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
 
-    res.cookie('refresh_token', result.tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 1000, // 30 days
-      sameSite: 'strict',
+    return new ApiResponseDto(true, {
+      identityId: result.identity.id,
+      sessionId: result.session.id,
+      hasHandle: result.session.activeHandleId !== null,
     });
-
-    return new ApiResponseDto(true, { userId: result.session.identityId });
   }
 
   @Get('profile')
-  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOperation({ summary: 'Get current user profile with handle and identity info' })
   @ApiCookieAuth()
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  @ApiResponse({ status: 200, description: 'Profile retrieved successfully', type: ApiResponseDto })
-  async getProfile(@CurrentUser() user: any) {
-    const profile = await this.authService.getIdentityProfile(user.id);
+  async getProfile(@CurrentIdentity() identity: any, @CurrentHandle() handle: any) {
+    const profile = await this.authService.getIdentityProfile(identity.id);
     return new ApiResponseDto(true, profile);
   }
 
@@ -149,30 +150,29 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'Sessions retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  @ApiResponse({
-    status: 200,
-    description: 'Sessions retrieved successfully',
-    type: ApiResponseDto<{ sessions: any[] }>,
-  })
-  async getSessions(@CurrentUser() user: any) {
-    const sessions = await this.authService.getIdentitySessions(user.id, user.sessionId);
+  async getSessions(@CurrentUser() user: AuthenticatedUser) {
+    const sessions = await this.authService.getIdentitySessions(user.identityId, user.sessionId);
     return new ApiResponseDto(true, { sessions });
   }
 
   @Post('sessions/revoke/:id')
   @ApiOperation({ summary: 'Revoke a specific session (except current)' })
   @ApiCookieAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Session ID to revoke',
+    type: String,
+    example: 'abc123-def456-ghi789',
+  })
   @ApiResponse({ status: 200, description: 'Session revoked successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  @ApiResponse({ status: 200, description: 'Session revoked successfully', type: ApiResponseDto })
-  async revokeSession(@CurrentUser() user: any, @Req() req: RequestWithCookies) {
-    const sessionId = req.url.split('/').pop(); // Get the session ID from URL
+  async revokeSession(@CurrentUser() user: AuthenticatedUser, @Param('id') sessionId: string) {
     if (!sessionId) {
-      throw new Error('Session ID not provided');
+      throw new BadRequestException('Session ID not provided');
     }
 
-    await this.authService.revokeSessionById(user.id, sessionId, user.sessionId);
+    await this.authService.revokeSessionById(user.identityId, sessionId, user.sessionId);
     return new ApiResponseDto(true);
   }
 
@@ -182,14 +182,37 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'All other sessions revoked successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  @ApiResponse({
-    status: 200,
-    description: 'All other sessions revoked successfully',
-    type: ApiResponseDto,
-  })
-  async revokeAllOtherSessions(@CurrentUser() user: any) {
-    await this.authService.revokeAllSessions(user.id, user.sessionId);
+  async revokeAllOtherSessions(@CurrentUser() user: AuthenticatedUser) {
+    await this.authService.revokeAllSessions(user.identityId, user.sessionId);
     return new ApiResponseDto(true);
+  }
+
+  @Post('switch-handle')
+  @ApiOperation({ summary: 'Switch active handle in current session' })
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: 'Handle switched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtSessionGuard)
+  @ApiBody({ schema: { properties: { handleId: { type: 'string' } } } })
+  async switchHandle(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSession() session: any,
+    @Body('handleId') handleId: string
+  ) {
+    if (!handleId) {
+      throw new BadRequestException('Handle ID is required');
+    }
+
+    const updatedSession = await this.authService.switchActiveHandle(
+      user.identityId,
+      session.id,
+      handleId
+    );
+
+    return new ApiResponseDto(true, {
+      message: 'Handle switched successfully',
+      activeHandleId: updatedSession.activeHandleId,
+    });
   }
 
   @Post('logout')
@@ -199,9 +222,11 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  @ApiResponse({ status: 200, description: 'Logged out successfully', type: ApiResponseDto })
-  async logout(@CurrentUser() user: any, @Res({ passthrough: true }) res: ResponseWithCookies) {
-    await this.authService.logout(user.id, user.sessionId);
+  async logout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: ResponseWithCookies
+  ) {
+    await this.authService.logout(user.identityId, user.sessionId);
 
     // Clear cookies
     res.clearCookie('access_token');
@@ -216,38 +241,40 @@ export class AuthSessionController {
   @ApiCookieAuth()
   @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 200,
-    description: 'Tokens refreshed successfully',
-    type: ApiResponseDto<{ userId: string }>,
-  })
   async refresh(
-    @Req() req: RequestWithCookies,
+    @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
     const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) {
-      throw new Error('Refresh token not found');
+      throw new BadRequestException('Refresh token not found');
     }
 
     const ipAddress = req.ip || 'unknown';
     const result = await this.authService.refreshTokens(refreshToken, ipAddress);
 
     // Set new HttpOnly cookies
-    res.cookie('access_token', result.accessToken, {
+    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+
+    return new ApiResponseDto(true, {
+      identityId: result.identity.id,
+      activeHandleId: result.activeHandle?.id,
+    });
+  }
+
+  private setAuthCookies(res: ResponseWithCookies, accessToken: string, refreshToken: string) {
+    res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 60 * 1000, // 30 minutes
+      maxAge: 30 * 60 * 1000, // 30 минут
       sameSite: 'strict',
     });
 
-    res.cookie('refresh_token', result.refreshToken, {
+    res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
       sameSite: 'strict',
     });
-
-    return new ApiResponseDto(true, { userId: result.identity.id });
   }
 }
