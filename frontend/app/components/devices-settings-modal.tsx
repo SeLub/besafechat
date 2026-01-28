@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 interface Session {
   id: string;
   deviceId: string;
-  deviceModel: string;
+  deviceName?: string;
+  deviceType?: string;
   ipAddress: string;
   lastActiveAt: string;
   createdAt: string;
@@ -40,7 +41,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
         const data = await response.json();
         setSessions(data.data.sessions);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to load sessions');
     }
   };
@@ -55,7 +56,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
         toast.success('Session terminated');
         fetchSessions();
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to terminate session');
     }
   };
@@ -71,15 +72,15 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
         toast.success('All other sessions closed');
         fetchSessions();
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to close sessions');
     } finally {
       setLoading(false);
     }
   };
 
-  const getDeviceIcon = (deviceModel: string) => {
-    const model = deviceModel.toLowerCase();
+  const getDeviceIcon = (deviceModel?: string) => {
+    const model = deviceModel?.toLowerCase() || '';
     if (model.includes('mobile') || model.includes('phone'))
       return <Smartphone className="h-5 w-5" />;
     if (model.includes('tablet') || model.includes('ipad')) return <Tablet className="h-5 w-5" />;
@@ -117,12 +118,12 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-3">
                     <div className="text-primary mt-1">
-                      {getDeviceIcon(currentSession.deviceModel)}
+                      {getDeviceIcon(currentSession.deviceName)}
                     </div>
                     <div>
                       <div className="font-medium">{currentSession.deviceId}</div>
                       <div className="text-sm text-muted-foreground">
-                        {currentSession.deviceModel}
+                        {currentSession.deviceName}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         IP: {currentSession.ipAddress}
@@ -162,11 +163,11 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-3">
                         <div className="text-muted-foreground mt-1">
-                          {getDeviceIcon(session.deviceModel)}
+                          {getDeviceIcon(session.deviceName)}
                         </div>
                         <div>
                           <div className="font-medium">{session.deviceId}</div>
-                          <div className="text-sm text-muted-foreground">{session.deviceModel}</div>
+                          <div className="text-sm text-muted-foreground">{session.deviceName}</div>
                           <div className="text-xs text-muted-foreground mt-1">
                             IP: {session.ipAddress}
                           </div>

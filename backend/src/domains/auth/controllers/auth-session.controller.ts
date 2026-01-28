@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Req,
@@ -37,68 +38,20 @@ import {
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { LoginDto, RegisterWithHandleDto } from '../dto/login.dto';
 import { AuthService } from '../services/auth.service';
+import { RedisService } from '../../../common/redis.service';
+import { MessagesGateway } from '../../message/gateways/messages.gateway';
+import { SessionService } from '../../session/services/session.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthSessionController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private redisService: RedisService,
+    private messagesGateway: MessagesGateway,
+    private sessionService: SessionService
+  ) {}
 
-  @Post('register')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Register new identity with handle (complete registration)' })
-  @ApiBody({ type: RegisterWithHandleDto })
-  @ApiResponse({ status: 200, description: 'Identity registered with handle successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid data or handle already taken' })
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async register(
-    @Body() dto: RegisterWithHandleDto,
-    @Req() req: AuthenticatedRequest,
-    @Res({ passthrough: true }) res: ResponseWithCookies
-  ) {
-    const { publicKey, handle, displayName, deviceName, deviceType, userAgent, isSearchable } = dto;
-    const ipAddress = req.ip || 'unknown';
-
-    // Проверяем, соответствует ли handle формату, генерируемому из публичного ключа
-    const generatedHandle = this.authService['generateHandleFromPublicKey'](publicKey);
-
-    // Если предоставленный handle не соответствует формату генерации, проверяем его уникальность
-    if (!handle.startsWith('user_') && handle !== generatedHandle) {
-      // Проверяем доступность handle
-      const handleCheck = await this.authService['handleService'].searchByUsername(handle);
-      if (!handleCheck.available) {
-        throw new BadRequestException('Handle is already taken');
-      }
-    }
-
-    const result = await this.authService.registerWithHandle(
-      publicKey,
-      handle,
-      displayName,
-      deviceName,
-      deviceType,
-      ipAddress,
-      userAgent
-    );
-
-    // Устанавливаем searchable статус
-    if (isSearchable === 'yes') {
-      await this.authService['handleService'].setSearchable(result.handle.id, true);
-    }
-
-    // Set HttpOnly cookies for security
-    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
-
-    return new ApiResponseDto(true, {
-      identityId: result.identity.id,
-      handleId: result.handle.id,
-      handleValue: result.handle.value,
-      sessionId: result.session.id,
-      profile: {
-        displayName: result.profile.displayName,
-      },
-      hasHandle: true,
-    });
-  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -226,7 +179,20 @@ export class AuthSessionController {
     @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
+    // Get the active handle ID for this session to clear the correct online status
+    const session = await this.sessionService.getSessionById(user.sessionId);
+    const handleId = session?.activeHandleId;
+
     await this.authService.logout(user.identityId, user.sessionId);
+
+    // Clear online status from Redis if handleId exists
+    if (handleId) {
+      const redis = this.redisService.getClient();
+      await redis.del(`online:${handleId}`);
+
+      // Notify other users that this handle has gone offline
+      await this.messagesGateway.notifyContactsUserOffline(handleId);
+    }
 
     // Clear cookies
     res.clearCookie('access_token');

@@ -51,9 +51,12 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2">Password (min 8 characters)</label>
+          <label htmlFor="password-input" className="block text-sm font-medium mb-2">
+            Password (min 8 characters)
+          </label>
           <div className="relative">
             <input
+              id="password-input"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -86,8 +89,11 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Confirm Password</label>
+          <label htmlFor="confirm-password-input" className="block text-sm font-medium mb-2">
+            Confirm Password
+          </label>
           <input
+            id="confirm-password-input"
             type={showPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)}

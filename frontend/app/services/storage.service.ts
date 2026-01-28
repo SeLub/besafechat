@@ -320,6 +320,16 @@ export class StorageService {
     messageId?: string
   ): Promise<string> {
     try {
+      const id =
+        messageId || `${senderId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Check if message already exists to prevent duplicates
+      const existingMessage = await db.messages.get(id);
+      if (existingMessage) {
+        console.log(`⚠️ Message ${id} already exists, skipping save`);
+        return id;
+      }
+
       const textBytes = new TextEncoder().encode(content);
 
       const encrypted = await encryptWithPassphrase(textBytes, userId, this.DEFAULT_KDF_ITERATIONS);
@@ -329,9 +339,6 @@ export class StorageService {
       const encryptedArray = new Uint8Array(encrypted.encrypted);
       const ciphertext = encryptedArray.slice(0, -16); // Все кроме последних 16 байт
       const authTag = encryptedArray.slice(-16); // Последние 16 байт - auth tag
-
-      const id =
-        messageId || `${senderId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const message: Message = {
         id,

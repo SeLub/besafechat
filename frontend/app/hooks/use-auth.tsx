@@ -2,10 +2,10 @@ import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { UserService } from '@/services/user.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { User } from '~/types';
+import type { FullProfile } from '~/types';
 
 interface AuthContextType {
-  user: User | null;
+  user: FullProfile | null;
   loading: boolean;
   register: (deviceId: string) => Promise<void>;
   login: (publicKey: string, deviceId: string) => Promise<void>;
@@ -17,7 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Проверка аутентификации при старте
@@ -28,8 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const profile = await res.json();
-        setUser(profile.data);
+        const response = await res.json();
+        if (response.success && response.data) {
+          setUser(response.data);
+        } else {
+          setUser(null);
+        }
       } else if (res.status === 401) {
         clearAuthCookies();
         setUser(null);
@@ -106,9 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const profile = await res.json();
-        setUser(profile.data);
-        console.log('User profile refreshed successfully', profile.data);
+        const response = await res.json();
+        if (response.success && response.data) {
+          setUser(response.data);
+          console.log('User profile refreshed successfully', response.data);
+        } else {
+          console.error('Failed to refresh user profile: invalid response data');
+        }
       } else if (res.status === 401) {
         clearAuthCookies();
         setUser(null);

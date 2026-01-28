@@ -21,10 +21,8 @@ export class IdentityService {
       throw new ConflictException('Invalid public key format');
     }
 
-    // Check for existing identity
-    const existingIdentity = await this.identityRepository.findOne({
-      where: { masterPublicKey: publicKeyBuffer },
-    });
+    // Use the existing method to avoid code duplication
+    const existingIdentity = await this.findByIdentityPublicKey(publicKeyBase64);
 
     if (existingIdentity) {
       return existingIdentity;

@@ -11,6 +11,7 @@ import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { UserService } from '~/services/user.service';
 
 type AuthStep =
   | 'main'
@@ -47,9 +48,11 @@ export default function AuthRoute() {
     setUsername(selectedUsername);
     setLoading(true);
     try {
-      await setUsernameOnBackend(selectedUsername);
+      // Update handle using the proper handles endpoint
+      await UserService.setUsername(selectedUsername, selectedUsername.split('_')[0] || 'User');
+
       setStep('complete');
-      toast.success('Account created!');
+      toast.success('Handle updated successfully!');
       setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to set username');
@@ -87,11 +90,11 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       // Use the unified account creation flow with cloud backup
-      const result = await AccountService.createAccountWithCloud(password);
-      await loginOnly(result.publicKeyBase64);
-      // Go to username selection
-      setStep('username-selection');
-      toast.success('Account created! Now choose your username');
+      await AccountService.createAccountWithCloud(password);
+      // User is automatically logged in since login is called inside createAccountWithCloud
+      toast.success('Account created successfully!');
+      // Go directly to main page after account creation
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -103,10 +106,11 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       // Use the unified account creation flow with self-custody
-      const result = await AccountService.createAccountWithSelfCustody();
-      await loginOnly(result.publicKeyBase64);
-      setStep('username-selection');
-      toast.success('Account created! Now choose your username');
+      await AccountService.createAccountWithSelfCustody();
+      // User is automatically logged in since login is called inside createAccountWithSelfCustody
+      toast.success('Account created successfully!');
+      // Go directly to main page after account creation
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -114,25 +118,26 @@ export default function AuthRoute() {
     }
   };
 
-  const setUsernameOnBackend = async (usernameValue: string) => {
-    await AuthService.setUsername(usernameValue);
-  };
+  // This function is now obsolete since username setting happens differently
+  // The complete registration with custom handle happens separately
 
   const loginToBackend = async (publicKeyBase64: string) => {
-    const { deviceId } = AccountService.getDeviceInfo();
-    // Register the user and get the userId
-    const registrationResult = await AuthService.register({
+    const { deviceId, deviceName } = AccountService.getDeviceInfo();
+    // Login the user (creates identity if first time) and get the result
+    const loginResult = await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
+      deviceName,
     });
-    return registrationResult;
+    return loginResult;
   };
 
   const loginOnly = async (publicKeyBase64: string) => {
-    const { deviceId } = AccountService.getDeviceInfo();
+    const { deviceId, deviceName } = AccountService.getDeviceInfo();
     await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
+      deviceName,
     });
   };
 
