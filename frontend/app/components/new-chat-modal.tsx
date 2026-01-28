@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest } from '@/services/api-utils';
 import { Search, User, X } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface NewChatModalProps {
@@ -17,6 +17,7 @@ interface SearchResult {
   username?: string;
   displayName?: string;
   userId?: string;
+  handleId?: string;
   requestStatus?: string;
 }
 
@@ -27,7 +28,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
   const [creating, setCreating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { checkAuth } = useAuth();
 
   useEffect(() => {
@@ -51,21 +52,23 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
     setSearchResults([]); // Clear previous results
 
     try {
-      const result = await apiRequest<{ available: boolean; user?: any; username?: string }>(
-        `/username/search/${encodeURIComponent(cleanQuery)}`,
+      const result = await apiRequest<{ handles: any[] }>(
+        `/handles/search?q=${encodeURIComponent(cleanQuery)}`,
         {
           method: 'GET',
         }
       );
 
-      if (result.available) {
-        // Username not found
+      if (!result.handles || result.handles.length === 0) {
+        // Handle not found
         setSearchResults([]);
         setSearchError('User not found');
       } else {
         // User found, get request status
+        const handle = result.handles[0]; // Take the first match
+
         const statusData = await apiRequest<{ status: string }>(
-          `/contacts/check/${result.user.id}`,
+          `/contacts/check/${handle.ownerIdentityId}`,
           {
             method: 'GET',
           }
@@ -76,16 +79,54 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
           requestStatus = statusData.status;
         }
 
-        setSearchResults([
-          {
-            publicKey: result.user.publicKey,
-            username: cleanQuery,
-            displayName: result.user.displayName,
-            userId: result.user.id,
-            requestStatus,
-          },
-        ]);
-        setSearchError(null);
+        // For the search result, get additional profile data if available
+        try {
+          // Try to get more detailed profile information
+          const profileResponse = await fetch(
+            `http://localhost:4000/profiles/public/${handle.value}`,
+            {
+              credentials: 'include',
+            }
+          );
+
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setSearchResults([
+              {
+                publicKey: profileData?.publicKey || '',
+                username: handle.value,
+                displayName: profileData?.profile?.displayName || handle.value,
+                userId: handle.ownerIdentityId,
+                handleId: handle.id, // Add handle ID for direct contact request
+                requestStatus,
+              },
+            ]);
+          } else {
+            // Use basic data if profile not found
+            setSearchResults([
+              {
+                publicKey: '', // Public key might not be available in search for privacy
+                username: handle.value,
+                displayName: handle.value,
+                userId: handle.ownerIdentityId,
+                handleId: handle.id, // Add handle ID for direct contact request
+                requestStatus,
+              },
+            ]);
+          }
+        } catch (profileError) {
+          // Use basic data if profile request fails
+          setSearchResults([
+            {
+              publicKey: '', // Public key might not be available in search for privacy
+              username: handle.value,
+              displayName: handle.value,
+              userId: handle.ownerIdentityId,
+              handleId: handle.id, // Add handle ID for direct contact request
+              requestStatus,
+            },
+          ]);
+        }
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -121,13 +162,16 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
     }
   };
 
-  const handleSendRequest = async (userId: string, username: string) => {
+  const handleSendRequest = async (userId: string, username: string, handleId?: string) => {
     setCreating(true);
     try {
       await apiRequest('/contacts/request', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          toUserId: userId,
+          toHandleId: handleId || userId, // Use handleId if available, fallback to userId if needed
           message: message.trim() || undefined,
         }),
       });
@@ -141,7 +185,11 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
       if (error.status === 401) {
         await checkAuth();
         toast.error('Session expired. Please try again.');
+      } else if (error.status === 409) {
+        // Conflict error - request already exists
+        toast.info('Request already sent to this user');
       } else {
+        console.error('Contact request error details:', error);
         toast.error(error.message || 'Failed to send request');
       }
     } finally {
@@ -167,7 +215,16 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose();
+        }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close modal"
+      />
 
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
@@ -263,7 +320,11 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                       className="w-full"
                       disabled={creating}
                       onClick={() =>
-                        handleSendRequest(result.userId || result.publicKey, result.username || '')
+                        handleSendRequest(
+                          result.userId || result.publicKey,
+                          result.username || '',
+                          result.handleId
+                        )
                       }
                     >
                       {creating ? 'Sending...' : 'Send Request'}

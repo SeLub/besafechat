@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import { UserService } from '@/services/user.service';
+import { useEffect, useRef, useState } from 'react';
 
 interface UsernameSelectionProps {
   onUsernameSelected: (username: string) => void;
@@ -10,7 +10,7 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [available, setAvailable] = useState(false);
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const validateUsername = (value: string): string | null => {
     if (value.length < 5) return 'Username must be at least 5 characters';
@@ -37,7 +37,7 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
         setError('Username is already taken');
         setAvailable(false);
       }
-    } catch (err) {
+    } catch {
       // Network errors or other issues - assume available
       setAvailable(true);
     } finally {
@@ -100,12 +100,15 @@ export function UsernameSelection({ onUsernameSelected }: UsernameSelectionProps
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2">Username</label>
+          <label htmlFor="username-input" className="block text-sm font-medium mb-2">
+            Username
+          </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               @
             </span>
             <input
+              id="username-input"
               type="text"
               value={username}
               onChange={e => handleChange(e.target.value)}

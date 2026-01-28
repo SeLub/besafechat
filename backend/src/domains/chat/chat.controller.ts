@@ -2,7 +2,7 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { ChatRoomService } from '../message/services/chat-room.service';
 import { CurrentUser } from '../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../session/guards/jwt-session.guard';
@@ -54,7 +54,7 @@ export class ChatController {
     // Получаем участников чата
     const members = await this.chatMemberRepository.find({
       where: { chatId: chatId },
-      relations: ['memberHandle'],
+      relations: ['memberHandle', 'memberHandle.profile'],
     });
 
     // Формируем ответ с участниками
@@ -65,12 +65,59 @@ export class ChatController {
         role: member.role,
         canSendMessages: member.canSendMessages,
         joinedAt: member.joinedAt,
+        user: {
+          id: member.memberHandle?.ownerIdentityId,
+          displayName: member.memberHandle?.profile?.displayName,
+          handle: member.memberHandle?.value,
+        },
         handle: {
           value: member.memberHandle?.value,
           alias: member.memberHandle?.alias,
         },
       })),
     };
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all chats for current user' })
+  @ApiResponse({ status: 200, description: 'Chats retrieved successfully' })
+  async getAllChats(@CurrentUser() user: any) {
+    // Find all chat memberships for the user's handle
+    const chatMemberships = await this.chatMemberRepository.find({
+      where: { memberHandleId: user.handleId },
+      relations: ['chat', 'memberHandle', 'memberHandle.profile'],
+    });
+
+    // For each chat, find the other member(s) (not the current user)
+    const chats = await Promise.all(
+      chatMemberships.map(async (membership) => {
+        const otherMembers = await this.chatMemberRepository.find({
+          where: {
+            chatId: membership.chatId,
+            memberHandleId: Not(user.handleId), // Exclude current user
+          },
+          relations: ['memberHandle', 'memberHandle.profile', 'memberHandle.ownerIdentity'],
+        });
+
+        return {
+          id: membership.chatId,
+          type: membership.chat.type,
+          createdAt: membership.chat.createdAt,
+          lastMessageAt: membership.chat.lastMessageAt,
+          otherMembers: otherMembers.map((member) => ({
+            handleId: member.memberHandleId,
+            user: {
+              id: member.memberHandle?.ownerIdentityId,
+              displayName: member.memberHandle?.profile?.displayName,
+              handle: member.memberHandle?.value,
+              publicKey: member.memberHandle?.ownerIdentity?.masterPublicKey?.toString('base64'),
+            },
+          })),
+        };
+      })
+    );
+
+    return { chats };
   }
 
   @Post('find-or-create')
@@ -81,10 +128,10 @@ export class ChatController {
         otherHandleId: {
           type: 'string',
           example: 'def456-ghi789-jkl012',
-          description: 'The handle ID of the other user to create chat with'
-        }
-      }
-    }
+          description: 'The handle ID of the other user to create chat with',
+        },
+      },
+    },
   })
   async findOrCreateChat(@Body() body: { otherHandleId: string }, @CurrentUser() user: any) {
     // Используем handleId вместо identityId

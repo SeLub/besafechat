@@ -1,4 +1,3 @@
-import { StorageService } from '@/services/storage.service';
 import { useEffect, useState } from 'react';
 import { useAuth } from './use-auth';
 
@@ -47,45 +46,55 @@ export function useChats() {
       loadChatsFromBackend();
     }
   }, [user]);
-
   const loadChatsFromBackend = async () => {
     try {
-      const res = await fetch('http://localhost:4000/contacts', {
+      // Load actual chats from the chats API
+      const chatsRes = await fetch('http://localhost:4000/chats', {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const chats = data.contacts.map((contact: any) => ({
-          id: `chat_${contact.user.id}`,
-          name: contact.user.displayName || `@${contact.user.username}` || 'Unknown User',
-          userId: contact.user.id,
-          publicKey: contact.user.publicKey,
-          isOnline: false,
-        }));
+      let chatData = [];
+      if (chatsRes.ok) {
+        const chatsJson = await chatsRes.json();
+        chatData = chatsJson.chats || chatsJson; // Handle different response formats
 
-        // Save contacts to IndexedDB
-        if (user) {
-          for (const chat of chats) {
-            await StorageService.saveContact(chat.userId, user.id, chat.name);
-          }
-        }
+        // Transform chat data to our Chat interface
+        const actualChats = chatData.map((chat: any) => {
+          // Get the first other member (in private chats there's typically one other person)
+          const otherMember = chat.otherMembers?.[0];
 
-        setChats([...mockChats, ...chats]);
+          return {
+            id: chat.id, // Use actual chat ID
+            name:
+              otherMember?.user?.displayName || `@${otherMember?.user?.handle}` || 'Unknown User',
+            userId: otherMember?.handleId, // Use handleId of the other user
+            publicKey: otherMember?.user?.publicKey,
+            isOnline: false,
+          };
+        });
+        setChats([...mockChats, ...actualChats]);
       } else {
+        // Fallback to mock chats only
         setChats(mockChats);
       }
     } catch (error) {
+      console.error('Error loading chats:', error);
       setChats(mockChats);
     } finally {
       setLoading(false);
     }
   };
-
   // Load online statuses after chats are loaded
   useEffect(() => {
     if (chats.length > 0) {
       loadOnlineStatuses();
+
+      // Set up periodic refresh of online statuses every 30 seconds
+      const interval = setInterval(() => {
+        loadOnlineStatuses();
+      }, 30000);
+
+      return () => clearInterval(interval);
     }
   }, [chats.length]);
 
@@ -140,7 +149,7 @@ export function useChats() {
     if (userIds.length === 0) return;
 
     try {
-      const res = await fetch('http://localhost:4000/users/bulk-online-status', {
+      const res = await fetch('http://localhost:4000/contacts/bulk-online-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

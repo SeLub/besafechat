@@ -1,10 +1,10 @@
 // app/components/username-setup-modal.tsx
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { X, AtSign, CheckCircle, XCircle } from 'lucide-react';
-import { toast } from 'sonner';
 import { UserService } from '@/services/user.service';
+import { AtSign, CheckCircle, X, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface UsernameSetupModalProps {
   isOpen: boolean;
@@ -175,7 +175,16 @@ export function UsernameSetupModal({
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose();
+        }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close modal"
+      />
 
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
@@ -192,10 +201,13 @@ export function UsernameSetupModal({
         {/* Content */}
         <div className="p-4 space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">Username</label>
+            <label htmlFor="username-input" className="text-sm font-medium mb-2 block">
+              Username
+            </label>
             <div className="relative">
               <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
+                id="username-input"
                 type="text"
                 placeholder="username"
                 value={username}

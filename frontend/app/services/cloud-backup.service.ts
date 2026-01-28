@@ -1,5 +1,5 @@
-import { decryptSeedFromCloud, deriveKeyPairFromSeed, encryptSeedForCloud } from '../lib/crypto';
-import type { EncryptedSeedData, KeyPair } from '../lib/crypto/types';
+import { decryptSeedFromCloud } from '../lib/crypto';
+import type { EncryptedSeedData } from '../lib/crypto/types';
 import { S3Service } from './s3-service';
 
 // ============================================================================
@@ -175,7 +175,7 @@ export class CloudBackupService {
 
       return encryptedSeed;
     } catch (error) {
-      console.log('Seed restore failed');
+      console.log('Seed restore failed', error);
       return null;
     }
   }

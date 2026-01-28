@@ -1,15 +1,8 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 import { useAuth } from './use-auth';
 import { useNotifications } from './use-notifications';
-import { toast } from 'sonner';
-
-interface WebSocketNotificationsProps {
-  onChatCreated?: (chatId: string) => void;
-  onMessageReceived?: (message: any) => void;
-  onUserOnline?: (userId: string) => void;
-  onUserOffline?: (userId: string) => void;
-}
 
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
@@ -38,8 +31,9 @@ export function useWebSocketNotifications(
 
     // Contact request received
     socket.on('contact_request_received', data => {
-      const { fromUser, message } = data;
-      const displayName = fromUser.displayName || `@${fromUser.username}` || 'Someone';
+      console.log('Contact request received:', data);
+      const { fromHandle, message } = data;
+      const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
 
       toast.success(`${displayName} wants to connect`, {
         description: message || 'New contact request',
@@ -50,8 +44,8 @@ export function useWebSocketNotifications(
 
     // Contact request accepted
     socket.on('contact_request_accepted', data => {
-      const { byUser, chatId } = data;
-      const displayName = byUser.displayName || `@${byUser.username}` || 'Someone';
+      const { byHandle, chatId } = data;
+      const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
 
       toast.success(`${displayName} accepted your request`, {
         description: 'You can now start chatting',
@@ -67,10 +61,25 @@ export function useWebSocketNotifications(
 
     // Contact request rejected
     socket.on('contact_request_rejected', data => {
-      const { byUser } = data;
-      const displayName = byUser.displayName || `@${byUser.username}` || 'Someone';
+      const { byHandle } = data;
+      const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
 
       toast.error(`${displayName} declined your request`);
+    });
+
+    // New chat available (when user accepts a contact request)
+    socket.on('new_chat_available', data => {
+      const { fromHandle, chatId } = data;
+      const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
+
+      toast.success(`Chat available with ${displayName}`, {
+        description: 'You can now start messaging',
+      });
+
+      // Handle chat creation/selection
+      if (chatId) {
+        callbacksRef.current.onChatCreated?.(chatId);
+      }
     });
 
     // Message received
@@ -102,8 +111,16 @@ export function useWebSocketNotifications(
 
     // Heartbeat to maintain online status
     const heartbeatInterval = setInterval(() => {
-      socket.emit('heartbeat');
-    }, 30000); // Every 30 seconds
+      if (socket.connected) {
+        socket.emit('heartbeat');
+      }
+    }, 20000); // Every 20 seconds - more frequent to ensure online status stays current
+
+    // Listen for disconnect events to update UI appropriately
+    socket.on('disconnect', reason => {
+      console.log('WebSocket disconnected:', reason);
+      // Optionally notify the UI that connection was lost
+    });
 
     return () => {
       clearInterval(heartbeatInterval);
