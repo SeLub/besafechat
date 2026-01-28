@@ -8,6 +8,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class S3Service {
@@ -33,6 +34,58 @@ export class S3Service {
       },
       forcePathStyle: true,
     });
+  }
+
+  // Unified methods for all file types
+  async uploadObject(key: string, data: Buffer, contentType: string = 'application/octet-stream'): Promise<void> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: data,
+      ContentType: contentType,
+    });
+    await this.s3.send(command);
+  }
+
+  async deleteObjectIfExists(key: string): Promise<void> {
+    try {
+      await this.deleteObject(key);
+    } catch (error) {
+      // Ignore 404 - file didn't exist
+    }
+  }
+
+  // Avatar-specific methods
+  private getAvatarHash(handleId: string): string {
+    return createHash('sha256').update(handleId).digest('hex').substring(0, 16);
+  }
+
+  getAvatarPath(handleId: string): string {
+    return `avatars/${this.getAvatarHash(handleId)}/avatar.png`;
+  }
+
+  getAvatarUrl(handleId: string): string {
+    return `https://s3.tebi.io/besafe.backet/${this.getAvatarPath(handleId)}`;
+  }
+
+  async uploadAvatar(handleId: string, imageData: Buffer): Promise<string> {
+    // 1. Delete old avatar
+    await this.deleteObjectIfExists(this.getAvatarPath(handleId));
+    
+    // 2. Upload new avatar
+    await this.uploadObject(this.getAvatarPath(handleId), imageData, 'image/png');
+    
+    return this.getAvatarUrl(handleId);
+  }
+
+  async deleteAvatar(handleId: string): Promise<void> {
+    await this.deleteObjectIfExists(this.getAvatarPath(handleId));
+  }
+
+  // Future media methods
+  getMediaPath(handleId: string, messageId: string, filename: string): string {
+    const hash = this.getAvatarHash(handleId); // Reuse hash function
+    return `media/${hash}/${messageId}/${filename}`;
   }
 
   async getPresignedUrlForUpload(key: string, contentType: string): Promise<string> {

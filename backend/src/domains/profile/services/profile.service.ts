@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Profile } from '../profile.entity';
 import { HandleService } from '../../handle/services/handle.service';
+import { MediaService } from '../../media/media.service';
 
 @Injectable()
 export class ProfileService {
@@ -11,7 +12,8 @@ export class ProfileService {
     @InjectRepository(Profile)
     private profileRepository: Repository<Profile>,
     private handleService: HandleService,
-    private dataSource: DataSource
+    private dataSource: DataSource,
+    private mediaService: MediaService
   ) {}
 
   async createProfile(data: {
@@ -21,7 +23,6 @@ export class ProfileService {
     lastName?: string;
     email?: string;
     phone?: string;
-    avatarUrl?: string;
     bio?: string;
     settings?: Record<string, any>;
   }): Promise<Profile> {
@@ -45,7 +46,6 @@ export class ProfileService {
       lastName: data.lastName,
       email: data.email,
       phone: data.phone,
-      avatarUrl: data.avatarUrl,
       bio: data.bio,
       settings: data.settings || {},
     });
@@ -71,7 +71,11 @@ export class ProfileService {
       throw new NotFoundException(`Profile not found for handle ${handleId}`);
     }
 
-    return profile;
+    // Always generate avatarUrl dynamically
+    return {
+      ...profile,
+      avatarUrl: this.mediaService.getAvatarUrl(handleId)
+    } as any;
   }
 
   async getProfileByHandleValue(handleValue: string): Promise<Profile> {
@@ -144,7 +148,7 @@ export class ProfileService {
         isSearchable: profile.handle.isSearchable,
       },
       displayName: profile.displayName,
-      avatarUrl: profile.avatarUrl,
+      avatarUrl: this.mediaService.getAvatarUrl(profile.handleId), // Always generate dynamically
       bio: profile.bio,
       metadata: profile.metadata,
       createdAt: profile.createdAt,
@@ -171,14 +175,6 @@ export class ProfileService {
 
     // Обновляем только settings
     profile.settings = { ...profile.settings, ...settings };
-    profile.updatedAt = new Date();
-
-    return this.profileRepository.save(profile);
-  }
-
-  async updateAvatar(handleId: string, avatarUrl: string): Promise<Profile> {
-    const profile = await this.getProfileByHandle(handleId);
-    profile.avatarUrl = avatarUrl;
     profile.updatedAt = new Date();
 
     return this.profileRepository.save(profile);

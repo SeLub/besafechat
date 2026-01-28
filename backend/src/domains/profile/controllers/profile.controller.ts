@@ -108,7 +108,7 @@ export class ProfileController {
         alias: profile.handle.alias,
       },
       displayName: profile.displayName,
-      avatarUrl: profile.avatarUrl,
+      avatarUrl: (profile as any).avatarUrl, // Already computed by ProfileService
       bio: profile.bio,
       createdAt: profile.createdAt,
     }));
@@ -143,20 +143,6 @@ export class ProfileController {
     return new ApiResponseDto(true, {
       message: 'Settings updated successfully',
       settings: updatedProfile.settings,
-    });
-  }
-
-  @Put('avatar')
-  @UseGuards(JwtSessionGuard)
-  @ApiOperation({ summary: 'Update profile avatar' })
-  @ApiBearerAuth()
-  @ApiCookieAuth()
-  @ApiBody({ schema: { properties: { avatarUrl: { type: 'string' } } } })
-  async updateAvatar(@CurrentHandle() handle: any, @Body('avatarUrl') avatarUrl: string) {
-    const updatedProfile = await this.profileService.updateAvatar(handle.id, avatarUrl);
-    return new ApiResponseDto(true, {
-      message: 'Avatar updated successfully',
-      avatarUrl: updatedProfile.avatarUrl,
     });
   }
 
