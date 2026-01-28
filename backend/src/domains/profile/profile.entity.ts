@@ -47,9 +47,6 @@ export class Profile {
   phone?: string;
 
   @Column({ type: 'text', nullable: true })
-  avatarUrl?: string;
-
-  @Column({ type: 'text', nullable: true })
   bio?: string;
 
   @Column({ type: 'jsonb', default: {} })

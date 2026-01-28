@@ -4,6 +4,7 @@ import { IdentityService } from '../../identity/services/identity.service';
 import { SessionService } from '../../session/services/session.service';
 import { HandleService } from '../../handle/services/handle.service';
 import { ProfileService } from '../../profile/services/profile.service';
+import { MediaService } from '../../media/media.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,7 +13,8 @@ export class AuthService {
     private identityService: IdentityService,
     private sessionService: SessionService,
     private handleService: HandleService,
-    private profileService: ProfileService
+    private profileService: ProfileService,
+    private mediaService: MediaService
   ) {}
 
  /**
@@ -190,7 +192,7 @@ export class AuthService {
         displayName: profile.displayName,
         firstName: profile.firstName,
         lastName: profile.lastName,
-        avatarUrl: profile.avatarUrl,
+        avatarUrl: this.mediaService.getAvatarUrl(primaryHandle.id),
         bio: profile.bio,
         settings: profile.settings,
       },
