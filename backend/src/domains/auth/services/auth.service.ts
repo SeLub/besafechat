@@ -1,11 +1,11 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/auth/services/auth.service.ts
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IdentityService } from '../../identity/services/identity.service';
-import { SessionService } from '../../session/services/session.service';
-import { HandleService } from '../../handle/services/handle.service';
-import { ProfileService } from '../../profile/services/profile.service';
-import { MediaService } from '../../media/media.service';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { HandleService } from '../../handle/services/handle.service';
+import { IdentityService } from '../../identity/services/identity.service';
+import { MediaService } from '../../media/media.service';
+import { ProfileService } from '../../profile/services/profile.service';
+import { SessionService } from '../../session/services/session.service';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +17,7 @@ export class AuthService {
     private mediaService: MediaService
   ) {}
 
- /**
+  /**
    * Генерирует handle на основе хэша публичного ключа
    * @param publicKeyBase64 - публичный ключ в формате base64
    * @returns строка handle в формате user_{hash}
@@ -25,13 +25,13 @@ export class AuthService {
   generateHandleFromPublicKey(publicKeyBase64: string): string {
     // Декодируем base64 публичный ключ в байты
     const publicKeyBuffer = Buffer.from(publicKeyBase64, 'base64');
-    
+
     // Создаем хэш из публичного ключа
     const hash = crypto.createHash('sha256').update(publicKeyBuffer).digest('hex');
-    
+
     // Берем первые 16 символов хэша для краткости
     const hashPrefix = hash.substring(0, 12);
-    
+
     // Формируем handle в формате user_{hash}
     return `user_${hashPrefix}`;
   }
@@ -61,7 +61,6 @@ export class AuthService {
       identity,
     };
   }
-
 
   async loginWithPublicKey(
     publicKeyBase64: string,
@@ -99,7 +98,7 @@ export class AuthService {
     let activeHandle;
     try {
       activeHandle = await this.handleService.getPrimaryHandle(identity.id);
-    } catch (error) {
+    } catch {
       // If no primary handle exists (edge case), create default one
       const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
 
@@ -159,7 +158,7 @@ export class AuthService {
     let primaryHandle;
     try {
       primaryHandle = await this.handleService.getPrimaryHandle(identityId);
-    } catch (error) {
+    } catch {
       // Если нет handle, возвращаем только identity
       return {
         identity: {
@@ -173,6 +172,7 @@ export class AuthService {
 
     // Получаем profile для handle
     const profile = await this.profileService.getProfileByHandle(primaryHandle.id);
+    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(primaryHandle.id);
 
     return {
       identity: {
@@ -192,7 +192,7 @@ export class AuthService {
         displayName: profile.displayName,
         firstName: profile.firstName,
         lastName: profile.lastName,
-        avatarUrl: this.mediaService.getAvatarUrl(primaryHandle.id),
+        avatarUrl: avatarUrl,
         bio: profile.bio,
         settings: profile.settings,
       },

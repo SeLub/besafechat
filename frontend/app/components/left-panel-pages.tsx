@@ -1,33 +1,33 @@
-import { useState, useRef } from 'react';
-import type { ReactNode } from 'react';
+import { ContactsPage } from '@/components/contacts-page';
+import { DevicesSettingsModal } from '@/components/devices-settings-modal';
+import { DisplayNameModal } from '@/components/display-name-modal';
+import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
+import { StorageSettingsModal } from '@/components/storage-settings-modal';
+import { ThemeSelectorModal } from '@/components/theme-selector-modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
-import { DisplayNameModal } from '@/components/display-name-modal';
-import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
-import { ThemeSelectorModal } from '@/components/theme-selector-modal';
-import { StorageSettingsModal } from '@/components/storage-settings-modal';
-import { DevicesSettingsModal } from '@/components/devices-settings-modal';
-import { ContactsPage } from '@/components/contacts-page';
 import { useAuth } from '@/hooks/use-auth';
 import { MediaService } from '@/services/media.service';
-import { toast } from 'sonner';
 import {
   ArrowLeft,
-  Edit3,
-  Camera,
-  User,
   AtSign,
   Bell,
-  Shield,
-  Palette,
+  Camera,
   Database,
+  Edit3,
   Globe,
   HelpCircle,
-  LogOut,
   Key,
+  LogOut,
+  Palette,
+  Shield,
+  User,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { UserService } from '~/services';
 
 interface LeftPanelPageProps {
@@ -123,7 +123,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const handleSaveUsername = async (username: string, isSearchable: boolean) => {
     try {
       // Обновляем username на сервере с isSearchable
-      await UserService.setUsername(username, isSearchable);
+      await UserService.setUsername(username, userProfile?.profile?.displayName, isSearchable);
 
       // Обновляем данные пользователя без перезагрузки страницы
       await refreshUser();
@@ -156,7 +156,9 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                   {getInitials(userProfile?.profile?.displayName)}
                 </AvatarFallback>
                 {userProfile?.profile?.avatarUrl && (
-                  <AvatarImage src={userProfile.profile.avatarUrl} />
+                  <AvatarImage
+                    src={userProfile.profile.avatarUrl + '?' + Math.random().toString(36)}
+                  />
                 )}
               </Avatar>
               <input
@@ -213,7 +215,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         <UsernameSetupModal
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
-          currentUsername={userProfile?.username}
+          currentUsername={userProfile?.handle?.value}
           onSave={handleSaveUsername}
         />
 
@@ -221,7 +223,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         <DisplayNameModal
           isOpen={displayNameModalOpen}
           onClose={() => setDisplayNameModalOpen(false)}
-          currentDisplayName={userProfile?.displayName}
+          currentDisplayName={userProfile?.profile?.displayName}
           onUpdate={checkAuth}
         />
       </>
@@ -234,10 +236,6 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         onBack={onBack}
         onChatSelect={userId => {
           onChatCreated?.(userId);
-          onBack();
-        }}
-        onChatCreated={chatId => {
-          onChatCreated?.(chatId);
           onBack();
         }}
       />

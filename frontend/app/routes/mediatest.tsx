@@ -70,7 +70,7 @@ export default function MediaTestRoute() {
         default:
           throw new Error('Unsupported media type');
       }
-      
+
       setUploadedUrl(result.url);
       toast.success(`${mediaType} uploaded successfully`);
     } catch (error) {
@@ -135,13 +135,14 @@ export default function MediaTestRoute() {
         <label className="block text-sm font-medium mb-2">Media Type</label>
         <select
           value={mediaType}
-          onChange={(e) => setMediaType(e.target.value as MediaType)}
+          onChange={e => setMediaType(e.target.value as MediaType)}
           className="w-full p-2 border rounded-lg"
         >
           <option value={MediaType.AVATAR}>Avatar (5MB, auto-resize to 256x256)</option>
           <option value={MediaType.IMAGE}>Image (10MB, for chat messages)</option>
           <option value={MediaType.DOCUMENT}>Document (50MB, PDF/DOC/etc)</option>
           <option value={MediaType.AUDIO}>Audio (20MB, voice messages)</option>
+          <option value={MediaType.VIDEO}>Video (25MB, for chat messages)</option>
         </select>
       </div>
 
@@ -165,26 +166,25 @@ export default function MediaTestRoute() {
 
         {selectedFile && (
           <div className="mb-4 p-2 bg-gray-100 rounded">
-            <p><strong>File:</strong> {selectedFile.name}</p>
-            <p><strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-            <p><strong>Type:</strong> {selectedFile.type}</p>
+            <p>
+              <strong>File:</strong> {selectedFile.name}
+            </p>
+            <p>
+              <strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+            </p>
+            <p>
+              <strong>Type:</strong> {selectedFile.type}
+            </p>
           </div>
         )}
 
         <div className="flex gap-2">
-          <Button 
-            onClick={handleUpload} 
-            disabled={isUploading || !selectedFile} 
-            className="flex-1"
-          >
+          <Button onClick={handleUpload} disabled={isUploading || !selectedFile} className="flex-1">
             {isUploading ? 'Uploading...' : `Upload ${mediaType}`}
           </Button>
 
           {mediaType === MediaType.AVATAR && uploadedUrl && (
-            <Button 
-              onClick={handleDelete} 
-              variant="destructive"
-            >
+            <Button onClick={handleDelete} variant="destructive">
               Delete Avatar
             </Button>
           )}
@@ -195,7 +195,7 @@ export default function MediaTestRoute() {
       {uploadedUrl && (
         <div className="border p-4 rounded-lg mb-6">
           <h2 className="text-xl font-semibold mb-4">Upload Result</h2>
-          
+
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-2">URL:</p>
             <p className="break-all bg-gray-100 p-2 rounded text-sm">{uploadedUrl}</p>
@@ -204,9 +204,9 @@ export default function MediaTestRoute() {
           {(mediaType === MediaType.AVATAR || mediaType === MediaType.IMAGE) && (
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">Preview:</p>
-              <img 
-                src={uploadedUrl} 
-                alt="Uploaded media" 
+              <img
+                src={uploadedUrl}
+                alt="Uploaded media"
                 className="max-w-xs max-h-64 border rounded"
                 onError={() => toast.error('Failed to load image')}
               />
@@ -229,11 +229,21 @@ export default function MediaTestRoute() {
       <div className="text-sm text-gray-600">
         <h3 className="font-semibold mb-2">New Unified Media API:</h3>
         <ul className="list-disc pl-5 space-y-1">
-          <li><code>POST /media/upload/avatar</code> - Avatar upload (auto-resize)</li>
-          <li><code>POST /media/upload/image</code> - Chat images</li>
-          <li><code>POST /media/upload/document</code> - Documents</li>
-          <li><code>POST /media/upload/audio</code> - Voice messages</li>
-          <li><code>DELETE /media/avatar</code> - Delete avatar</li>
+          <li>
+            <code>POST /media/upload/avatar</code> - Avatar upload (auto-resize)
+          </li>
+          <li>
+            <code>POST /media/upload/image</code> - Chat images
+          </li>
+          <li>
+            <code>POST /media/upload/document</code> - Documents
+          </li>
+          <li>
+            <code>POST /media/upload/audio</code> - Voice messages
+          </li>
+          <li>
+            <code>DELETE /media/avatar</code> - Delete avatar
+          </li>
         </ul>
         <p className="mt-2">
           <strong>S3 Structure:</strong> <code>handles/&#123;hash16&#125;/avatar.png</code>

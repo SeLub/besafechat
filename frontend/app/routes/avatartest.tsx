@@ -26,7 +26,8 @@ export default function AvatarTestRoute() {
     setIsUploading(true);
     try {
       const result = await MediaService.uploadAvatar(selectedFile);
-      setAvatarUrl(result.url);
+      // Add timestamp for cache busting
+      setAvatarUrl(`${result.url}?t=${Date.now()}`);
       toast.success('Avatar uploaded successfully');
     } catch (error) {
       console.error('Upload error:', error);
@@ -65,9 +66,7 @@ export default function AvatarTestRoute() {
             </div>
           )}
         </div>
-        {avatarUrl && (
-          <p className="text-sm text-gray-600 break-all">{avatarUrl}</p>
-        )}
+        {avatarUrl && <p className="text-sm text-gray-600 break-all">{avatarUrl}</p>}
       </div>
 
       {/* Upload Section */}
@@ -88,17 +87,17 @@ export default function AvatarTestRoute() {
           />
         </div>
 
-        <Button 
-          onClick={handleUpload} 
-          disabled={isUploading || !selectedFile} 
+        <Button
+          onClick={handleUpload}
+          disabled={isUploading || !selectedFile}
           className="w-full mb-2"
         >
           {isUploading ? 'Uploading...' : 'Upload Avatar'}
         </Button>
 
-        <Button 
-          onClick={handleDelete} 
-          disabled={isDeleting || !avatarUrl} 
+        <Button
+          onClick={handleDelete}
+          disabled={isDeleting || !avatarUrl}
           variant="destructive"
           className="w-full"
         >
