@@ -7,7 +7,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { RedisService } from '../../../common/redis.service';
+import { RedisService } from '../../../domains/redis/redis.service';
 import { SessionService } from '../../session/services/session.service';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { ChatRoomService } from '../services/chat-room.service';

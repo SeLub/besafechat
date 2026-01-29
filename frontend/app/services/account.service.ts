@@ -1,8 +1,8 @@
 import {
   deriveKeyPairFromSeed,
   encryptSeedForCloud,
-  validateSeedPhrase,
   generateSeedPhrase,
+  validateSeedPhrase,
 } from '../lib/crypto';
 import { AuthService } from './auth.service';
 import { CloudBackupService } from './cloud-backup.service';
@@ -11,11 +11,37 @@ import { StorageService } from './storage.service';
 
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
+// Store private key temporarily in memory for challenge-response operations
+let temporaryPrivateKey: Uint8Array | null = null;
+
+/**
+ * Temporarily store the private key for challenge-response operations
+ * This is only for the duration of the active session when the account is unlocked
+ */
+export function setTemporaryPrivateKey(privateKey: Uint8Array) {
+  temporaryPrivateKey = privateKey;
+}
+
+/**
+ * Get the temporarily stored private key for challenge-response operations
+ * Returns null if no private key is temporarily available
+ */
+export function getTemporaryPrivateKey(): Uint8Array | null {
+  return temporaryPrivateKey;
+}
+
+/**
+ * Clear the temporarily stored private key
+ * Called during logout or when the session expires
+ */
+export function clearTemporaryPrivateKey() {
+  temporaryPrivateKey = null;
+}
 
 export class AccountService {
   /**
    * Unified account creation flow with cloud backup
-   * Follows the unified pattern: generate seed → derive keys → store public key → login user (creates identity) → backup seed
+   * Follows the unified pattern: generate seed → derive keys → store public key → temporarily store private key → login user (creates identity) → backup seed
    */
   static async createAccountWithCloud(password: string) {
     // 1. Generate new seed
@@ -26,10 +52,15 @@ export class AccountService {
     // 2. Сохранение публичного ключа в локальном хранилище
     await StorageService.storePublicKey(publicKeyBase64);
 
-    // 3. Генерация данных клиента
+    // 3. Store private key temporarily for challenge-response operations BEFORE attempting login
+    // This ensures that when AuthService.login() is called, the private key is available for signing challenges
+    setTemporaryPrivateKey(keyPair.privateKey);
+
+    // 4. Генерация данных клиента
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 4. Login (creates identity if first time) on server
+    // 5. Login (creates identity if first time) on server
+    // This will now be able to access the temporarily stored private key for challenge signing
     const result = await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
@@ -39,7 +70,7 @@ export class AccountService {
     // Wait briefly to ensure user profile is created on the backend
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // 5. Encrypt and backup seed to cloud
+    // 6. Encrypt and backup seed to cloud
     const encrypted = await encryptSeedForCloud(seed, password, result.userId);
     const uploadResult = await CloudBackupService.backupSeed(encrypted, password);
 
@@ -47,7 +78,7 @@ export class AccountService {
       throw new Error(`Cloud backup failed: ${uploadResult.message || 'Unknown error'}`);
     }
 
-    // 6. Download backup file for user
+    // 7. Download backup file for user
     AccountService.downloadBackupFile(encrypted, publicKeyBase64);
 
     return {
@@ -60,7 +91,7 @@ export class AccountService {
 
   /**
    * Unified account creation flow with self-custody (no cloud backup)
-   * Follows the unified pattern: generate seed → derive keys → store public key → login user (creates identity)
+   * Follows the unified pattern: generate seed → derive keys → store public key → temporarily store private key → login user (creates identity)
    */
   static async createAccountWithSelfCustody() {
     // 1. Generate new seed
@@ -71,10 +102,15 @@ export class AccountService {
     // 2. Сохранение публичного ключа в локальном хранилище
     await StorageService.storePublicKey(publicKeyBase64);
 
-    // 3. Генерация данных клиента
+    // 3. Store private key temporarily for challenge-response operations BEFORE attempting login
+    // This ensures that when AuthService.login() is called, the private key is available for signing challenges
+    setTemporaryPrivateKey(keyPair.privateKey);
+
+    // 4. Генерация данных клиента
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 4. Login (creates identity if first time) on server
+    // 5. Login (creates identity if first time) on server
+    // This will now be able to access the temporarily stored private key for challenge signing
     const result = await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
@@ -104,12 +140,15 @@ export class AccountService {
     }
 
     // Derive keys from the recovered seed
-    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
+    const keyPair = await deriveKeyPairFromSeed(seed);
 
-    // Save to IndexedDB
-    await StorageService.storePublicKey(publicKeyBase64);
+    // Save public key to IndexedDB
+    await StorageService.storePublicKey(keyPair.publicKeyBase64);
 
-    return { privateKey, publicKey, publicKeyBase64 };
+    // Store private key temporarily for challenge-response operations
+    setTemporaryPrivateKey(keyPair.privateKey);
+
+    return keyPair;
   }
 
   /**
@@ -123,12 +162,15 @@ export class AccountService {
     }
 
     // Derive keys
-    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
+    const keyPair = await deriveKeyPairFromSeed(seed);
 
     // Save public key to IndexedDB
-    await StorageService.storePublicKey(publicKeyBase64);
+    await StorageService.storePublicKey(keyPair.publicKeyBase64);
 
-    return { privateKey, publicKey, publicKeyBase64 };
+    // Store private key temporarily for challenge-response operations
+    setTemporaryPrivateKey(keyPair.privateKey);
+
+    return keyPair;
   }
 
   /**
@@ -136,6 +178,7 @@ export class AccountService {
    */
   static clearTemporarySeed() {
     temporarySeed = null;
+    clearTemporaryPrivateKey(); // Also clear the temporary private key
   }
 
   /**
@@ -181,15 +224,22 @@ export class AccountService {
     }
 
     // Derive keys
-    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
+    const keyPair = await deriveKeyPairFromSeed(seed);
 
     // Save public key to IndexedDB
-    await StorageService.storePublicKey(publicKeyBase64);
+    await StorageService.storePublicKey(keyPair.publicKeyBase64);
 
     // Store seed temporarily in memory only (not in IndexedDB)
     temporarySeed = [...seed]; // Create a copy to avoid reference issues
 
-    return { privateKey, publicKey, publicKeyBase64 };
+    // Store private key temporarily for challenge-response operations
+    setTemporaryPrivateKey(keyPair.privateKey);
+
+    return {
+      privateKey: keyPair.privateKey,
+      publicKey: keyPair.publicKey,
+      publicKeyBase64: keyPair.publicKeyBase64,
+    };
   }
 
   /**

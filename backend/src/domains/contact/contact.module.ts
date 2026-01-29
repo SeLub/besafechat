@@ -1,7 +1,7 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/contact/contact.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { RedisService } from '../../common/redis.service';
+import { RedisService } from '../../domains/redis/redis.service';
 import { ChatMember } from '../chat/chat-member.entity';
 import { Chat } from '../chat/chat.entity';
 import { Handle } from '../handle/handle.entity';
