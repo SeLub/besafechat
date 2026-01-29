@@ -1,7 +1,6 @@
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarUrl } from '@/lib/avatar-utils';
-import { Phone, Video, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Info, Phone, Video } from 'lucide-react';
 
 interface MiddleHeaderProps {
   selectedChat: any;
@@ -31,7 +30,17 @@ export function MiddleHeader({
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(selectedChat.name)}
             </AvatarFallback>
-            {selectedChat.avatarUrl && <AvatarImage src={selectedChat.avatarUrl} />}
+            {selectedChat.avatarUrl ? (
+              <AvatarImage
+                src={selectedChat.avatarUrl}
+                onError={e => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
+            ) : (
+              <AvatarImage src="" style={{ display: 'none' }} />
+            )}
           </Avatar>
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>

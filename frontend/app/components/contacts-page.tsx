@@ -1,7 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/use-notifications';
-import { getAvatarUrl } from '@/lib/avatar-utils';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -235,7 +234,17 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(contact.user)}
                       </AvatarFallback>
-                      <AvatarImage src={contact.user.avatarUrl} />
+                      {contact.user.avatarUrl ? (
+                        <AvatarImage
+                          src={contact.user.avatarUrl}
+                          onError={e => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <AvatarImage src="" style={{ display: 'none' }} />
+                      )}
                     </Avatar>
                     <div>
                       <div className="font-medium">
@@ -295,8 +304,16 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.fromUser || {})}
                           </AvatarFallback>
-                          {request.fromUser?.avatarUrl && (
-                            <AvatarImage src={request.fromUser.avatarUrl} />
+                          {request.fromUser?.avatarUrl ? (
+                            <AvatarImage
+                              src={request.fromUser.avatarUrl}
+                              onError={e => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <AvatarImage src="" style={{ display: 'none' }} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -375,8 +392,16 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.toUser || {})}
                           </AvatarFallback>
-                          {request.toUser?.avatarUrl && (
-                            <AvatarImage src={request.toUser.avatarUrl} />
+                          {request.toUser?.avatarUrl ? (
+                            <AvatarImage
+                              src={request.toUser.avatarUrl}
+                              onError={e => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <AvatarImage src="" style={{ display: 'none' }} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">

@@ -1,6 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { getAvatarUrl } from '@/lib/avatar-utils';
 import { getInitials } from '@/lib/utils';
 import { Plus, Search } from 'lucide-react';
 
@@ -95,7 +94,17 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
           <AvatarFallback className="bg-primary text-primary-foreground">
             {getInitials(chat.name)}
           </AvatarFallback>
-          {chat.avatarUrl && <AvatarImage src={chat.avatarUrl} />}
+          {chat.avatarUrl ? (
+            <AvatarImage
+              src={chat.avatarUrl}
+              onError={e => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          ) : (
+            <AvatarImage src="" style={{ display: 'none' }} />
+          )}
         </Avatar>
         {chat.isOnline && (
           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
