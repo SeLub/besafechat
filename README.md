@@ -22,24 +22,26 @@ BeSafeChat is an end-to-end encrypted anonymous messenger that implements a uniq
 
 To prevent collisions where users with identical passwords would have their encrypted seeds stored at the same location, we've implemented a robust password uniqueness system:
 
-#### Two-Stage Approach:
+#### Privacy-Preserving Approach:
 
-1. **Temporary Reservation (Redis)**: Uses atomic operations to prevent race conditions during account creation (24-hour TTL)
-2. **Permanent Storage (PostgreSQL)**: Maintains unique password hashes with database-level constraints
+1. **Password Hash Tracking**: Uses a dedicated table `claimed_recovery_passwords` to track unique password hashes
+2. **No Identity Links**: The table only stores the password hash, not linking it to any specific identity for privacy
+3. **Database-Level Constraints**: UNIQUE constraint on password_hash prevents duplicates
+4. **Atomic Operations**: PostgreSQL handles duplicate prevention reliably
 
 #### Key Benefits:
 
 - Prevents password collisions that could overwrite other users' seed backups
-- Maintains zero-knowledge properties (server only sees password hashes)
+- Maintains zero-knowledge properties (server only sees password hashes, not the actual passwords or links to identities)
 - Provides immediate feedback if password is already in use
-- Automatic cleanup of temporary reservations
+- Preserves user privacy by not linking passwords to identities
 
 #### Implementation Details:
 
 - Password availability checked before account creation
-- Unique password hashes stored in `permanent_password_hashes` table
+- Unique password hashes stored in `claimed_recovery_passwords` table
 - Rate limiting prevents abuse of password checking endpoints
-- Atomic Redis operations ensure race condition safety
+- SHA-256 hashing used consistently across client and server
 
 ### 4. End-to-End Encryption
 
@@ -201,8 +203,8 @@ export class Profile {
 ### 1. Password Uniqueness Protection
 
 - **Problem**: Users with same password would have same S3 storage path
-- **Solution**: Two-stage system with temporary Redis reservation and permanent PostgreSQL storage
-- **Benefit**: Eliminates collision risk while maintaining usability
+- **Solution**: Privacy-preserving system with database-level uniqueness enforcement
+- **Benefit**: Eliminates collision risk while maintaining user privacy
 
 ### 2. Challenge-Response Authentication
 
@@ -230,7 +232,6 @@ export class Profile {
 
 - `POST /password-recovery/check-availability` - Check if password is available
 - `POST /password-recovery/claim` - Claim password for exclusive use
-- `POST /password-recovery/lookup-identity` - Find identity by password hash
 
 ### Authentication Endpoints
 
@@ -296,8 +297,8 @@ VITE_API_BASE_URL=http://localhost:4000
 ### Account Recovery
 
 1. User enters their password
-2. System verifies password hash is registered
-3. Encrypted seed is downloaded from unique location
+2. Client computes storage path from password using same algorithm as during backup
+3. Encrypted seed is downloaded from unique location based on password hash
 4. Seed is decrypted locally with user's password
 5. Keys are regenerated and account is unlocked
 
@@ -321,7 +322,7 @@ npm run test
 - **Separation of Concerns**: Identity, handles, and profiles are distinct entities
 - **Privacy First**: Server only sees public keys and encrypted data
 - **Zero-Knowledge**: Cloud storage encrypted client-side
-- **Collision Prevention**: Unique password enforcement system
+- **Collision Prevention**: Privacy-preserving password uniqueness enforcement
 - **Scalability**: Designed for growth with proper indexing and caching
 
 ## Contributing
