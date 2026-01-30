@@ -1,4 +1,3 @@
-// /home/selub/Documents/progs/besafechat/backend/src/domains/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HandleModule } from '../handle/handle.module';
@@ -9,12 +8,15 @@ import { ProfileModule } from '../profile/profile.module';
 import { RedisModule } from '../redis/redis.module';
 import { SessionModule } from '../session/session.module';
 import { AuthSessionController } from './controllers/auth-session.controller';
+import { PasswordRecoveryController } from './controllers/password-recovery.controller';
+import { ClaimedRecoveryPassword } from './entities/claimed-recovery-password.entity';
 import { AuthService } from './services/auth.service';
 import { ChallengeService } from './services/challenge.service';
+import { PasswordRecoveryService } from './services/password-recovery.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([]),
+    TypeOrmModule.forFeature([ClaimedRecoveryPassword]), // Add the new entity
     IdentityModule,
     SessionModule,
     HandleModule,
@@ -23,8 +25,19 @@ import { ChallengeService } from './services/challenge.service';
     MediaModule,
     RedisModule,
   ],
-  providers: [AuthService, ChallengeService],
-  controllers: [AuthSessionController],
-  exports: [AuthService, ChallengeService],
+  providers: [
+    AuthService,
+    ChallengeService,
+    PasswordRecoveryService, // Add the new service
+  ],
+  controllers: [
+    AuthSessionController,
+    PasswordRecoveryController, // Add the new controller
+  ],
+  exports: [
+    AuthService,
+    ChallengeService,
+    PasswordRecoveryService, // Export the new service
+  ],
 })
 export class AuthModule {}
