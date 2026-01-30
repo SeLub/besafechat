@@ -53,6 +53,7 @@ export class CloudBackupService {
 
   /**
    * Backup encrypted seed to cloud storage using password-derived storage path
+   * This method is called after the password has been claimed via PasswordRecoveryService
    */
   static async backupSeedWithPassword(
     encryptedSeed: EncryptedSeedData,
@@ -73,7 +74,7 @@ export class CloudBackupService {
           kdfParams: encryptedSeed.kdfParams,
         }),
       ]);
-      
+
       await MediaService.uploadSeed(encryptedBlob, storagePath);
 
       return {
@@ -117,7 +118,7 @@ export class CloudBackupService {
           kdfParams: encryptedSeed.kdfParams,
         }),
       ]);
-      
+
       await MediaService.uploadSeed(encryptedBlob, storagePath);
 
       return {
@@ -183,11 +184,11 @@ export class CloudBackupService {
       // For now, use direct S3 URL as fallback
       const s3Url = `https://s3.tebi.io/besafe.backet/handles/${userId}/backups/encrypted-seed.enc`;
       const response = await fetch(s3Url);
-      
+
       if (!response.ok) {
         throw new Error('Backup not found');
       }
-      
+
       const blob = await response.blob();
       const text = await blob.text();
       const encryptedSeed: EncryptedSeedData = JSON.parse(text);
