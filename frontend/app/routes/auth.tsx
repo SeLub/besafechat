@@ -33,11 +33,28 @@ export default function AuthRoute() {
   const [seed, setSeed] = useState<string[]>([]);
 
   useEffect(() => {
-    const checkKey = async () => {
+    const attemptAutoLogin = async () => {
+      // First check if user is already authenticated with valid tokens
+      try {
+        const profileResponse = await fetch('http://localhost:4000/auth/profile', {
+          credentials: 'include',
+        });
+
+        if (profileResponse.ok) {
+          // User is already authenticated, redirect to main app
+          window.location.href = '/';
+          return;
+        }
+      } catch (error) {
+        console.log('User not authenticated with existing tokens, proceeding normally');
+      }
+
+      // If not authenticated, check if we have a stored public key
       const hasKey = await StorageService.hasStoredPublicKey();
       setHasKey(hasKey);
     };
-    checkKey();
+
+    attemptAutoLogin();
   }, []);
 
   const handleCreateAccount = () => {
@@ -169,7 +186,7 @@ export default function AuthRoute() {
     setStep('recovery');
   };
 
-  const handlePasswordRecovery = async (username: string, password: string) => {
+  const handlePasswordRecovery = async (password: string) => {
     setLoading(true);
     try {
       const { publicKeyBase64 } = await AccountService.recoverWithPassword(password);
@@ -273,15 +290,22 @@ export default function AuthRoute() {
 
         {hasKey ? (
           <div className="space-y-3">
-            <Button onClick={handleLogin} disabled={loading} className="w-full py-6 text-lg">
-              {loading ? 'Logging in...' : 'Continue as User'}
+            <div className="text-center py-6 text-lg">
+              <div className="mb-2">Stored account detected</div>
+              <div className="text-sm text-muted-foreground">Automatically authenticating...</div>
+            </div>
+            <Button onClick={handleRecovery} variant="outline" className="w-full py-6 text-lg">
+              Restore Access
+            </Button>
+            <Button onClick={handleCreateAccount} className="w-full py-6 text-lg">
+              Create New Account
             </Button>
             <div className="text-center">
               <button
                 onClick={handleClearKey}
                 className="text-sm text-muted-foreground hover:text-foreground underline"
               >
-                Use different account
+                Clear Stored Account
               </button>
             </div>
           </div>
