@@ -8,7 +8,7 @@ export enum MediaType {
   DOCUMENT = 'document',
   AUDIO = 'audio',
   SEED = 'seed',
-  BACKUP = 'backup'
+  BACKUP = 'backup',
 }
 
 export class MediaService {
@@ -18,22 +18,22 @@ export class MediaService {
   static async uploadAvatar(file: File): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await fetch(`${this.baseUrl}/media/upload/avatar`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
   static async deleteAvatar(): Promise<{ message: string }> {
     const response = await fetch(`${this.baseUrl}/media/avatar`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -42,13 +42,13 @@ export class MediaService {
     const formData = new FormData();
     formData.append('file', file);
     if (messageId) formData.append('messageId', messageId);
-    
+
     const response = await fetch(`${this.baseUrl}/media/upload/image`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -57,13 +57,13 @@ export class MediaService {
     const formData = new FormData();
     formData.append('file', file);
     if (messageId) formData.append('messageId', messageId);
-    
+
     const response = await fetch(`${this.baseUrl}/media/upload/video`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -71,13 +71,13 @@ export class MediaService {
   static async uploadDocument(file: File): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await fetch(`${this.baseUrl}/media/upload/document`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -86,13 +86,13 @@ export class MediaService {
     const formData = new FormData();
     formData.append('file', file);
     if (messageId) formData.append('messageId', messageId);
-    
+
     const response = await fetch(`${this.baseUrl}/media/upload/audio`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -100,14 +100,13 @@ export class MediaService {
   static async uploadSeed(encryptedSeed: Blob, passwordHash: string): Promise<{ message: string }> {
     const formData = new FormData();
     formData.append('file', encryptedSeed);
-    formData.append('passwordHash', passwordHash);
-    
-    const response = await fetch(`${this.baseUrl}/media/upload/seed`, {
+
+    const response = await fetch(`${this.baseUrl}/media/upload/seed/${passwordHash}`, {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -115,9 +114,9 @@ export class MediaService {
   static async deleteFile(type: MediaType, path: string): Promise<{ message: string }> {
     const response = await fetch(`${this.baseUrl}/media/${type}/${path}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     });
-    
+
     return handleApiResponse(response);
   }
 
@@ -134,7 +133,7 @@ export class MediaService {
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
     return validTypes.includes(file.type) && file.size <= 50 * 1024 * 1024; // 50MB
   }

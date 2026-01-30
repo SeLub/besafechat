@@ -18,7 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
-import { CurrentHandle } from '../session/decorators/current-user.decorator';
+import { CurrentHandle, CurrentIdentity } from '../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../session/guards/jwt-session.guard';
 import { MediaService, MediaType } from './media.service';
 
@@ -404,7 +404,11 @@ export class MediaController {
   })
   @ApiResponse({ status: 400, description: 'Bad request - missing file or password hash' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async uploadSeed(@UploadedFile() file: MulterFile, @Param('passwordHash') passwordHash: string) {
+  async uploadSeed(
+    @CurrentIdentity() identity: any,
+    @UploadedFile() file: MulterFile,
+    @Param('passwordHash') passwordHash: string
+  ) {
     if (!file) throw new BadRequestException('No file provided');
     if (!passwordHash) throw new BadRequestException('Password hash required');
 
