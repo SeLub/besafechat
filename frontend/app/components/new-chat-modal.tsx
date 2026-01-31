@@ -19,6 +19,7 @@ interface SearchResult {
   userId?: string;
   handleId?: string;
   requestStatus?: string;
+  isCurrentUser?: boolean; // New property to indicate if the user is the current user
 }
 
 export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalProps) {
@@ -29,7 +30,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
   const [searchError, setSearchError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { checkAuth } = useAuth();
+  const { user, checkAuth } = useAuth(); // Get the current user from auth context
 
   useEffect(() => {
     return () => {
@@ -66,17 +67,27 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
       } else {
         // User found, get request status
         const handle = result.handles[0]; // Take the first match
-
-        const statusData = await apiRequest<{ status: string }>(
-          `/contacts/check/${handle.ownerIdentityId}`,
-          {
-            method: 'GET',
-          }
-        );
-
+        
+        // Check if this is the current user by comparing identity IDs
+        const isCurrentUser = user?.identity.id === handle.ownerIdentityId;
+        
+        // Skip contact status check if it's the current user
         let requestStatus = 'none';
-        if (statusData && statusData.status) {
-          requestStatus = statusData.status;
+        if (!isCurrentUser) {
+          try {
+            const statusData = await apiRequest<{ status: string }>(
+              `/contacts/check/${handle.ownerIdentityId}`,
+              {
+                method: 'GET',
+              }
+            );
+            
+            if (statusData && statusData.status) {
+              requestStatus = statusData.status;
+            }
+          } catch (statusError) {
+            console.error('Error checking contact status:', statusError);
+          }
         }
 
         // For the search result, get additional profile data if available
@@ -99,6 +110,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                 userId: handle.ownerIdentityId,
                 handleId: handle.id, // Add handle ID for direct contact request
                 requestStatus,
+                isCurrentUser, // Add flag to indicate if this is the current user
               },
             ]);
           } else {
@@ -111,6 +123,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                 userId: handle.ownerIdentityId,
                 handleId: handle.id, // Add handle ID for direct contact request
                 requestStatus,
+                isCurrentUser, // Add flag to indicate if this is the current user
               },
             ]);
           }
@@ -124,6 +137,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
               userId: handle.ownerIdentityId,
               handleId: handle.id, // Add handle ID for direct contact request
               requestStatus,
+              isCurrentUser, // Add flag to indicate if this is the current user
             },
           ]);
         }
@@ -303,7 +317,11 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                     </div>
                   </div>
 
-                  {result.requestStatus === 'connected' ? (
+                  {result.isCurrentUser ? (
+                    <Button className="w-full" disabled>
+                      This is you
+                    </Button>
+                  ) : result.requestStatus === 'connected' ? (
                     <Button className="w-full" disabled>
                       Already Connected
                     </Button>
@@ -338,4 +356,3 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
       </div>
     </>
   );
-}
