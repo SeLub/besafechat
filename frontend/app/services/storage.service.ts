@@ -2,12 +2,16 @@ import {
   base64ToUint8,
   decryptWithPassphrase,
   encryptWithPassphrase,
+  encryptWithKey,
+  decryptWithKey,
   generateSalt,
   randomBytes,
   testKeyImport,
   toArrayBuffer,
   uint8ToBase64,
+  deriveEncryptionKeyFromHash,
 } from '@/lib/crypto';
+import { getSessionPrivateKeyHash } from './account.service';
 import { db } from '@/lib/db/db';
 import type { Contact, Message, MessageRetentionPeriod, PublicKey } from '@/lib/db/schema';
 // Conversion utilities for IndexedDB storage
@@ -188,6 +192,35 @@ export class StorageService {
     try {
       const textBytes = new TextEncoder().encode(text);
 
+      // Try new method first (hash-based encryption)
+      const privateKeyHash = getSessionPrivateKeyHash();
+      if (privateKeyHash) {
+        try {
+          const encryptionKey = await deriveEncryptionKeyFromHash(
+            privateKeyHash,
+            handleId,
+            context
+          );
+
+          const { encrypted, iv } = await encryptWithKey(textBytes, encryptionKey);
+
+          return {
+            encrypted,
+            salt: new Uint8Array(0), // Not used with hash-based approach
+            iv,
+            version: 2, // Version 2 = hash-based
+            context,
+            timestamp: Date.now(),
+          };
+        } catch (newMethodError) {
+          console.warn(
+            `Hash-based encryption failed for ${context}, falling back to legacy method:`,
+            newMethodError
+          );
+        }
+      }
+
+      // Fallback to old method (passphrase-based) for backward compatibility
       const encrypted = await encryptWithPassphrase(
         textBytes,
         handleId,
@@ -268,21 +301,55 @@ export class StorageService {
         );
       }
 
-      if (encryptedStorage.version === 2 && encryptedStorage.authTag) {
-        const key = await this.deriveFileKey(handleId, encryptedStorage.salt);
+      // Version 2 can be either:
+      // - Hash-based encryption (new method, no salt needed, salt.length === 0)
+      // - File-based with auth tag (old method)
 
-        const combined = new Uint8Array([
-          ...encryptedStorage.encrypted,
-          ...encryptedStorage.authTag,
-        ]);
+      if (encryptedStorage.version === 2) {
+        // Try hash-based decryption first (new method)
+        if (encryptedStorage.salt.length === 0) {
+          try {
+            const privateKeyHash = getSessionPrivateKeyHash();
+            if (privateKeyHash) {
+              const encryptionKey = await deriveEncryptionKeyFromHash(
+                privateKeyHash,
+                handleId,
+                encryptedStorage.context
+              );
 
-        const decrypted = await crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: toArrayBuffer(encryptedStorage.iv) },
-          key,
-          toArrayBuffer(combined)
-        );
+              const decrypted = await decryptWithKey(
+                encryptedStorage.encrypted,
+                encryptionKey,
+                encryptedStorage.iv
+              );
 
-        return new Uint8Array(decrypted);
+              return new Uint8Array(decrypted);
+            }
+          } catch (hashMethodError) {
+            console.warn(
+              'Hash-based decryption failed, trying file-based method:',
+              hashMethodError
+            );
+          }
+        }
+
+        // Fall back to file-based decryption (old method)
+        if (encryptedStorage.authTag) {
+          const key = await this.deriveFileKey(handleId, encryptedStorage.salt);
+
+          const combined = new Uint8Array([
+            ...encryptedStorage.encrypted,
+            ...encryptedStorage.authTag,
+          ]);
+
+          const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: toArrayBuffer(encryptedStorage.iv) },
+            key,
+            toArrayBuffer(combined)
+          );
+
+          return new Uint8Array(decrypted);
+        }
       }
 
       throw new Error(`Unsupported encryption version: ${encryptedStorage.version}`);
@@ -336,30 +403,76 @@ export class StorageService {
 
       const textBytes = new TextEncoder().encode(content);
 
-      const encrypted = await encryptWithPassphrase(
-        textBytes,
-        handleId,
-        this.DEFAULT_KDF_ITERATIONS
-      );
+      let encryptedContent: ArrayBuffer;
+      let salt: ArrayBuffer;
+      let iv: Uint8Array;
+      let authTag: ArrayBuffer | undefined;
 
-      // Для AES-GCM, auth tag (16 байт) находится в конце зашифрованных данных
-      // Вам нужно отделить ciphertext от auth tag
-      const encryptedArray = new Uint8Array(encrypted.encrypted);
-      const ciphertext = encryptedArray.slice(0, -16); // Все кроме последних 16 байт
-      const authTag = encryptedArray.slice(-16); // Последние 16 байт - auth tag
+      // Try hash-based encryption first
+      const privateKeyHash = getSessionPrivateKeyHash();
+      if (privateKeyHash) {
+        try {
+          const encryptionKey = await deriveEncryptionKeyFromHash(
+            privateKeyHash,
+            handleId,
+            'message'
+          );
+
+          const { encrypted: enc, iv: newIv } = await encryptWithKey(textBytes, encryptionKey);
+
+          encryptedContent = convertUint8ToArrayBuffer(enc);
+          salt = convertUint8ToArrayBuffer(new Uint8Array(0)); // No salt needed
+          iv = newIv;
+          // authTag is undefined (not used in hash-based)
+        } catch (hashError) {
+          console.warn('Hash-based message encryption failed, using legacy method:', hashError);
+
+          // Fall back to passphrase-based
+          const encrypted = await encryptWithPassphrase(
+            textBytes,
+            handleId,
+            this.DEFAULT_KDF_ITERATIONS
+          );
+
+          const encryptedArray = new Uint8Array(encrypted.encrypted);
+          const ciphertext = encryptedArray.slice(0, -16);
+          const tag = encryptedArray.slice(-16);
+
+          encryptedContent = convertUint8ToArrayBuffer(ciphertext);
+          salt = convertUint8ToArrayBuffer(encrypted.salt);
+          iv = encrypted.iv;
+          authTag = convertUint8ToArrayBuffer(tag);
+        }
+      } else {
+        // No hash available, use legacy method
+        const encrypted = await encryptWithPassphrase(
+          textBytes,
+          handleId,
+          this.DEFAULT_KDF_ITERATIONS
+        );
+
+        const encryptedArray = new Uint8Array(encrypted.encrypted);
+        const ciphertext = encryptedArray.slice(0, -16);
+        const tag = encryptedArray.slice(-16);
+
+        encryptedContent = convertUint8ToArrayBuffer(ciphertext);
+        salt = convertUint8ToArrayBuffer(encrypted.salt);
+        iv = encrypted.iv;
+        authTag = convertUint8ToArrayBuffer(tag);
+      }
 
       const message: Message = {
         id,
         chatId,
         senderId,
         contentType: 'text',
-        encryptedContent: convertUint8ToArrayBuffer(ciphertext), // ciphertext без auth tag
-        salt: convertUint8ToArrayBuffer(encrypted.salt),
-        iv: convertUint8ToArrayBuffer(encrypted.iv),
+        encryptedContent,
+        salt,
+        iv,
         timestamp: Date.now(),
         isOwn,
         status: 'sent',
-        authTag: convertUint8ToArrayBuffer(authTag), // Сохраняем auth tag отдельно
+        authTag,
       };
 
       await db.messages.put(message);

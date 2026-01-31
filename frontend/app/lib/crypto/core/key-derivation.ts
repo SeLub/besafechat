@@ -355,3 +355,95 @@ export async function decryptSeedFromCloud(
     throw new Error(`Backup restoration failed: ${errorMessage}`);
   }
 }
+
+/**
+ * Hash private key for encryption operations (SHA-256)
+ *
+ * Creates a one-way hash of the private key that can be safely stored in memory
+ * for the duration of the session. The hash is used to derive encryption keys,
+ * while the original private key is destroyed immediately after authentication.
+ *
+ * Security Properties:
+ * - One-way function (cannot be reversed to recover private key)
+ * - Deterministic (same input always produces same output)
+ * - High entropy (32 bytes = 256 bits)
+ * - Fast (SHA-256 is optimized)
+ *
+ * @param privateKey - Raw private key (32 bytes)
+ * @returns SHA-256 hash of private key (32 bytes)
+ *
+ * @example
+ * const privateKey = new Uint8Array(32); // Ed25519 raw key
+ * const hash = await hashPrivateKey(privateKey);
+ * // hash is now safe to store in memory
+ * // privateKey should be securely cleared
+ */
+export async function hashPrivateKey(privateKey: Uint8Array): Promise<Uint8Array> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', privateKey);
+  return new Uint8Array(hashBuffer);
+}
+
+/**
+ * Derive AES-256-GCM encryption key from private key hash
+ *
+ * Uses PBKDF2 to derive a cryptographically strong encryption key from:
+ * 1. Hash of private key (secret, in-memory only)
+ * 2. Handle ID (public, acts as salt for personalization)
+ * 3. Purpose string (for key separation across different uses)
+ *
+ * The derived key is ready to use with Web Crypto API's AES-GCM operations.
+ *
+ * Key Derivation Process:
+ * - Input material = privateKeyHash || handleId || purpose
+ * - PBKDF2(material, salt=handleId, iterations=100000, hash=SHA-256)
+ * - Output: 256-bit AES-GCM key
+ *
+ * Why 100K iterations instead of 210K?
+ * - Private key hash already has high entropy (256 bits)
+ * - No need for excessive key stretching
+ * - Reduces CPU load on client while maintaining security
+ *
+ * @param privateKeyHash - SHA-256 hash of private key (from hashPrivateKey)
+ * @param handleId - User's handle ID (public, but acts as salt)
+ * @param purpose - Derivation purpose: 'message', 'file', 'contact', etc.
+ * @returns Ready-to-use CryptoKey for AES-256-GCM encryption/decryption
+ *
+ * @example
+ * const hash = await hashPrivateKey(rawPrivateKey);
+ * const key = await deriveEncryptionKeyFromHash(hash, handleId, 'message');
+ * const encrypted = await encryptWithKey(message, key);
+ */
+export async function deriveEncryptionKeyFromHash(
+  privateKeyHash: Uint8Array,
+  handleId: string,
+  purpose: string = 'message'
+): Promise<CryptoKey> {
+  // Combine all material for key derivation
+  const material = concatUint8Arrays([
+    privateKeyHash,
+    new TextEncoder().encode(handleId),
+    new TextEncoder().encode(purpose),
+  ]);
+
+  // Use handleId as salt for personalization
+  const salt = new TextEncoder().encode(handleId);
+
+  // Import the combined material as PBKDF2 base key
+  const baseKey = await crypto.subtle.importKey('raw', toArrayBuffer(material), 'PBKDF2', false, [
+    'deriveKey',
+  ]);
+
+  // Derive the final encryption key using PBKDF2
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: toArrayBuffer(salt),
+      iterations: 100000, // Reduced from 210K (hash is already strong)
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 }, // AES-256-GCM
+    false, // Not extractable
+    ['encrypt', 'decrypt'] // Can be used for both operations
+  );
+}
