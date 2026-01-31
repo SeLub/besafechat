@@ -112,12 +112,22 @@ export class ContactRequestController {
             type: 'object',
             properties: {
               id: { type: 'string', example: 'abc123-def456-ghi789' },
-              fromHandle: {
+              from: {
                 type: 'object',
                 properties: {
-                  id: { type: 'string', example: 'xyz789-uvw012-stu345' },
+                  handleId: { type: 'string', example: 'xyz789-uvw012-stu345' },
+                  value: { type: 'string', example: 'user_123456789' },
                   displayName: { type: 'string', example: 'John Doe' },
-                  handle: { type: 'string', example: 'user_123456789' },
+                  firstName: { type: 'string', example: 'John' },
+                  lastName: { type: 'string', example: 'Doe' },
+                  avatarUrl: { type: 'string', example: 'https://example.com/avatar.jpg' },
+                  bio: { type: 'string', example: 'Software Engineer' },
+                },
+              },
+              to: {
+                type: 'object',
+                properties: {
+                  handleId: { type: 'string', example: 'abc123-def456-ghi789' },
                 },
               },
               message: { type: 'string', example: "Hi, let's connect!" },
@@ -142,10 +152,17 @@ export class ContactRequestController {
     return {
       requests: requests.map((request) => ({
         id: request.id,
-        fromHandle: {
-          id: request.fromHandle.id,
-          displayName: request.fromHandle.profile?.displayName,
-          handle: request.fromHandle.value,
+        from: {
+          handleId: request.fromHandle?.id || '',
+          value: request.fromHandle?.value || '',
+          displayName: request.fromHandle?.profile?.displayName,
+          firstName: request.fromHandle?.profile?.firstName,
+          lastName: request.fromHandle?.profile?.lastName,
+          avatarUrl: null, // avatarUrl is not stored in the Profile entity
+          bio: request.fromHandle?.profile?.bio,
+        },
+        to: {
+          handleId: request.toHandle?.id || '',
         },
         message: request.message,
         createdAt: request.createdAt,
@@ -170,12 +187,22 @@ export class ContactRequestController {
             type: 'object',
             properties: {
               id: { type: 'string', example: 'abc123-def456-ghi789' },
-              toHandle: {
+              from: {
                 type: 'object',
                 properties: {
-                  id: { type: 'string', example: 'xyz789-uvw012-stu345' },
+                  handleId: { type: 'string', example: 'xyz789-uvw012-stu345' },
+                  value: { type: 'string', example: 'user_123456789' },
                   displayName: { type: 'string', example: 'Jane Smith' },
-                  handle: { type: 'string', example: 'user_987654321' },
+                  firstName: { type: 'string', example: 'Jane' },
+                  lastName: { type: 'string', example: 'Smith' },
+                  avatarUrl: { type: 'string', example: 'https://example.com/avatar.jpg' },
+                  bio: { type: 'string', example: 'Designer' },
+                },
+              },
+              to: {
+                type: 'object',
+                properties: {
+                  handleId: { type: 'string', example: 'abc123-def456-ghi789' },
                 },
               },
               message: { type: 'string', example: "Hi, let's connect!" },
@@ -205,10 +232,17 @@ export class ContactRequestController {
     return {
       requests: requests.map((request) => ({
         id: request.id,
-        toHandle: {
-          id: request.toHandle.id,
-          displayName: request.toHandle.profile?.displayName,
-          handle: request.toHandle.value,
+        from: {
+          handleId: request.fromHandle?.id || '',
+          value: request.fromHandle?.value || '',
+          displayName: request.fromHandle?.profile?.displayName || '',
+          firstName: request.fromHandle?.profile?.firstName || null,
+          lastName: request.fromHandle?.profile?.lastName || null,
+          avatarUrl: null, // avatarUrl is not stored in the Profile entity
+          bio: request.fromHandle?.profile?.bio || null,
+        },
+        to: {
+          handleId: request.toHandle?.id || '',
         },
         message: request.message,
         status: request.status,

@@ -2,17 +2,15 @@ export type {
   ApiResponse,
   // LoginRequest,
   LoginResponse,
-  UsernameCheckResponse,
   ProfileResponse,
-  // CloudUploadResponse,
-  // CloudDownloadResponse
+  UsernameCheckResponse,
 } from './api';
 
 export type {
+  OnlineStatusResponse,
   PublicKeyResponse,
   RefreshTokenResponse,
   Session,
-  OnlineStatusResponse,
   UpdateDisplayNameRequest,
 } from './account';
 
@@ -24,8 +22,6 @@ export type {
   // CloudRecoveryData,
   // AuthState,
   LoginCredentials,
-  // RegisterCredentials,
-  // User
 } from './auth';
 
-export type { User, Username } from './user';
+export type { Identity, Handle, Profile } from './profile';
