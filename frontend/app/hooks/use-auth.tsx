@@ -3,6 +3,7 @@ import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { FullProfile } from '~/types/user';
+import type { ApiResponse } from '../types/api';
 
 interface AuthContextType {
   user: FullProfile | null;
@@ -28,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const response = await res.json();
+        const response: ApiResponse<FullProfile> = await res.json();
         if (response.success && response.data) {
           setUser(response.data);
         } else {
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (retryRes.ok) {
-              const retryResponse = await retryRes.json();
+              const retryResponse: ApiResponse<FullProfile> = await retryRes.json();
               if (retryResponse.success && retryResponse.data) {
                 setUser(retryResponse.data);
                 return;
@@ -139,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const response = await res.json();
+        const response: ApiResponse<FullProfile> = await res.json();
         if (response.success && response.data) {
           setUser(response.data);
           console.log('User profile refreshed successfully', response.data);
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (retryRes.ok) {
-              const retryResponse = await retryRes.json();
+              const retryResponse: ApiResponse<FullProfile> = await retryRes.json();
               if (retryResponse.success && retryResponse.data) {
                 setUser(retryResponse.data);
                 console.log('User profile refreshed after token refresh', retryResponse.data);

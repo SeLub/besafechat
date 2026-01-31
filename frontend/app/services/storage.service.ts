@@ -182,13 +182,17 @@ export class StorageService {
    */
   static async encryptTextData(
     text: string,
-    userId: string,
+    handleId: string,
     context: 'message' | 'contact' | 'metadata'
   ): Promise<EncryptedStorage> {
     try {
       const textBytes = new TextEncoder().encode(text);
 
-      const encrypted = await encryptWithPassphrase(textBytes, userId, this.DEFAULT_KDF_ITERATIONS);
+      const encrypted = await encryptWithPassphrase(
+        textBytes,
+        handleId,
+        this.DEFAULT_KDF_ITERATIONS
+      );
 
       return {
         ...encrypted,
@@ -208,12 +212,12 @@ export class StorageService {
    */
   static async encryptBinaryData(
     data: Uint8Array,
-    userId: string,
+    handleId: string,
     context: 'file'
   ): Promise<EncryptedStorage> {
     try {
-      const salt = await this.generateFileSalt(userId);
-      const key = await this.deriveFileKey(userId, salt);
+      const salt = await this.generateFileSalt(handleId);
+      const key = await this.deriveFileKey(handleId, salt);
       const iv = randomBytes(12);
 
       const encrypted = await crypto.subtle.encrypt(
@@ -248,7 +252,7 @@ export class StorageService {
    */
   static async decryptData(
     encryptedStorage: EncryptedStorage,
-    userId: string
+    handleId: string
   ): Promise<Uint8Array> {
     try {
       if (encryptedStorage.version === 1) {
@@ -259,13 +263,13 @@ export class StorageService {
             iv: encryptedStorage.iv,
             version: 1,
           },
-          userId,
+          handleId,
           this.DEFAULT_KDF_ITERATIONS
         );
       }
 
       if (encryptedStorage.version === 2 && encryptedStorage.authTag) {
-        const key = await this.deriveFileKey(userId, encryptedStorage.salt);
+        const key = await this.deriveFileKey(handleId, encryptedStorage.salt);
 
         const combined = new Uint8Array([
           ...encryptedStorage.encrypted,
@@ -295,9 +299,9 @@ export class StorageService {
    */
   static async decryptTextData(
     encryptedStorage: EncryptedStorage,
-    userId: string
+    handleId: string
   ): Promise<string> {
-    const decryptedBytes = await this.decryptData(encryptedStorage, userId);
+    const decryptedBytes = await this.decryptData(encryptedStorage, handleId);
     return new TextDecoder().decode(decryptedBytes);
   }
 
@@ -315,7 +319,7 @@ export class StorageService {
     chatId: string,
     senderId: string,
     content: string,
-    userId: string,
+    handleId: string,
     isOwn: boolean = false,
     messageId?: string
   ): Promise<string> {
@@ -332,7 +336,11 @@ export class StorageService {
 
       const textBytes = new TextEncoder().encode(content);
 
-      const encrypted = await encryptWithPassphrase(textBytes, userId, this.DEFAULT_KDF_ITERATIONS);
+      const encrypted = await encryptWithPassphrase(
+        textBytes,
+        handleId,
+        this.DEFAULT_KDF_ITERATIONS
+      );
 
       // Для AES-GCM, auth tag (16 байт) находится в конце зашифрованных данных
       // Вам нужно отделить ciphertext от auth tag
@@ -370,7 +378,7 @@ export class StorageService {
    */
   static async loadDecryptedMessages(
     chatId: string,
-    userId: string
+    handleId: string
   ): Promise<
     Array<{
       id: string;
@@ -400,7 +408,7 @@ export class StorageService {
               authTag,
               version: 1,
             },
-            userId,
+            handleId,
             this.DEFAULT_KDF_ITERATIONS
           );
 
@@ -439,10 +447,10 @@ export class StorageService {
    */
   static async encryptPrivateKeyForSession(
     privateKey: Uint8Array,
-    publicKeyBase64: string
+    handleId: string
   ): Promise<EncryptedStorage> {
     try {
-      return await this.encryptTextData(uint8ToBase64(privateKey), publicKeyBase64, 'metadata');
+      return await this.encryptTextData(uint8ToBase64(privateKey), handleId, 'metadata');
     } catch (error) {
       console.error('Error encrypting private key for session:', error);
       throw new Error(
@@ -456,10 +464,10 @@ export class StorageService {
    */
   static async decryptPrivateKeyFromSession(
     encryptedStorage: EncryptedStorage,
-    publicKeyBase64: string
+    handleId: string
   ): Promise<Uint8Array> {
     try {
-      const base64Key = await this.decryptTextData(encryptedStorage, publicKeyBase64);
+      const base64Key = await this.decryptTextData(encryptedStorage, handleId);
       return base64ToUint8(base64Key);
     } catch (error) {
       console.error('Error decrypting private key from session:', error);
@@ -563,11 +571,15 @@ export class StorageService {
   /**
    * Сохранение контакта
    */
-  static async saveContact(contactId: string, userId: string, displayName?: string): Promise<void> {
+  static async saveContact(
+    contactId: string,
+    handleId: string,
+    displayName?: string
+  ): Promise<void> {
     try {
       const contact: Contact = {
         contactId,
-        userId,
+        handleId,
         displayName: displayName || '',
       };
 
@@ -581,9 +593,9 @@ export class StorageService {
   /**
    * Удаление контакта
    */
-  static async removeContact(contactId: string, userId: string): Promise<void> {
+  static async removeContact(contactId: string, handleId: string): Promise<void> {
     try {
-      await db.contacts.where('userId').equals(userId).delete();
+      await db.contacts.where('handleId').equals(handleId).delete();
     } catch (error) {
       console.error('Error removing contact:', error);
       throw error;
@@ -746,7 +758,7 @@ export class StorageService {
   /**
    * Проверка целостности зашифрованных данных
    */
-  static async verifyEncryptionIntegrity(userId: string): Promise<{
+  static async verifyEncryptionIntegrity(handleId: string): Promise<{
     messages: { total: number; successful: number; failed: number };
     contacts: { total: number; successful: number; failed: number };
   }> {
@@ -769,7 +781,7 @@ export class StorageService {
             timestamp: msg.timestamp,
           };
 
-          await this.decryptTextData(encryptedStorage, userId);
+          await this.decryptTextData(encryptedStorage, handleId);
           successfulMessages++;
         } catch {
           failedMessages++;
@@ -825,13 +837,13 @@ export class StorageService {
   /**
    * Генерация соли для файлов
    */
-  private static async generateFileSalt(userId: string): Promise<Uint8Array> {
-    const userIdBytes = base64ToUint8(userId);
+  private static async generateFileSalt(handleId: string): Promise<Uint8Array> {
+    const handleIdBytes = base64ToUint8(handleId);
     const timestampBytes = new TextEncoder().encode(Date.now().toString());
 
-    const combined = new Uint8Array(userIdBytes.length + timestampBytes.length);
-    combined.set(userIdBytes);
-    combined.set(timestampBytes, userIdBytes.length);
+    const combined = new Uint8Array(handleIdBytes.length + timestampBytes.length);
+    combined.set(handleIdBytes);
+    combined.set(timestampBytes, handleIdBytes.length);
 
     const hash = await crypto.subtle.digest('SHA-256', combined);
     return new Uint8Array(hash);
@@ -840,12 +852,12 @@ export class StorageService {
   /**
    * Деривация ключа для файлов
    */
-  private static async deriveFileKey(userId: string, salt: Uint8Array): Promise<CryptoKey> {
-    const userIdBytes = base64ToUint8(userId);
+  private static async deriveFileKey(handleId: string, salt: Uint8Array): Promise<CryptoKey> {
+    const handleIdBytes = base64ToUint8(handleId);
 
     const baseKey = await crypto.subtle.importKey(
       'raw',
-      toArrayBuffer(userIdBytes),
+      toArrayBuffer(handleIdBytes),
       'PBKDF2',
       false,
       ['deriveKey']
