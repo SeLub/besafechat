@@ -1,20 +1,21 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, Check, X, Clock, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Check, Clock, Send, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
 interface ContactRequest {
   id: string;
-  fromUser?: {
-    id: string;
-    displayName?: string;
-    username?: string;
+  from: {
+    handleId: string;
+    value: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
   };
-  toUser?: {
-    id: string;
-    displayName?: string;
-    username?: string;
+  to: {
+    handleId: string;
   };
   message?: string;
   status?: string;
@@ -107,7 +108,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
     }
   };
 
-  const getInitials = (user: { displayName?: string; username?: string }) => {
+  const getInitials = (user: { displayName?: string; value?: string }) => {
     if (user.displayName) {
       return user.displayName
         .split(' ')
@@ -116,8 +117,8 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
         .toUpperCase()
         .slice(0, 2);
     }
-    if (user.username) {
-      return user.username.slice(0, 2).toUpperCase();
+    if (user.value) {
+      return user.value.slice(0, 2).toUpperCase();
     }
     return 'U';
   };
@@ -193,24 +194,22 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
                     <div className="flex items-start space-x-3">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(request.fromUser || {})}
+                          {getInitials(request.from || {})}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">
-                            {request.fromUser?.displayName ||
-                              `@${request.fromUser?.username}` ||
+                            {request.from?.displayName ||
+                              `@${request.from?.value}` ||
                               'Anonymous User'}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {formatDate(request.createdAt)}
                           </div>
                         </div>
-                        {request.fromUser?.username && (
-                          <div className="text-sm text-muted-foreground">
-                            @{request.fromUser.username}
-                          </div>
+                        {request.from?.value && (
+                          <div className="text-sm text-muted-foreground">@{request.from.value}</div>
                         )}
                         {request.message && (
                           <div className="mt-2 p-2 bg-muted rounded text-sm">{request.message}</div>
@@ -250,14 +249,14 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
                   <div className="flex items-start space-x-3">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-primary text-primary-foreground">
-                        {getInitials(request.toUser || {})}
+                        {getInitials(request.from || {})}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div className="font-medium">
-                          {request.toUser?.displayName ||
-                            `@${request.toUser?.username}` ||
+                          {request.from?.displayName ||
+                            `@${request.from?.value}` ||
                             'Anonymous User'}
                         </div>
                         <div className="flex items-center space-x-2">
@@ -280,10 +279,8 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
                           </div>
                         </div>
                       </div>
-                      {request.toUser?.username && (
-                        <div className="text-sm text-muted-foreground">
-                          @{request.toUser.username}
-                        </div>
+                      {request.from?.value && (
+                        <div className="text-sm text-muted-foreground">@{request.from.value}</div>
                       )}
                       {request.message && (
                         <div className="mt-2 p-2 bg-muted rounded text-sm">{request.message}</div>

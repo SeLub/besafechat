@@ -240,7 +240,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         const roomSize = room ? room.size : 0;
         console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
 
-        this.server.to(`user:${handleId}`).emit('user_online', { userId: activeHandleId });
+        this.server.to(`user:${handleId}`).emit('user_online', { handleId: activeHandleId });
         console.log(`✅ Online status emitted to handle: ${handleId}`);
       }
     } catch (error) {
@@ -266,7 +266,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         const roomSize = room ? room.size : 0;
         console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
 
-        this.server.to(`user:${handleId}`).emit('user_offline', { userId: activeHandleId });
+        this.server.to(`user:${handleId}`).emit('user_offline', { handleId: activeHandleId });
         console.log(`✅ Offline status emitted to handle: ${handleId}`);
       }
     } catch (error) {
