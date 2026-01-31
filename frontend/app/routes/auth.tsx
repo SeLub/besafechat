@@ -166,7 +166,14 @@ export default function AuthRoute() {
         toast.error('No stored key found');
         return;
       }
-      await loginOnly(publicKey);
+      const { deviceId, deviceName } = AccountService.getDeviceInfo();
+      const loginResult = await AuthService.login({
+        publicKey,
+        deviceId,
+        deviceName,
+      });
+      // Initialize database after login with identityId (Phase 4)
+      await StorageService.initialize(loginResult.identityId);
       window.location.href = '/';
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
@@ -204,7 +211,14 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       const { publicKeyBase64 } = await AccountService.recoverWithSeed(recoveredSeed);
-      await loginOnly(publicKeyBase64);
+      const { deviceId, deviceName } = AccountService.getDeviceInfo();
+      const loginResult = await AuthService.login({
+        publicKey: publicKeyBase64,
+        deviceId,
+        deviceName,
+      });
+      // Initialize database after login with identityId (Phase 4)
+      await StorageService.initialize(loginResult.identityId);
       toast.success('Account recovered!');
       window.location.href = '/';
     } catch (error: any) {
