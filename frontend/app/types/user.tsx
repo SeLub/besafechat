@@ -26,5 +26,4 @@ export interface FullProfile {
   identity: Identity;
   handle: Handle;
   profile: Profile;
-  hasHandle: boolean;
 }

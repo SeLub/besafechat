@@ -29,7 +29,6 @@ interface HamburgerMenuProps {
       bio: string | null;
       settings: Record<string, any>;
     };
-    hasHandle: boolean;
   };
   onProfileClick?: () => void;
   onContactsClick?: () => void;
