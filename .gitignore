@@ -64,3 +64,4 @@ mcp*.*
 *.tsbuildinfo
 tests/*
 .kilocode/
+plans/

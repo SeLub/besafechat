@@ -3,7 +3,9 @@ import {
   encryptSeedForCloud,
   generateSeedPhrase,
   validateSeedPhrase,
+  hashPrivateKey,
 } from '../lib/crypto';
+import { pkcs8ToRawPrivateKey } from '../lib/crypto';
 import { AuthService } from './auth.service';
 import { CloudBackupService } from './cloud-backup.service';
 import { DeviceService } from './device.service';
@@ -12,31 +14,47 @@ import { StorageService } from './storage.service';
 
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
-// Store private key temporarily in memory for challenge-response operations
-let temporaryPrivateKey: Uint8Array | null = null;
+
+// Store ONLY hash of private key (never the full key itself)
+// The private key is destroyed immediately after authentication
+// This hash is used for encryption/decryption operations only
+let sessionPrivateKeyHash: Uint8Array | null = null;
 
 /**
- * Temporarily store the private key for challenge-response operations
- * This is only for the duration of the active session when the account is unlocked
+ * Set the hashed private key for encryption operations
+ * Private key itself should be destroyed immediately after auth
+ *
+ * CRITICAL: Never store full private key, only its hash
  */
-export function setTemporaryPrivateKey(privateKey: Uint8Array) {
-  temporaryPrivateKey = privateKey;
+export function setSessionPrivateKeyHash(privateKeyHash: Uint8Array): void {
+  sessionPrivateKeyHash = privateKeyHash;
 }
 
 /**
- * Get the temporarily stored private key for challenge-response operations
- * Returns null if no private key is temporarily available
+ * Get the hashed private key for encryption/decryption
  */
-export function getTemporaryPrivateKey(): Uint8Array | null {
-  return temporaryPrivateKey;
+export function getSessionPrivateKeyHash(): Uint8Array | null {
+  return sessionPrivateKeyHash;
 }
 
 /**
- * Clear the temporarily stored private key
- * Called during logout or when the session expires
+ * Clear the session private key hash on logout
+ * This removes all encryption capability for the account
  */
-export function clearTemporaryPrivateKey() {
-  temporaryPrivateKey = null;
+export function clearSessionPrivateKeyHash(): void {
+  if (sessionPrivateKeyHash) {
+    // Secure deletion: overwrite with random data before clearing
+    crypto.getRandomValues(sessionPrivateKeyHash);
+    sessionPrivateKeyHash = null;
+  }
+}
+
+/**
+ * Securely clear sensitive Uint8Array data
+ * Overwrites with random data before clearing (defense against memory dumps)
+ */
+function secureClearUint8Array(data: Uint8Array): void {
+  crypto.getRandomValues(data);
 }
 
 export class AccountService {
@@ -67,20 +85,30 @@ export class AccountService {
     // 4. Save public key to local storage
     await StorageService.storePublicKey(publicKeyBase64);
 
-    // 5. Store private key temporarily for challenge-response operations BEFORE attempting login
-    // This ensures that when AuthService.login() is called, the private key is available for signing challenges
-    setTemporaryPrivateKey(keyPair.privateKey);
-
-    // 6. Generate client data
+    // 5. Generate client data
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 7. Login (creates identity if first time) on server
-    // This will now be able to access the temporarily stored private key for challenge signing
+    // 6. Login (creates identity if first time) on server
+    // Private key is used for signing auth challenges
     const result = await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
       deviceName,
     });
+
+    // 7. Authentication successful - now hash the private key and destroy the original
+    const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
+    const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+    // Securely destroy the private key (overwrite with random before clearing)
+    secureClearUint8Array(rawPrivateKey);
+    secureClearUint8Array(keyPair.privateKey);
+
+    // Store ONLY the hash for encryption operations
+    setSessionPrivateKeyHash(privateKeyHash);
+
+    // 8. Initialize database with this account's identityId
+    await StorageService.initialize(result.identityId);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -117,7 +145,7 @@ export class AccountService {
 
   /**
    * Unified account creation flow with self-custody (no cloud backup)
-   * Follows the unified pattern: generate seed → derive keys → store public key → temporarily store private key → login user (creates identity)
+   * Follows the unified pattern: generate seed → derive keys → store public key → hash private key → login user (creates identity)
    */
   static async createAccountWithSelfCustody() {
     // 1. Generate new seed
@@ -128,20 +156,30 @@ export class AccountService {
     // 2. Save public key to local storage
     await StorageService.storePublicKey(publicKeyBase64);
 
-    // 3. Store private key temporarily for challenge-response operations BEFORE attempting login
-    // This ensures that when AuthService.login() is called, the private key is available for signing challenges
-    setTemporaryPrivateKey(keyPair.privateKey);
-
-    // 4. Generate client data
+    // 3. Generate client data
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 5. Login (creates identity if first time) on server
-    // This will now be able to access the temporarily stored private key for challenge signing
+    // 4. Login (creates identity if first time) on server
+    // Private key is used for signing auth challenges
     const result = await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
       deviceName,
     });
+
+    // 5. Authentication successful - now hash the private key and destroy the original
+    const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
+    const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+    // Securely destroy the private key
+    secureClearUint8Array(rawPrivateKey);
+    secureClearUint8Array(keyPair.privateKey);
+
+    // Store ONLY the hash for encryption operations
+    setSessionPrivateKeyHash(privateKeyHash);
+
+    // 6. Initialize database with this account's identityId
+    await StorageService.initialize(result.identityId);
 
     // Wait briefly to ensure user profile is created on the backend
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -171,8 +209,15 @@ export class AccountService {
     // Save public key to IndexedDB
     await StorageService.storePublicKey(keyPair.publicKeyBase64);
 
-    // Store private key temporarily for challenge-response operations
-    setTemporaryPrivateKey(keyPair.privateKey);
+    // Hash the private key and destroy the original
+    const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
+    const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+    secureClearUint8Array(rawPrivateKey);
+    secureClearUint8Array(keyPair.privateKey);
+
+    // Store only the hash for encryption
+    setSessionPrivateKeyHash(privateKeyHash);
 
     return keyPair;
   }
@@ -193,8 +238,15 @@ export class AccountService {
     // Save public key to IndexedDB
     await StorageService.storePublicKey(keyPair.publicKeyBase64);
 
-    // Store private key temporarily for challenge-response operations
-    setTemporaryPrivateKey(keyPair.privateKey);
+    // Hash the private key and destroy the original
+    const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
+    const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+    secureClearUint8Array(rawPrivateKey);
+    secureClearUint8Array(keyPair.privateKey);
+
+    // Store only the hash for encryption
+    setSessionPrivateKeyHash(privateKeyHash);
 
     return keyPair;
   }
@@ -204,7 +256,7 @@ export class AccountService {
    */
   static clearTemporarySeed() {
     temporarySeed = null;
-    clearTemporaryPrivateKey(); // Also clear the temporary private key
+    clearSessionPrivateKeyHash(); // Also clear the session private key hash
   }
 
   /**
