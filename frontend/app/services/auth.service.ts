@@ -53,19 +53,17 @@ export class AuthService {
     const { challengeId, challenge } = challengeData.data!;
 
     // Get the private key to sign the challenge
-    // In the current architecture, the private key is temporarily available
-    // through the AccountService when the account is unlocked
-    const { getTemporaryPrivateKey } = await import('./account.service');
-    const privateKey = getTemporaryPrivateKey();
-    console.log('Private key retrieved for signing:', privateKey);
-
-    if (!privateKey) {
-      throw new Error('Private key not available. Please log in to your account first.');
-    }
-
-    // Sign the challenge using the private key
+    // The private key parameter is now passed to login() method directly
+    // This should be called during account creation/recovery before the private key is destroyed
     const { signMessageToBase64 } = await import('../lib/crypto/core/signatures');
-    const signature = await signMessageToBase64(privateKey, challenge);
+    
+    // Note: The privateKey parameter should be provided by the caller
+    // If not available, it means we're trying to login without a proper key derivation
+    if (!credentials.privateKey) {
+      throw new Error('Private key not available. Please complete account creation or recovery first.');
+    }
+    
+    const signature = await signMessageToBase64(credentials.privateKey, challenge);
 
     // Send the signature back to the server to complete authentication
     const authRes = await fetch(`${this.API_BASE}/auth/login`, {

@@ -122,9 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       // Clear all authentication data
       clearAuthCookies();
-      await StorageService.clearStoredKey(); // Clear stored public key
+      
+      // Close the current database connection (per-user database remains in IndexedDB)
       await StorageService.cleanup(); // Close and cleanup database (Phase 4)
-      AccountService.clearTemporarySeed(); // Clear any temporary seed storage
+      
+      // Clear sensitive data from memory
+      AccountService.clearTemporarySeed(); // Clears seed and private key hash from memory
+      
       setUser(null);
     }
   };
