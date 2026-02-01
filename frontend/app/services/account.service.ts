@@ -82,21 +82,25 @@ export class AccountService {
     const keyPair = await deriveKeyPairFromSeed(seed);
     const publicKeyBase64 = keyPair.publicKeyBase64;
 
-    // 4. Save public key to local storage
-    await StorageService.storePublicKey(publicKeyBase64);
-
-    // 5. Generate client data
+    // 4. Generate client data
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 6. Login (creates identity if first time) on server
+    // 5. Login (creates identity if first time) on server
     // Private key is used for signing auth challenges
     const result = await AuthService.login({
-      publicKey: publicKeyBase64,
-      deviceId,
-      deviceName,
+     publicKey: publicKeyBase64,
+     privateKey: keyPair.privateKey,
+     deviceId,
+     deviceName,
     });
 
-    // 7. Authentication successful - now hash the private key and destroy the original
+    // 6. Initialize database FIRST with this account's identityId (before storing keys)
+    await StorageService.initialize(result.identityId);
+
+    // 7. NOW save public key to IndexedDB (requires initialized database)
+    await StorageService.storePublicKey(publicKeyBase64);
+
+    // 8. Authentication successful - now hash the private key and destroy the original
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
     const privateKeyHash = await hashPrivateKey(rawPrivateKey);
 
@@ -106,9 +110,6 @@ export class AccountService {
 
     // Store ONLY the hash for encryption operations
     setSessionPrivateKeyHash(privateKeyHash);
-
-    // 8. Initialize database with this account's identityId
-    await StorageService.initialize(result.identityId);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -153,21 +154,25 @@ export class AccountService {
     const keyPair = await deriveKeyPairFromSeed(seed);
     const publicKeyBase64 = keyPair.publicKeyBase64;
 
-    // 2. Save public key to local storage
-    await StorageService.storePublicKey(publicKeyBase64);
-
-    // 3. Generate client data
+    // 2. Generate client data
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
 
-    // 4. Login (creates identity if first time) on server
+    // 3. Login (creates identity if first time) on server
     // Private key is used for signing auth challenges
     const result = await AuthService.login({
       publicKey: publicKeyBase64,
+      privateKey: keyPair.privateKey,
       deviceId,
       deviceName,
     });
 
-    // 5. Authentication successful - now hash the private key and destroy the original
+    // 4. Initialize database FIRST with this account's identityId (before storing keys)
+    await StorageService.initialize(result.identityId);
+
+    // 5. NOW save public key to IndexedDB (requires initialized database)
+    await StorageService.storePublicKey(publicKeyBase64);
+
+    // 6. Authentication successful - now hash the private key and destroy the original
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
     const privateKeyHash = await hashPrivateKey(rawPrivateKey);
 
@@ -177,9 +182,6 @@ export class AccountService {
 
     // Store ONLY the hash for encryption operations
     setSessionPrivateKeyHash(privateKeyHash);
-
-    // 6. Initialize database with this account's identityId
-    await StorageService.initialize(result.identityId);
 
     // Wait briefly to ensure user profile is created on the backend
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -205,9 +207,9 @@ export class AccountService {
 
     // Derive keys from the recovered seed
     const keyPair = await deriveKeyPairFromSeed(seed);
-
-    // Save public key to IndexedDB
-    await StorageService.storePublicKey(keyPair.publicKeyBase64);
+    
+    // Keep a reference to the private key BEFORE clearing
+    const privateKeyForLogin = keyPair.privateKey.slice(); // Make a copy to preserve
 
     // Hash the private key and destroy the original
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
@@ -219,7 +221,10 @@ export class AccountService {
     // Store only the hash for encryption
     setSessionPrivateKeyHash(privateKeyHash);
 
-    return keyPair;
+    return {
+      publicKeyBase64: keyPair.publicKeyBase64,
+      privateKey: privateKeyForLogin,
+    };
   }
 
   /**
@@ -234,9 +239,9 @@ export class AccountService {
 
     // Derive keys
     const keyPair = await deriveKeyPairFromSeed(seed);
-
-    // Save public key to IndexedDB
-    await StorageService.storePublicKey(keyPair.publicKeyBase64);
+    
+    // Keep a reference to the private key BEFORE clearing
+    const privateKeyForLogin = keyPair.privateKey.slice(); // Make a copy to preserve
 
     // Hash the private key and destroy the original
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
@@ -248,7 +253,10 @@ export class AccountService {
     // Store only the hash for encryption
     setSessionPrivateKeyHash(privateKeyHash);
 
-    return keyPair;
+    return {
+      publicKeyBase64: keyPair.publicKeyBase64,
+      privateKey: privateKeyForLogin,
+    };
   }
 
   /**

@@ -5,4 +5,5 @@ export default [
   route('auth', 'routes/auth.tsx'),
   route('avatartest', 'routes/avatartest.tsx'),
   route('mediatest', 'routes/mediatest.tsx'),
+  route('phase5test', 'routes/phase5test.tsx'),
 ] satisfies RouteConfig;
