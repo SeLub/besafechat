@@ -13,7 +13,6 @@ import { MessageModule } from './domains/message/message.module';
 import { ContactModule } from './domains/contact/contact.module';
 import { ChatModule } from './domains/chat/chat.module';
 import { S3Module } from './domains/s3/s3.module';
-import { MediaModule } from './domains/media/media.module';
 
 @Module({
   imports: [
@@ -30,7 +29,6 @@ import { MediaModule } from './domains/media/media.module';
     ContactModule,
     ChatModule,
     S3Module,
-    MediaModule,
   ],
 })
 export class AppModule {

@@ -11,7 +11,7 @@ import { StorageSettingsModal } from '@/components/storage-settings-modal';
 import { DevicesSettingsModal } from '@/components/devices-settings-modal';
 import { ContactsPage } from '@/components/contacts-page';
 import { useAuth } from '@/hooks/use-auth';
-import { MediaService } from '@/services/media.service';
+import { S3Service } from '@/services/s3-service';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -105,9 +105,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         throw new Error('User not authenticated');
       }
 
-      // Use the MediaService uploadAvatar method which properly handles the upload
-      const result = await MediaService.uploadAvatar(file);
-      const avatarUrl = result.url;
+      // Use the S3Service uploadAvatar method which properly handles the upload
+      const avatarUrl = await S3Service.uploadAvatar(userId, file);
 
       toast.success('Avatar updated');
       // Force reload with cache bust

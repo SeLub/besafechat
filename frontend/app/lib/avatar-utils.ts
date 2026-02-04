@@ -1,11 +1,14 @@
 /**
- * Simple avatar utilities - URLs come from API responses
+ * Construct avatar URL for any user
+ * Avatar is always stored as avatar.png in S3
  */
-export function getAvatarUrl(profile: { avatarUrl?: string }): string | undefined {
-  return profile.avatarUrl;
+export function getAvatarUrl(userId: string): string {
+  return `https://s3.tebi.io/besafe.backet/users/${userId}/avatar.png`;
 }
 
-export function getAvatarUrlWithCacheBust(profile: { avatarUrl?: string }): string | undefined {
-  const url = profile.avatarUrl;
-  return url ? `${url}?v=${Date.now()}` : undefined;
+/**
+ * Get avatar URL with cache busting (use after upload)
+ */
+export function getAvatarUrlWithCacheBust(userId: string): string {
+  return `${getAvatarUrl(userId)}?v=${Date.now()}`;
 }

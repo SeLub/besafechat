@@ -1,6 +1,6 @@
 import { decryptSeedFromCloud } from '../lib/crypto';
 import type { EncryptedSeedData } from '../lib/crypto/types';
-import { MediaService } from './media.service';
+import { S3Service } from './s3-service';
 
 // ============================================================================
 // Types
@@ -62,19 +62,24 @@ export class CloudBackupService {
       // Compute storage path from password
       const storagePath = await CloudBackupService.computeStoragePath(password);
 
-      // Use MediaService to upload the seed
-      const encryptedBlob = new Blob([
-        JSON.stringify({
-          encrypted: encryptedSeed.encrypted,
-          salt: encryptedSeed.salt,
-          iv: encryptedSeed.iv,
-          authTag: encryptedSeed.authTag,
-          version: encryptedSeed.version,
-          kdfParams: encryptedSeed.kdfParams,
-        }),
-      ]);
-      
-      await MediaService.uploadSeed(encryptedBlob, storagePath);
+      // Use frontend S3Service to upload the seed
+      await S3Service.uploadFile(
+        new Blob([
+          JSON.stringify({
+            encrypted: encryptedSeed.encrypted,
+            salt: encryptedSeed.salt,
+            iv: encryptedSeed.iv,
+            authTag: encryptedSeed.authTag,
+            version: encryptedSeed.version,
+            kdfParams: encryptedSeed.kdfParams,
+          }),
+        ]),
+        {
+          path: `seeds/${storagePath}`,
+          fileName: 'encrypted_seed.bin',
+          contentType: 'application/json',
+        }
+      );
 
       return {
         success: true,
@@ -106,19 +111,24 @@ export class CloudBackupService {
     const storagePath = await CloudBackupService.computeStoragePath(password);
 
     try {
-      // Use MediaService to upload the seed
-      const encryptedBlob = new Blob([
-        JSON.stringify({
-          encrypted: encryptedSeed.encrypted,
-          salt: encryptedSeed.salt,
-          iv: encryptedSeed.iv,
-          authTag: encryptedSeed.authTag,
-          version: encryptedSeed.version,
-          kdfParams: encryptedSeed.kdfParams,
-        }),
-      ]);
-      
-      await MediaService.uploadSeed(encryptedBlob, storagePath);
+      // Use frontend S3Service to upload the seed to the correct path
+      await S3Service.uploadFile(
+        new Blob([
+          JSON.stringify({
+            encrypted: encryptedSeed.encrypted,
+            salt: encryptedSeed.salt,
+            iv: encryptedSeed.iv,
+            authTag: encryptedSeed.authTag,
+            version: encryptedSeed.version,
+            kdfParams: encryptedSeed.kdfParams,
+          }),
+        ]),
+        {
+          path: `seeds/${storagePath}`,
+          fileName: 'encrypted-seed.enc',
+          contentType: 'application/json',
+        }
+      );
 
       return {
         success: true,
@@ -144,7 +154,7 @@ export class CloudBackupService {
       const storagePath = await CloudBackupService.computeStoragePath(password);
 
       // Direct S3 URL
-      const s3Url = `https://s3.tebi.io/besafe.backet/seeds/${storagePath}/seed.enc`;
+      const s3Url = `https://s3.tebi.io/besafe.backet/seeds/${storagePath}/encrypted-seed.enc`;
 
       // Download directly from S3
       const response = await fetch(s3Url);
@@ -179,16 +189,8 @@ export class CloudBackupService {
     }
 
     try {
-      // Use MediaService to download the seed (not implemented yet)
-      // For now, use direct S3 URL as fallback
-      const s3Url = `https://s3.tebi.io/besafe.backet/handles/${userId}/backups/encrypted-seed.enc`;
-      const response = await fetch(s3Url);
-      
-      if (!response.ok) {
-        throw new Error('Backup not found');
-      }
-      
-      const blob = await response.blob();
+      // Use frontend S3Service to download the seed
+      const blob = await S3Service.downloadFile(`users/${userId}`, 'encrypted-seed.enc');
       const text = await blob.text();
       const encryptedSeed: EncryptedSeedData = JSON.parse(text);
       return encryptedSeed;

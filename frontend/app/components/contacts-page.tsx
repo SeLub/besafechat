@@ -12,7 +12,6 @@ interface Contact {
     id: string;
     displayName?: string;
     username?: string;
-    avatarUrl?: string;
   };
   acceptedAt: string;
 }
@@ -23,13 +22,11 @@ interface ContactRequest {
     id: string;
     displayName?: string;
     username?: string;
-    avatarUrl?: string;
   };
   toUser?: {
     id: string;
     displayName?: string;
     username?: string;
-    avatarUrl?: string;
   };
   message?: string;
   status?: string;
@@ -235,7 +232,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(contact.user)}
                       </AvatarFallback>
-                      <AvatarImage src={contact.user.avatarUrl} />
+                      <AvatarImage src={getAvatarUrl(contact.user.id)} />
                     </Avatar>
                     <div>
                       <div className="font-medium">
@@ -295,8 +292,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.fromUser || {})}
                           </AvatarFallback>
-                          {request.fromUser?.avatarUrl && (
-                            <AvatarImage src={request.fromUser.avatarUrl} />
+                          {request.fromUser?.id && (
+                            <AvatarImage src={getAvatarUrl(request.fromUser.id)} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -375,8 +372,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                             {getInitials(request.toUser || {})}
                           </AvatarFallback>
-                          {request.toUser?.avatarUrl && (
-                            <AvatarImage src={request.toUser.avatarUrl} />
+                          {request.toUser?.id && (
+                            <AvatarImage src={getAvatarUrl(request.toUser.id)} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
