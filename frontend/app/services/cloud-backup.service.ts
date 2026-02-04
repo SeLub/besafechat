@@ -286,29 +286,13 @@ export class CloudBackupService {
       // Compute storage path from password
       const storagePath = await CloudBackupService.computeStoragePath(password);
 
-      // Direct S3 URL
-      const s3Url = `https://s3.tebi.io/besafe.backet/seeds/${storagePath}/encrypted-seed.enc`;
-
-      // Download directly from S3
-      const response = await fetch(s3Url);
-
-      if (!response.ok) {
-        console.log('Seed restore failed');
-        return null;
-      }
-
-      const text = await response.text();
+      // Use frontend S3Service to download the seed
+      const blob = await S3Service.downloadFile(`seeds/${storagePath}`, 'encrypted_seed.bin');
+      const text = await blob.text();
       const encryptedSeed: EncryptedSeedData = JSON.parse(text);
-
-      // Basic validation
-      if (!encryptedSeed.encrypted || !encryptedSeed.salt || !encryptedSeed.iv) {
-        console.log('Invalid seed format');
-        return null;
-      }
-
       return encryptedSeed;
     } catch (error) {
-      console.log('Seed restore failed');
+      console.error('Seed restore failed:', error);
       return null;
     }
   }
@@ -361,7 +345,10 @@ export class CloudBackupService {
    * Restore seed by password and decrypt it
    * Used for account recovery flow
    */
-  static async restoreAndDecryptSeedByPassword(password: string): Promise<string[] | null> {
+  static async restoreAndDecryptSeedByPassword(
+    password: string,
+    userId: string
+  ): Promise<string[] | null> {
     // 1. Download encrypted seed by password
     const encryptedSeed = await CloudBackupService.restoreSeedByPassword(password);
 
@@ -371,7 +358,7 @@ export class CloudBackupService {
 
     // 2. Decrypt the seed using the password and userId
     try {
-      const seed = await decryptSeedFromCloud(encryptedSeed, password);
+      const seed = await decryptSeedFromCloud(encryptedSeed, password, userId);
       return seed;
     } catch (error) {
       console.error('Decryption failed:', error);
@@ -397,7 +384,7 @@ export class CloudBackupService {
 
     // 2. Decrypt the seed
     try {
-      const seed = await decryptSeedFromCloud(encryptedSeed, password);
+      const seed = await decryptSeedFromCloud(encryptedSeed, password, userId);
       return seed;
     } catch (error) {
       console.error('Decryption failed:', error);
@@ -668,7 +655,7 @@ export class CloudBackupService {
    * Used for account recovery flow with password only
    */
   static async restoreAccountWithPassword(password: string, userId: string): Promise<KeyPair> {
-    const seedWords = await CloudBackupService.restoreAndDecryptSeedByPassword(password);
+    const seedWords = await CloudBackupService.restoreAndDecryptSeedByPassword(password, userId);
 
     if (!seedWords) {
       throw new Error('Failed to restore seed from backup');
