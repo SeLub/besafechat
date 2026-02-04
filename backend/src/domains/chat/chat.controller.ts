@@ -1,6 +1,6 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/chat/chat.controller.ts
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatRoomService } from '../message/services/chat-room.service';
@@ -74,18 +74,6 @@ export class ChatController {
   }
 
   @Post('find-or-create')
-  @ApiOperation({ summary: 'Find or create a private chat with another user' })
-  @ApiBody({
-    schema: {
-      properties: {
-        otherHandleId: {
-          type: 'string',
-          example: 'def456-ghi789-jkl012',
-          description: 'The handle ID of the other user to create chat with'
-        }
-      }
-    }
-  })
   async findOrCreateChat(@Body() body: { otherHandleId: string }, @CurrentUser() user: any) {
     // Используем handleId вместо identityId
     const chat = await this.chatRoomService.findOrCreatePrivateChat(

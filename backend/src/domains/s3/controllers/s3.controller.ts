@@ -8,7 +8,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiSecurity, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { UnifiedDeleteDto } from '../dto/unified-delete.dto';
@@ -49,12 +54,12 @@ export class S3Controller {
 
   @Post('upload')
   @ApiOperation({ summary: 'Get presigned URL for file upload' })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'Upload URL generated successfully',
     type: ApiResponseDto<UploadResponseData>,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid request',
   })
@@ -95,12 +100,12 @@ export class S3Controller {
 
   @Post('download')
   @ApiOperation({ summary: 'Get presigned URL for file download' })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'Download URL generated successfully',
     type: ApiResponseDto<DownloadResponseData>,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid request or access denied',
   })
@@ -144,12 +149,12 @@ export class S3Controller {
 
   @Delete('delete')
   @ApiOperation({ summary: 'Delete file from storage' })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'File deleted successfully',
     type: ApiResponseDto<DeleteResponseData>,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid request or file not found',
   })
