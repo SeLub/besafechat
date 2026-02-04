@@ -2,7 +2,7 @@ import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { FullProfile } from '~/types/profile';
+import type { FullProfile } from '~/types/user';
 import type { ApiResponse } from '../types/api';
 
 interface AuthContextType {

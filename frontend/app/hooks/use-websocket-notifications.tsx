@@ -7,8 +7,8 @@ import { useNotifications } from './use-notifications';
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
-  onUserOnline?: (handleId: string) => void,
-  onUserOffline?: (handleId: string) => void
+  onUserOnline?: (userId: string) => void,
+  onUserOffline?: (userId: string) => void
 ) {
   const { user } = useAuth();
   const { incrementRequests, incrementAccepted } = useNotifications();
@@ -101,12 +101,12 @@ export function useWebSocketNotifications(
     });
 
     // Online status events
-    socket.on('user_online', (data: { handleId: string }) => {
-      callbacksRef.current.onUserOnline?.(data.handleId);
+    socket.on('user_online', (data: { userId: string }) => {
+      callbacksRef.current.onUserOnline?.(data.userId);
     });
 
-    socket.on('user_offline', (data: { handleId: string }) => {
-      callbacksRef.current.onUserOffline?.(data.handleId);
+    socket.on('user_offline', (data: { userId: string }) => {
+      callbacksRef.current.onUserOffline?.(data.userId);
     });
 
     // Heartbeat to maintain online status
