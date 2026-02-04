@@ -28,7 +28,6 @@ import {
   LogOut,
   Key,
 } from 'lucide-react';
-import { UserService } from '~/services';
 
 interface LeftPanelPageProps {
   page: 'profile' | 'settings' | 'contacts' | null;
@@ -43,7 +42,7 @@ interface LeftPanelPageProps {
 }
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
-  const { user, logout, checkAuth, refreshUser } = useAuth();
+  const { logout, checkAuth, user } = useAuth();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -95,22 +94,6 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
       toast.error('Failed to upload avatar');
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleSaveUsername = async (username: string, isSearchable: boolean) => {
-    try {
-      // Обновляем username на сервере с isSearchable
-      await UserService.setUsername(username, isSearchable);
-
-      // Обновляем данные пользователя без перезагрузки страницы
-      await refreshUser();
-
-      toast.success('Settings updated successfully');
-      setUsernameModalOpen(false);
-    } catch (error) {
-      console.error('Failed to update username:', error);
-      toast.error('Failed to update username');
     }
   };
 
@@ -190,7 +173,6 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
           currentUsername={userProfile?.username}
-          onSave={handleSaveUsername}
         />
 
         {/* Display Name Modal */}

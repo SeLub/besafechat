@@ -14,11 +14,11 @@ import { toast } from 'sonner';
 
 type AuthStep =
   | 'main'
+  | 'username-selection'
   | 'method-selection'
   | 'seed-display'
   | 'seed-verify'
   | 'password'
-  | 'username-selection'
   | 'recovery'
   | 'complete';
 type AuthMethod = 'cloud' | 'self-custody' | null;
@@ -40,21 +40,12 @@ export default function AuthRoute() {
   }, []);
 
   const handleCreateAccount = () => {
-    setStep('method-selection');
+    setStep('username-selection');
   };
 
-  const handleUsernameSelected = async (selectedUsername: string) => {
+  const handleUsernameSelected = (selectedUsername: string) => {
     setUsername(selectedUsername);
-    setLoading(true);
-    try {
-      await setUsernameOnBackend(selectedUsername);
-      setStep('complete');
-      toast.success('Account created!');
-      setTimeout(() => (window.location.href = '/'), 1500);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to set username');
-      setLoading(false);
-    }
+    setStep('method-selection');
   };
 
   const handleMethodSelect = async (selectedMethod: 'cloud' | 'self-custody') => {
@@ -88,10 +79,13 @@ export default function AuthRoute() {
     try {
       // Use the unified account creation flow with cloud backup
       const result = await AccountService.createAccountWithCloud(password);
-      await loginOnly(result.publicKeyBase64);
-      // Go to username selection
-      setStep('username-selection');
-      toast.success('Account created! Now choose your username');
+
+      // Set username
+      await setUsernameOnBackend(username);
+
+      setStep('complete');
+      toast.success('Account created with cloud backup!');
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -105,8 +99,10 @@ export default function AuthRoute() {
       // Use the unified account creation flow with self-custody
       const result = await AccountService.createAccountWithSelfCustody();
       await loginOnly(result.publicKeyBase64);
-      setStep('username-selection');
-      toast.success('Account created! Now choose your username');
+      await setUsernameOnBackend(username);
+      setStep('complete');
+      toast.success('Account created!');
+      setTimeout(() => (window.location.href = '/'), 1500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
