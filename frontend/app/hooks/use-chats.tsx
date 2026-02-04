@@ -11,7 +11,7 @@ interface Chat {
   phone?: string;
   username?: string;
   publicKey?: string;
-  handleId?: string;
+  userId?: string;
 }
 
 export function useChats() {
@@ -67,7 +67,7 @@ export function useChats() {
             id: chat.id, // Use actual chat ID
             name:
               otherMember?.user?.displayName || `@${otherMember?.user?.handle}` || 'Unknown User',
-            handleId: otherMember?.handleId, // Use handleId of the other user
+            userId: otherMember?.handleId, // Use handleId of the other user
             publicKey: otherMember?.user?.publicKey,
             isOnline: false,
           };
@@ -110,11 +110,10 @@ export function useChats() {
     };
 
     setChats(prev => {
-      // Check if chat already exists by handleId or publicKey
+      // Check if chat already exists by userId or publicKey
       const exists = prev.find(
         c =>
-          (c.handleId && c.handleId === chat.handleId) ||
-          (c.publicKey && c.publicKey === chat.publicKey)
+          (c.userId && c.userId === chat.userId) || (c.publicKey && c.publicKey === chat.publicKey)
       );
       if (exists) return prev;
 
@@ -141,20 +140,20 @@ export function useChats() {
     );
   };
 
-  const updateChatOnlineStatus = (handleId: string, isOnline: boolean) => {
-    setChats(prev => prev.map(chat => (chat.handleId === handleId ? { ...chat, isOnline } : chat)));
+  const updateChatOnlineStatus = (userId: string, isOnline: boolean) => {
+    setChats(prev => prev.map(chat => (chat.userId === userId ? { ...chat, isOnline } : chat)));
   };
 
   const loadOnlineStatuses = async () => {
-    const handleIds = chats.map(chat => chat.handleId).filter(Boolean);
-    if (handleIds.length === 0) return;
+    const userIds = chats.map(chat => chat.userId).filter(Boolean);
+    if (userIds.length === 0) return;
 
     try {
       const res = await fetch('http://localhost:4000/contacts/bulk-online-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ userIds: handleIds }),
+        body: JSON.stringify({ userIds }),
       });
 
       if (res.ok) {
@@ -162,7 +161,7 @@ export function useChats() {
         setChats(prev =>
           prev.map(chat => ({
             ...chat,
-            isOnline: chat.handleId ? statuses[chat.handleId] || false : false,
+            isOnline: chat.userId ? statuses[chat.userId] || false : false,
           }))
         );
       }

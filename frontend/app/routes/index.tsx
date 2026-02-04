@@ -12,7 +12,7 @@ import { Socket } from 'socket.io-client';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
-    { id: string; text: string; isOwn?: boolean; fromHandleId?: string }[]
+    { id: string; text: string; isOwn?: boolean; fromUserId?: string }[]
   >([]);
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
@@ -35,7 +35,7 @@ function ChatRouteContent() {
     if (!socketRef.current || !selectedChatId || !user) return;
 
     const selectedChat = getChatById(selectedChatId);
-    const recipientHandleId = selectedChat?.handleId; // This should be the handleId of the recipient for sending
+    const recipientHandleId = selectedChat?.userId; // This should be the handleId of the recipient for sending
 
     // Use actual chat ID for storage, ensuring we have a proper chat ID
     let chatStorageId = selectedChat?.id;
@@ -64,8 +64,8 @@ function ChatRouteContent() {
       timestamp,
     });
 
-    // Generate message ID using handle ID
-    const senderIdForMessage = user.handle.id;
+    // Generate message ID using handle ID if available, fallback to identity ID
+    const senderIdForMessage = user.handle?.id || user.id;
     const messageId = `${senderIdForMessage}_${Date.now()}`;
     const newMessage = {
       id: messageId,
@@ -89,9 +89,9 @@ function ChatRouteContent() {
     );
     await StorageService.saveEncryptedMessage(
       chatStorageId,
-      senderIdForMessage, // Use handle ID if available
+      senderIdForMessage, // Use handle ID if available, fallback to identity ID
       message,
-      user.handle.id, // Use handle ID for encryption instead of identity ID
+      user.id, // Keep identity ID for encryption
       true,
       messageId
     );
@@ -119,9 +119,7 @@ function ChatRouteContent() {
       return;
     }
     // Load messages from IndexedDB
-    const loadedMessages = user
-      ? await StorageService.loadDecryptedMessages(loadKey, user.handle.id)
-      : [];
+    const loadedMessages = user ? await StorageService.loadDecryptedMessages(loadKey, user.id) : [];
     console.log('📚 Loaded', loadedMessages.length, 'messages');
     setMessages(loadedMessages);
   };
@@ -141,7 +139,7 @@ function ChatRouteContent() {
         if (res.ok) {
           const chatData = await res.json();
           // Find the other user in the chat
-          const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.identity.id);
+          const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.id);
 
           const newChatId = addChat({
             id: chatId,
@@ -150,7 +148,7 @@ function ChatRouteContent() {
               `@${otherMember?.user?.username?.username}` ||
               'Unknown User',
             publicKey: otherMember?.user?.publicKey,
-            handleId: otherMember?.handleId, // Use handleId instead of identityId
+            userId: otherMember?.handleId, // Use handleId instead of identityId
           });
           setSelectedChatId(newChatId);
 
@@ -169,7 +167,7 @@ function ChatRouteContent() {
       }
       setNewChatModalOpen(false);
     },
-    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses]
+    [user?.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses]
   );
 
   const chatsRef = useRef(chats);
@@ -180,7 +178,7 @@ function ChatRouteContent() {
   const handleMessageReceived = useCallback(
     async (message: any) => {
       // Skip processing if this is our own message (sender should not receive their own messages)
-      const currentUserHandleId = user?.handle?.id || user?.identity.id;
+      const currentUserHandleId = user?.handle?.id || user?.id;
       if (message.fromUserId === currentUserHandleId) {
         console.log('🚫 Skipping own message:', message.id);
         return;
@@ -188,10 +186,10 @@ function ChatRouteContent() {
 
       const selectedChat = chatsRef.current.find(c => c.id === selectedChatId);
 
-      // Check if message is for currently selected chat (by handleId or chatId)
+      // Check if message is for currently selected chat (by userId or chatId)
       const isSelectedChat =
         selectedChat &&
-        (selectedChat.handleId === message.fromHandleId ||
+        (selectedChat.userId === message.fromUserId ||
           message.chatId === selectedChatId ||
           message.chatId === selectedChatId?.replace('chat_', ''));
 
@@ -209,13 +207,13 @@ function ChatRouteContent() {
         console.log('💾 Saving received message with chatId:', message.chatId);
         try {
           // Generate a fallback ID if the message doesn't have one
-          const messageId = message.id || `received_${message.fromHandleId}_${Date.now()}`;
+          const messageId = message.id || `received_${message.fromUserId}_${Date.now()}`;
 
           await StorageService.saveEncryptedMessage(
             message.chatId, // Use actual chat ID for storage
-            message.fromHandleId,
+            message.fromUserId,
             message.text,
-            user.handle.id,
+            user.id,
             false,
             messageId
           );
@@ -230,15 +228,15 @@ function ChatRouteContent() {
   );
 
   const handleUserOnline = useCallback(
-    (handleId: string) => {
-      updateChatOnlineStatus(handleId, true);
+    (userId: string) => {
+      updateChatOnlineStatus(userId, true);
     },
     [updateChatOnlineStatus]
   );
 
   const handleUserOffline = useCallback(
-    (handleId: string) => {
-      updateChatOnlineStatus(handleId, false);
+    (userId: string) => {
+      updateChatOnlineStatus(userId, false);
     },
     [updateChatOnlineStatus]
   );
