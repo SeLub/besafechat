@@ -6,7 +6,7 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
-    "dev": "nest start --watch",
+    "dev": "node scripts/wait-port.js 4000 && nest start --watch",
     "dev:nowait": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
