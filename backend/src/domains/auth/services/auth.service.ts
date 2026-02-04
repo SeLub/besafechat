@@ -60,6 +60,85 @@ export class AuthService {
     };
   }
 
+  async registerWithHandle(
+    publicKeyBase64: string,
+    handleValue: string,
+    displayName: string,
+    deviceName: string,
+    deviceType?: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) {
+    // Проверяем, существует ли уже идентичность с этим публичным ключом
+    const existingIdentity = await this.identityService.findByIdentityPublicKey(publicKeyBase64);
+    
+    if (existingIdentity) {
+      // Если идентичность уже существует, проверяем, есть ли у нее уже primary handle
+      const existingHandles = await this.handleService.getHandlesByIdentity(existingIdentity.id);
+      const hasPrimaryHandle = existingHandles.some(h => h.isPrimary);
+      
+      if (hasPrimaryHandle) {
+        // Если у идентичности уже есть primary handle, возвращаем ошибку
+        throw new BadRequestException('Identity already registered with a handle');
+      }
+    }
+
+    // Регистрируем Identity (создаст новую или вернет существующую)
+    const identity = await this.identityService.registerIdentity(publicKeyBase64);
+
+    // Определяем handle - если handle начинается с "user_", используем генерацию из публичного ключа
+    let finalHandleValue = handleValue;
+    
+    // Если handle начинается с "user_", используем генерацию из публичного ключа
+    if (handleValue.startsWith('user_')) {
+      // Проверяем, совпадает ли предоставленный handle с тем, который будет сгенерирован
+      const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
+      
+      // Используем генерируемый handle вместо предоставленного
+      finalHandleValue = generatedHandle;
+    } else {
+      // Если handle не начинается с "user_", проверяем, совпадает ли он с генерируемым
+      const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
+      
+      // Если предоставленный handle не совпадает с генерируемым, используем генерируемый
+      if (handleValue !== generatedHandle) {
+        finalHandleValue = generatedHandle;
+      }
+    }
+
+    // Создаем Handle (будет primary)
+    const handle = await this.handleService.createHandle({
+      value: finalHandleValue,
+      type: 'account',
+      ownerIdentityId: identity.id,
+      isSearchable: true,
+      isPrimary: true,
+    });
+
+    // Создаем Profile для Handle
+    const profile = await this.profileService.createProfile({
+      handleId: handle.id,
+      displayName,
+    });
+
+    // Создаем сессию с активным Handle
+    const sessionResult = await this.sessionService.createSession(
+      identity.id,
+      deviceName,
+      deviceType,
+      ipAddress,
+      userAgent,
+      handle.id // Устанавливаем активный Handle
+    );
+
+    return {
+      session: sessionResult.session,
+      tokens: sessionResult.tokens,
+      identity,
+      handle,
+      profile,
+    };
+  }
 
   async loginWithPublicKey(
     publicKeyBase64: string,
@@ -74,62 +153,16 @@ export class AuthService {
     if (!identity) {
       // Если Identity не существует, регистрируем его (первый вход)
       identity = await this.identityService.registerIdentity(publicKeyBase64);
-
-      // Создаем дефолтный handle и профиль для новой идентичности
-      const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
-
-      const handle = await this.handleService.createHandle({
-        value: generatedHandle,
-        type: 'account',
-        ownerIdentityId: identity.id,
-        isSearchable: true, // Make searchable by default
-        isPrimary: true,
-      });
-
-      // Создаем дефолтный профиль
-      await this.profileService.createProfile({
-        handleId: handle.id,
-        displayName: 'Anonym User', // Default display name
-      });
     }
 
-    // Получаем primary handle
-    let activeHandle;
-    try {
-      activeHandle = await this.handleService.getPrimaryHandle(identity.id);
-    } catch (error) {
-      // If no primary handle exists (edge case), create default one
-      const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
-
-      const handle = await this.handleService.createHandle({
-        value: generatedHandle,
-        type: 'account',
-        ownerIdentityId: identity.id,
-        isSearchable: true, // Make searchable by default
-        isPrimary: true,
-      });
-
-      activeHandle = handle;
-
-      // Создаем дефолтный профиль если его нет
-      try {
-        await this.profileService.getProfileByHandle(handle.id);
-      } catch {
-        await this.profileService.createProfile({
-          handleId: handle.id,
-          displayName: 'Anonym User', // Default display name
-        });
-      }
-    }
-
-    // Создаем сессию с активным Handle
+    // Создаем сессию
     const sessionResult = await this.sessionService.createSession(
       identity.id,
       deviceName,
       deviceType,
       ipAddress,
-      userAgent,
-      activeHandle.id // Устанавливаем активный Handle
+      userAgent
+      // Handle будет установлен автоматически (primary или из сессии)
     );
 
     return {

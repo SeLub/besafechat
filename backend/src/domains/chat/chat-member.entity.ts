@@ -1,5 +1,5 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/chat/chat-member.entity.ts
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Handle } from '../handle/handle.entity';
 import { Chat } from './chat.entity';
 
@@ -24,7 +24,7 @@ export class ChatMember {
   })
   role!: string; // 'member' (для симметрии), 'admin', 'owner'
 
-  @Column({ type: 'boolean', default: true })
+ @Column({ type: 'boolean', default: true })
   canSendMessages!: boolean;
 
   @Column({ type: 'jsonb', default: {} })

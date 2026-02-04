@@ -15,7 +15,7 @@ let temporarySeed: string[] | null = null;
 export class AccountService {
   /**
    * Unified account creation flow with cloud backup
-   * Follows the unified pattern: generate seed → derive keys → store public key → login user (creates identity) → backup seed
+   * Follows the unified pattern: generate seed → derive keys → store public key → register user → backup seed
    */
   static async createAccountWithCloud(password: string) {
     // 1. Generate new seed
@@ -27,20 +27,19 @@ export class AccountService {
     await StorageService.storePublicKey(publicKeyBase64);
 
     // 3. Генерация данных клиента
-    const { deviceId, deviceName } = AccountService.getDeviceInfo();
+    const deviceId = DeviceService.getDeviceId();
 
-    // 4. Login (creates identity if first time) on server
-    const result = await AuthService.login({
+    // 4. Регистрация на сервере
+    const { userId } = await AuthService.register({
       publicKey: publicKeyBase64,
       deviceId,
-      deviceName,
     });
 
     // Wait briefly to ensure user profile is created on the backend
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // 5. Encrypt and backup seed to cloud
-    const encrypted = await encryptSeedForCloud(seed, password, result.userId);
+    const encrypted = await encryptSeedForCloud(seed, password, userId);
     const uploadResult = await CloudBackupService.backupSeed(encrypted, password);
 
     if (!uploadResult.success) {
@@ -54,13 +53,13 @@ export class AccountService {
       privateKey: keyPair.privateKey,
       publicKey: keyPair.publicKey,
       publicKeyBase64,
-      userId: result.userId,
+      userId,
     };
   }
 
   /**
    * Unified account creation flow with self-custody (no cloud backup)
-   * Follows the unified pattern: generate seed → derive keys → store public key → login user (creates identity)
+   * Follows the unified pattern: generate seed → derive keys → store public key → register user
    */
   static async createAccountWithSelfCustody() {
     // 1. Generate new seed
@@ -72,13 +71,12 @@ export class AccountService {
     await StorageService.storePublicKey(publicKeyBase64);
 
     // 3. Генерация данных клиента
-    const { deviceId, deviceName } = AccountService.getDeviceInfo();
+    const deviceId = DeviceService.getDeviceId();
 
-    // 4. Login (creates identity if first time) on server
-    const result = await AuthService.login({
+    // 4. Регистрация на сервере
+    const { userId } = await AuthService.register({
       publicKey: publicKeyBase64,
       deviceId,
-      deviceName,
     });
 
     // Wait briefly to ensure user profile is created on the backend
@@ -88,7 +86,7 @@ export class AccountService {
       privateKey: keyPair.privateKey,
       publicKey: keyPair.publicKey,
       publicKeyBase64,
-      userId: result.userId,
+      userId,
     };
   }
 

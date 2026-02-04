@@ -65,7 +65,7 @@ export class ContactRequestService {
     // Send WebSocket notification
     await this.messagesGateway.notifyContactRequest(
       toHandle.ownerIdentity.id,
-      fromHandle,
+      fromHandle.ownerIdentity,
       savedRequest.id,
       message?.trim()
     );
@@ -76,7 +76,7 @@ export class ContactRequestService {
   async getIncomingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
       where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
-      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'fromHandle.profile'],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -84,7 +84,7 @@ export class ContactRequestService {
   async getOutgoingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
       where: { fromHandleId: handleId },
-      relations: ['toHandle', 'toHandle.ownerIdentity', 'toHandle.profile'],
+      relations: ['toHandle', 'toHandle.ownerIdentity'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -92,69 +92,10 @@ export class ContactRequestService {
   async acceptRequest(requestId: string, handleId: string) {
     const request = await this.contactRequestRepository.findOne({
       where: { id: requestId, toHandleId: handleId, status: ContactRequestStatus.PENDING },
-      relations: [
-        'fromHandle',
-        'fromHandle.ownerIdentity',
-        'fromHandle.profile',
-        'toHandle.ownerIdentity',
-        'toHandle.profile',
-      ],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle.ownerIdentity'],
     });
 
     if (!request) {
-      throw new NotFoundException('Contact request not found');
-    }
-
-    request.status = ContactRequestStatus.ACCEPTED;
-    await this.contactRequestRepository.save(request);
-
-    // Create chat between users
-    const chat = await this.chatRoomService.findOrCreatePrivateChat(
-      request.fromHandleId,
-      request.toHandleId
-    );
-
-    // Send WebSocket notification to request sender (they now have a chat available with accepter)
-    await this.messagesGateway.notifyRequestAccepted(
-      request.fromHandleId, // Use handle ID instead of identity ID
-      request.toHandle,
-      chat.id
-    );
-
-    // Also notify the user who accepted the request that a new chat is available
-    await this.messagesGateway.notifyNewChatAvailable(
-      request.toHandleId, // Notify the accepter
-      request.fromHandle,
-      chat.id
-    );
-
-    return { success: true, chatId: chat.id };
-  }
-
-  async acceptRequestByIdentity(requestId: string, identityId: string) {
-    // First, get the contact request by ID only
-    const request = await this.contactRequestRepository.findOne({
-      where: { id: requestId, status: ContactRequestStatus.PENDING },
-      relations: [
-        'fromHandle',
-        'fromHandle.ownerIdentity',
-        'fromHandle.profile',
-        'toHandle.ownerIdentity',
-        'toHandle.profile',
-      ],
-    });
-
-    if (!request) {
-      throw new NotFoundException('Contact request not found');
-    }
-
-    // Verify that the requesting user owns the handle that received the contact request
-    // Check if the identity owns the toHandleId
-    const targetHandle = await this.handleRepository.findOne({
-      where: { id: request.toHandleId, ownerIdentityId: identityId },
-    });
-
-    if (!targetHandle) {
       throw new NotFoundException('Contact request not found');
     }
 
@@ -169,15 +110,8 @@ export class ContactRequestService {
 
     // Send WebSocket notification to request sender
     await this.messagesGateway.notifyRequestAccepted(
-      request.fromHandleId, // Use handle ID instead of identity ID (keeping the correction)
-      request.toHandle,
-      chat.id
-    );
-
-    // Also notify the user who accepted the request that a new chat is available
-    await this.messagesGateway.notifyNewChatAvailable(
-      request.toHandleId, // Notify the accepter
-      request.fromHandle,
+      request.fromHandle.ownerIdentity.id,
+      request.toHandle.ownerIdentity,
       chat.id
     );
 
@@ -187,14 +121,7 @@ export class ContactRequestService {
   async rejectRequest(requestId: string, handleId: string) {
     const request = await this.contactRequestRepository.findOne({
       where: { id: requestId, toHandleId: handleId, status: ContactRequestStatus.PENDING },
-      relations: [
-        'fromHandle',
-        'fromHandle.ownerIdentity',
-        'fromHandle.profile',
-        'toHandle',
-        'toHandle.ownerIdentity',
-        'toHandle.profile',
-      ],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle', 'toHandle.ownerIdentity'],
     });
 
     if (!request) {
@@ -206,48 +133,8 @@ export class ContactRequestService {
 
     // Send WebSocket notification to request sender
     await this.messagesGateway.notifyRequestRejected(
-      request.fromHandleId, // Use handle ID instead of identity ID
-      request.toHandle
-    );
-
-    return { success: true };
-  }
-
-  async rejectRequestByIdentity(requestId: string, identityId: string) {
-    // First, get the contact request by ID only
-    const request = await this.contactRequestRepository.findOne({
-      where: { id: requestId, status: ContactRequestStatus.PENDING },
-      relations: [
-        'fromHandle',
-        'fromHandle.ownerIdentity',
-        'fromHandle.profile',
-        'toHandle',
-        'toHandle.ownerIdentity',
-        'toHandle.profile',
-      ],
-    });
-
-    if (!request) {
-      throw new NotFoundException('Contact request not found');
-    }
-
-    // Verify that the requesting user owns the handle that received the contact request
-    // Check if the identity owns the toHandleId
-    const targetHandle = await this.handleRepository.findOne({
-      where: { id: request.toHandleId, ownerIdentityId: identityId },
-    });
-
-    if (!targetHandle) {
-      throw new NotFoundException('Contact request not found');
-    }
-
-    request.status = ContactRequestStatus.REJECTED;
-    await this.contactRequestRepository.save(request);
-
-    // Send WebSocket notification to request sender
-    await this.messagesGateway.notifyRequestRejected(
-      request.fromHandleId, // Use handle ID instead of identity ID
-      request.toHandle
+      request.fromHandle.ownerIdentity.id,
+      request.toHandle.ownerIdentity
     );
 
     return { success: true };
@@ -282,14 +169,7 @@ export class ContactRequestService {
         { fromHandleId: handleId, status: ContactRequestStatus.ACCEPTED },
         { toHandleId: handleId, status: ContactRequestStatus.ACCEPTED },
       ],
-      relations: [
-        'fromHandle',
-        'fromHandle.ownerIdentity',
-        'fromHandle.profile',
-        'toHandle.ownerIdentity',
-        'toHandle',
-        'toHandle.profile',
-      ],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'toHandle.ownerIdentity'],
       order: { updatedAt: 'DESC' },
     });
 
@@ -300,41 +180,12 @@ export class ContactRequestService {
       return {
         id: request.id,
         user: {
-          id: otherHandle.id, // Use handle ID instead of identity ID
+          id: otherHandle.ownerIdentity.id,
           displayName: otherHandle.profile?.displayName,
           handle: otherHandle.value,
         },
         acceptedAt: request.updatedAt,
       };
-    });
-  }
-
-  async sendRequestByIdentity(fromIdentityId: string, toIdentityId: string, message?: string) {
-    // Get primary handles for both identities
-    const [fromHandle, toHandle] = await Promise.all([
-      this.handleRepository.findOne({
-        where: { ownerIdentityId: fromIdentityId, isPrimary: true, type: 'account' },
-      }),
-      this.handleRepository.findOne({
-        where: { ownerIdentityId: toIdentityId, isPrimary: true, type: 'account' },
-      }),
-    ]);
-
-    if (!fromHandle) {
-      throw new NotFoundException('Sender does not have a primary handle');
-    }
-
-    if (!toHandle) {
-      throw new NotFoundException('Recipient does not have a primary handle');
-    }
-
-    // Use the existing sendRequest method with handle IDs
-    return await this.sendRequest(fromHandle.id, toHandle.id, message);
-  }
-
-  async getPrimaryHandleForIdentity(identityId: string) {
-    return await this.handleRepository.findOne({
-      where: { ownerIdentityId: identityId, isPrimary: true, type: 'account' },
     });
   }
 }

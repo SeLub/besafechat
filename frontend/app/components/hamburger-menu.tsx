@@ -1,35 +1,16 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { useNotifications } from '@/hooks/use-notifications';
-import { Menu, Moon, Settings, Sun, User, Users, X } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { Menu, User, Users, Settings, Moon, Sun, X } from 'lucide-react';
 
 interface HamburgerMenuProps {
   userProfile?: {
-    identity: {
-      id: string;
-      publicKey: string;
-      createdAt: string;
-    };
-    handle: {
-      id: string;
-      value: string;
-      alias: string | null;
-      isSearchable: boolean;
-      isPrimary: boolean;
-      createdAt: string;
-    };
-    profile: {
-      displayName: string;
-      firstName: string | null;
-      lastName: string | null;
-      avatarUrl: string | null;
-      bio: string | null;
-      settings: Record<string, any>;
-    };
-    hasHandle: boolean;
+    displayName?: string;
+    publicKey: string;
+    avatarUrl?: string;
   };
   onProfileClick?: () => void;
   onContactsClick?: () => void;
@@ -54,10 +35,7 @@ export function HamburgerMenu({
   };
 
   const getInitials = (name?: string) => {
-    if (!name) {
-      const publicKey = userProfile?.identity?.publicKey;
-      return publicKey ? publicKey.slice(0, 2).toUpperCase() : 'U';
-    }
+    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || 'U';
     return name
       .split(' ')
       .map(n => n[0])
@@ -74,16 +52,7 @@ export function HamburgerMenu({
 
       {/* Overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsOpen(false)}
-          onKeyDown={e => {
-            if (e.key === 'Escape') setIsOpen(false);
-          }}
-          role="button"
-          tabIndex={-1}
-          aria-label="Close menu"
-        />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsOpen(false)} />
       )}
 
       {/* Sidebar */}
@@ -106,18 +75,16 @@ export function HamburgerMenu({
             <div className="flex items-center space-x-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {getInitials(userProfile?.profile?.displayName)}
+                  {getInitials(userProfile?.displayName)}
                 </AvatarFallback>
-                {userProfile?.profile?.avatarUrl && (
-                  <AvatarImage src={userProfile.profile.avatarUrl} />
-                )}
+                {userProfile?.avatarUrl && <AvatarImage src={userProfile.avatarUrl} />}
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">
-                  {userProfile?.profile?.displayName || 'Anonymous User'}
+                  {userProfile?.displayName || 'Anonymous User'}
                 </div>
                 <div className="text-sm text-muted-foreground truncate">
-                  {(userProfile?.identity?.publicKey || '').slice(0, 16)}...
+                  {userProfile?.publicKey.slice(0, 16)}...
                 </div>
               </div>
             </div>

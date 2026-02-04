@@ -23,9 +23,10 @@ interface ContactRequest {
 
 interface ContactRequestsProps {
   onBack: () => void;
+  onChatCreated?: (chatId: string) => void;
 }
 
-export function ContactRequests({ onBack }: ContactRequestsProps) {
+export function ContactRequests({ onBack, onChatCreated }: ContactRequestsProps) {
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
@@ -57,7 +58,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
         const outgoingData = await outgoingRes.json();
         setOutgoingRequests(outgoingData.requests || []);
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to load requests');
     } finally {
       setLoading(false);
@@ -79,7 +80,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
       } else {
         toast.error('Failed to accept request');
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -100,7 +101,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
       } else {
         toast.error('Failed to reject request');
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);

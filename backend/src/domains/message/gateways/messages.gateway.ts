@@ -10,7 +10,6 @@ import { Server, Socket } from 'socket.io';
 import { RedisService } from '../../../common/redis.service';
 import { SessionService } from '../../session/services/session.service';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
-import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
 
 @WebSocketGateway({
@@ -27,18 +26,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private sessionService: SessionService,
     private redisService: RedisService,
-    private messageMetadataService: MessageMetadataService,
-    private chatRoomService: ChatRoomService
+    private messageMetadataService: MessageMetadataService
   ) {}
 
   async handleConnection(client: Socket) {
     try {
-      console.log('🔌 WebSocket connection attempt');
-
       // 1. Извлекаем access_token из кук (Socket.IO поддерживает!)
       const cookieHeader = client.handshake.headers.cookie;
       if (!cookieHeader) {
-        console.log('❌ No cookie header found');
         client.disconnect(true);
         return;
       }
@@ -49,7 +44,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         ?.split('=')[1];
 
       if (!accessToken) {
-        console.log('❌ No access token found in cookies');
         client.disconnect(true);
         return;
       }
@@ -57,37 +51,23 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // 2. Валидируем сессию
       const session = await this.sessionService.validateAccessToken(accessToken);
       if (!session || session.revoked) {
-        console.log('❌ Invalid or revoked session');
         client.disconnect(true);
         return;
       }
 
       // 3. Сохраняем данные в сокет
       client.data.identityId = session.identity.id;
-      client.data.activeHandleId = session.activeHandleId;
       client.data.sessionId = session.id;
 
-      console.log(
-        `👤 Client connected: identity=${session.identity.id}, handle=${session.activeHandleId}`
-      );
+      // 4. Подключаем к комнате пользователя (для 1:1 и групп)
+      await client.join(`user:${session.identity.id}`);
 
-      // 4. Подключаем к комнате по handleId (пользователь может иметь несколько handle'ов)
-      if (session.activeHandleId) {
-        console.log(`🚪 Joining room: user:${session.activeHandleId}`);
-        await client.join(`user:${session.activeHandleId}`);
-        console.log(`✅ Joined room: user:${session.activeHandleId}`);
-      }
+      // 5. Обновляем онлайн-статус
+      const redis = this.redisService.getClient();
+      await redis.setex(`online:${session.identity.id}`, 60, '1');
 
-      // 5. Обновляем онлайн-статус по handleId
-      if (session.activeHandleId) {
-        const redis = this.redisService.getClient();
-        // Set online status with TTL of 120 seconds to handle connection failures
-        await redis.setex(`online:${session.activeHandleId}`, 120, '1');
-        console.log(`🌐 Online status set for handle: ${session.activeHandleId}`);
-
-        // 6. Уведомляем контакты о том, что пользователь онлайн
-        await this.notifyContactsUserOnline(session.activeHandleId);
-      }
+      // 6. Уведомляем контакты о том, что пользователь онлайн
+      await this.notifyContactsUserOnline(session.identity.id);
     } catch (error) {
       console.error('❌ WebSocket connection error:', error);
       client.disconnect(true);
@@ -95,15 +75,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async handleDisconnect(client: Socket) {
-    if (client.data?.activeHandleId) {
-      const handleId = client.data.activeHandleId;
+    if (client.data?.identityId) {
+      const identityId = client.data.identityId;
       const redis = this.redisService.getClient();
-
-      // Clear online status from Redis
-      await redis.del(`online:${handleId}`);
-
-      // Notify contacts that user went offline
-      await this.notifyContactsUserOffline(handleId);
+      await redis.del(`online:${identityId}`);
+      await this.notifyContactsUserOffline(identityId);
     }
   }
 
@@ -112,45 +88,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const { to, type, encryptedContent, encryptedKey, timestamp } = payload;
 
-      console.log(
-        `📨 Message received: from=${client.data.activeHandleId}, to=${to}, type=${type}`
-      );
-      console.log(
-        `📊 Payload details: encryptedKey length=${encryptedKey.length}, timestamp=${timestamp}`
-      );
+      // Сохраняем метаданные и получаем ID чата
+      const chatId = await this.messageMetadataService.save(client.data.identityId, to, payload);
 
-      // Сохраняем метаданные и получаем ID чата и сообщения
-      // Use activeHandleId instead of identityId (both should be handle IDs)
-      const result = await this.messageMetadataService.save(
-        client.data.activeHandleId,
-        to,
-        payload
-      );
-      const { chatId, messageId } = result;
-      console.log(`💾 Message metadata saved, chatId=${chatId}, messageId=${messageId}`);
-
-      // Check if the target room has any connected sockets
-      const room = this.server.sockets.adapter?.rooms?.get(`user:${to}`);
-      const roomSize = room ? room.size : 0;
-      console.log(`👥 Target room 'user:${to}' has ${roomSize} connected sockets`);
-
-      // Generate a unique message ID for client-side tracking if not available from metadata
-      const uniqueMessageId =
-        messageId ||
-        `${client.data.activeHandleId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Отправляем сообщение всем онлайн-сокетам получателя (по handleId)
-      console.log(`📤 Emitting message to room: user:${to}`);
+      // Отправляем сообщение всем онлайн-сокетам получателя
       this.server.to(`user:${to}`).emit('message:new', {
-        id: uniqueMessageId,
-        from: client.data.activeHandleId, // ✅ Use activeHandleId instead of identityId
+        from: client.data.identityId,
         chatId,
         type,
         encryptedContent,
         encryptedKey,
         timestamp,
       });
-      console.log(`✅ Message emitted to room: user:${to}`);
     } catch (error) {
       console.error('❌ Message handling error:', error);
       client.emit('message:error', { error: 'Failed to send message' });
@@ -159,55 +108,42 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   // Contact request notifications
   async notifyContactRequest(
-    toHandleId: string,
-    fromHandle: any,
+    toIdentityId: string,
+    fromIdentity: any,
     requestId: string,
     message?: string
   ) {
-    this.server.to(`user:${toHandleId}`).emit('contact_request_received', {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_received', {
       requestId,
-      fromHandle: {
-        id: fromHandle.id,
-        displayName: fromHandle.profile?.displayName,
-        handle: fromHandle.value,
+      fromUser: {
+        id: fromIdentity.id,
+        displayName: fromIdentity.profiles?.[0]?.displayName,
+        handle: fromIdentity.handles?.[0]?.value,
       },
       message,
       timestamp: new Date().toISOString(),
     });
   }
 
-  async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
-    this.server.to(`user:${toHandleId}`).emit('contact_request_accepted', {
-      byHandle: {
-        id: byHandle.id,
-        displayName: byHandle.profile?.displayName,
-        handle: byHandle.value,
+  async notifyRequestAccepted(toIdentityId: string, byIdentity: any, chatId?: string) {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_accepted', {
+      byUser: {
+        id: byIdentity.id,
+        displayName: byIdentity.profiles?.[0]?.displayName,
+        handle: byIdentity.handles?.[0]?.value,
       },
       chatId,
       timestamp: new Date().toISOString(),
     });
   }
 
-  async notifyRequestRejected(toHandleId: string, byHandle: any) {
-    this.server.to(`user:${toHandleId}`).emit('contact_request_rejected', {
-      byHandle: {
-        id: byHandle.id,
-        displayName: byHandle.profile?.displayName,
-        handle: byHandle.value,
+  async notifyRequestRejected(toIdentityId: string, byIdentity: any) {
+    this.server.to(`user:${toIdentityId}`).emit('contact_request_rejected', {
+      byUser: {
+        id: byIdentity.id,
+        displayName: byIdentity.profiles?.[0]?.displayName,
+        handle: byIdentity.handles?.[0]?.value,
       },
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  // Notify the user who accepted a contact request that a new chat is available
-  async notifyNewChatAvailable(toHandleId: string, fromHandle: any, chatId?: string) {
-    this.server.to(`user:${toHandleId}`).emit('new_chat_available', {
-      fromHandle: {
-        id: fromHandle.id,
-        displayName: fromHandle.profile?.displayName,
-        handle: fromHandle.value,
-      },
-      chatId,
       timestamp: new Date().toISOString(),
     });
   }
@@ -215,71 +151,31 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Heartbeat для поддержания онлайн-статуса
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(client: Socket) {
-    if (client.data?.activeHandleId) {
+    if (client.data?.identityId) {
       const redis = this.redisService.getClient();
-      // Refresh online status with extended expiry
-      await redis.setex(`online:${client.data.activeHandleId}`, 120, '1');
+      await redis.setex(`online:${client.data.identityId}`, 60, '1');
     }
   }
 
   // Уведомление контактов о статусе онлайн
-  async notifyContactsUserOnline(activeHandleId: string) {
-    try {
-      console.log(`🌐 Notifying contacts that handle ${activeHandleId} is online`);
-
-      // Get all handles that share chats with the active handle
-      const relatedHandles = await this.getRelatedHandles(activeHandleId);
-      console.log(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
-
-      // Emit to each related user's room
-      for (const handleId of relatedHandles) {
-        console.log(`📤 Emitting online status to handle: ${handleId}`);
-
-        // Check if the target room has any connected sockets
-        const room = this.server.sockets.adapter?.rooms?.get(`user:${handleId}`);
-        const roomSize = room ? room.size : 0;
-        console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
-
-        this.server.to(`user:${handleId}`).emit('user_online', { userId: activeHandleId });
-        console.log(`✅ Online status emitted to handle: ${handleId}`);
+  private async notifyContactsUserOnline(identityId: string) {
+    const sockets = await this.server.fetchSockets();
+    sockets.forEach((socket) => {
+      const socketIdentityId = (socket as any).data?.identityId;
+      if (socketIdentityId && socketIdentityId !== identityId) {
+        this.server.to(`user:${socketIdentityId}`).emit('user_online', { identityId });
       }
-    } catch (error) {
-      console.error('Error notifying contacts of online status:', error);
-    }
+    });
   }
 
   // Уведомление контактов о статусе оффлайн
-  async notifyContactsUserOffline(activeHandleId: string) {
-    try {
-      console.log(`📴 Notifying contacts that handle ${activeHandleId} is offline`);
-
-      // Get all handles that share chats with the active handle
-      const relatedHandles = await this.getRelatedHandles(activeHandleId);
-      console.log(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
-
-      // Emit to each related user's room
-      for (const handleId of relatedHandles) {
-        console.log(`📤 Emitting offline status to handle: ${handleId}`);
-
-        // Check if the target room has any connected sockets
-        const room = this.server.sockets.adapter?.rooms?.get(`user:${handleId}`);
-        const roomSize = room ? room.size : 0;
-        console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
-
-        this.server.to(`user:${handleId}`).emit('user_offline', { userId: activeHandleId });
-        console.log(`✅ Offline status emitted to handle: ${handleId}`);
+  private async notifyContactsUserOffline(identityId: string) {
+    const sockets = await this.server.fetchSockets();
+    sockets.forEach((socket) => {
+      const socketIdentityId = (socket as any).data?.identityId;
+      if (socketIdentityId && socketIdentityId !== identityId) {
+        this.server.to(`user:${socketIdentityId}`).emit('user_offline', { identityId });
       }
-    } catch (error) {
-      console.error('Error notifying contacts of offline status:', error);
-    }
-  }
-
-  // Helper method to find handles related to a given handle (through chats or contacts)
-  private async getRelatedHandles(handleId: string): Promise<string[]> {
-    console.log(`🔍 Finding related handles for: ${handleId}`);
-    // Use the ChatRoomService to find handles that share chats with the given handle
-    const relatedHandles = await this.chatRoomService.getRelatedHandles(handleId);
-    console.log(`🔍 Found related handles for ${handleId}:`, relatedHandles);
-    return relatedHandles;
+    });
   }
 }

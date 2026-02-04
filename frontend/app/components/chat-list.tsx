@@ -1,8 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { getAvatarUrl } from '@/lib/avatar-utils';
-import { getInitials } from '@/lib/utils';
-import { Plus, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Plus } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -22,6 +21,15 @@ interface ChatListProps {
 }
 
 export function ChatList({ chats, selectedChatId, onChatSelect, onNewChat }: ChatListProps) {
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Search Bar */}
@@ -75,16 +83,18 @@ interface ChatItemProps {
 }
 
 function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <div
       onClick={onClick}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          onClick();
-        }
-      }}
-      role="button"
-      tabIndex={0}
       className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 ${
         isSelected ? 'bg-accent' : ''
       }`}

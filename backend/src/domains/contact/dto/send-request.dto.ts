@@ -2,7 +2,7 @@ import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class SendRequestDto {
   @IsUUID()
-  toHandleId!: string;
+  toIdentityId!: string;
 
   @IsOptional()
   @IsString()

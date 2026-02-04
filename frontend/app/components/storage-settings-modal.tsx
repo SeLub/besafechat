@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
-import type { MessageRetentionPeriod } from '@/lib/db/schema';
 import { StorageService } from '@/services/storage.service';
+import type { MessageRetentionPeriod } from '@/lib/db/schema';
 import { Database, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -34,7 +34,7 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
       }
 
       onClose();
-    } catch {
+    } catch (error) {
       toast.error('Failed to save settings', { duration: 3000 });
     } finally {
       setLoading(false);
@@ -50,16 +50,7 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/50 z-50"
-        onClick={onClose}
-        onKeyDown={e => {
-          if (e.key === 'Escape') onClose();
-        }}
-        role="button"
-        tabIndex={-1}
-        aria-label="Close modal"
-      />
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
 
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         <div className="flex items-center justify-between p-4 border-b border-border">
@@ -81,18 +72,11 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
             <div
               key={option.value}
               onClick={() => setRetention(option.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  setRetention(option.value);
-                }
-              }}
               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                 retention === option.value
                   ? 'border-primary bg-primary/10'
                   : 'border-border hover:bg-accent'
               }`}
-              role="button"
-              tabIndex={0}
             >
               <div className="font-medium">{option.label}</div>
               <div className="text-sm text-muted-foreground">{option.description}</div>
@@ -136,7 +120,7 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
                       onClose();
                       // Reload page to refresh UI
                       setTimeout(() => window.location.reload(), 500);
-                    } catch {
+                    } catch (error) {
                       toast.error('Failed to delete messages', { duration: 3000 });
                     } finally {
                       setLoading(false);

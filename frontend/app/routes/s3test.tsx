@@ -118,12 +118,9 @@ export default function S3TestRoute() {
           <h2 className="text-xl font-semibold mb-4">Upload File</h2>
 
           <div className="mb-4">
-            <label htmlFor="selectFile" className="block text-sm font-medium mb-1">
-              Select File
-            </label>
+            <label className="block text-sm font-medium mb-1">Select File</label>
             <input
               type="file"
-              id="selectFile"
               ref={fileInputRef}
               onChange={handleFileChange}
               className="w-full p-2 border rounded"
@@ -131,12 +128,9 @@ export default function S3TestRoute() {
           </div>
 
           <div className="mb-4">
-            <label htmlFor="uploadPath" className="block text-sm font-medium mb-1">
-              Upload Path
-            </label>
+            <label className="block text-sm font-medium mb-1">Upload Path</label>
             <input
               type="text"
-              id="uploadPath"
               value={uploadPath}
               onChange={e => setUploadPath(e.target.value)}
               className="w-full p-2 border rounded"
@@ -145,12 +139,9 @@ export default function S3TestRoute() {
           </div>
 
           <div className="mb-4">
-            <label htmlFor="uploadFilename" className="block text-sm font-medium mb-1">
-              Filename
-            </label>
+            <label className="block text-sm font-medium mb-1">Filename</label>
             <input
               type="text"
-              id="uploadFilename"
               value={filename}
               onChange={e => setFilename(e.target.value)}
               className="w-full p-2 border rounded"
@@ -168,12 +159,9 @@ export default function S3TestRoute() {
           <h2 className="text-xl font-semibold mb-4">Download/Delete File</h2>
 
           <div className="mb-4">
-            <label htmlFor="downloadPath" className="block text-sm font-medium mb-1">
-              Download Path
-            </label>
+            <label className="block text-sm font-medium mb-1">Download Path</label>
             <input
               type="text"
-              id="downloadPath"
               value={downloadPath}
               onChange={e => setDownloadPath(e.target.value)}
               className="w-full p-2 border rounded"
@@ -182,12 +170,9 @@ export default function S3TestRoute() {
           </div>
 
           <div className="mb-4">
-            <label htmlFor="downloadFilename" className="block text-sm font-medium mb-1">
-              Filename
-            </label>
+            <label className="block text-sm font-medium mb-1">Filename</label>
             <input
               type="text"
-              id="downloadFilename"
               value={filename}
               onChange={e => setFilename(e.target.value)}
               className="w-full p-2 border rounded"

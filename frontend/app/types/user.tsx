@@ -1,30 +1,12 @@
-export interface Identity {
+export interface User {
   id: string;
   publicKey: string;
-  createdAt: string;
 }
 
-export interface Handle {
+export interface Username {
   id: string;
-  value: string;
-  alias: string | null;
   isSearchable: boolean;
-  isPrimary: boolean;
-  createdAt: string;
-}
-
-export interface Profile {
+  userId: string;
   displayName: string;
-  firstName: string | null;
-  lastName: string | null;
-  avatarUrl: string | null;
-  bio: string | null;
-  settings: Record<string, any>;
-}
-
-export interface FullProfile {
-  identity: Identity;
-  handle: Handle;
-  profile: Profile;
-  hasHandle: boolean;
+  username: string;
 }
