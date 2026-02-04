@@ -123,7 +123,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear all authentication data
       clearAuthCookies();
       await StorageService.clearStoredKey(); // Clear stored public key
-      await StorageService.cleanup(); // Close and cleanup database (Phase 4)
       AccountService.clearTemporarySeed(); // Clear any temporary seed storage
       setUser(null);
     }
