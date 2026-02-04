@@ -54,13 +54,13 @@ Added four new endpoints to support challenge-response authentication:
 #### `/auth/login` (POST)
 
 - Request: `{ challengeId: string, publicKey: string, signature: string, deviceId?: string, deviceName?: string }`
-- Response: `{ success: boolean, identityId: string, sessionId: string, handleId: string }`
+- Response: `{ success: boolean, identityId: string, sessionId: string, hasHandle: boolean }`
 - Purpose: Authenticate with challenge-response
 
 #### `/auth/register` (POST)
 
 - Request: `{ challengeId: string, publicKey: string, signature: string, deviceId?: string, deviceName?: string }`
-- Response: `{ success: boolean, identityId: string, sessionId: string, handleId: string }`
+- Response: `{ success: boolean, identityId: string, sessionId: string, hasHandle: boolean }`
 - Purpose: Register with challenge-response
 
 ### 4. DTOs for New Endpoints

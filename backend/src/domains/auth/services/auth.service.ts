@@ -154,8 +154,21 @@ export class AuthService {
       throw new UnauthorizedException('Identity not found');
     }
 
-    // Получаем primary handle (always guaranteed to exist from loginWithPublicKey)
-    const primaryHandle = await this.handleService.getPrimaryHandle(identityId);
+    // Получаем primary handle
+    let primaryHandle;
+    try {
+      primaryHandle = await this.handleService.getPrimaryHandle(identityId);
+    } catch {
+      // Если нет handle, возвращаем только identity
+      return {
+        identity: {
+          id: identity.id,
+          publicKey: identity.masterPublicKey?.toString('base64') || null,
+          createdAt: identity.createdAt,
+        },
+        hasHandle: false,
+      };
+    }
 
     // Получаем profile для handle
     const profile = await this.profileService.getProfileByHandle(primaryHandle.id);
@@ -183,6 +196,7 @@ export class AuthService {
         bio: profile.bio,
         settings: profile.settings,
       },
+      hasHandle: true,
     };
   }
 
