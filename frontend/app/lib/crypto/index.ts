@@ -22,31 +22,21 @@ export const CryptoUtils = {
   uint8ToBase64,
   base64ToUint8,
   rawPrivateKeyToPkcs8,
-  pkcs8ToRawPrivateKey,
+  pkcs8ToRawPrivateKey
 };
 
 // Named exports for frequently used functions
-export {
-  generateSeedPhrase,
-  deriveKeyPairFromSeed,
-  hashPrivateKey,
-  deriveEncryptionKeyFromHash,
-} from './core/key-derivation';
-export {
-  encryptWithPassphrase,
-  decryptWithPassphrase,
-  encryptWithKey,
-  decryptWithKey,
-} from './core/encryption';
+export { generateSeedPhrase, deriveKeyPairFromSeed } from './core/key-derivation';
+export { encryptWithPassphrase, decryptWithPassphrase } from './core/encryption';
 export { signMessage, verifySignature } from './core/signatures';
 
 // Export as default object for convenience
 export default {
   ...CryptoUtils,
   generateSeedPhrase: () => import('./core/key-derivation').then(m => m.generateSeedPhrase()),
-  deriveKeyPairFromSeed: (seedWords: string[]) =>
+  deriveKeyPairFromSeed: (seedWords: string[]) => 
     import('./core/key-derivation').then(m => m.deriveKeyPairFromSeed(seedWords)),
-  encryptWithPassphrase: (data: Uint8Array, passphrase: string) =>
+  encryptWithPassphrase: (data: Uint8Array, passphrase: string) => 
     import('./core/encryption').then(m => m.encryptWithPassphrase(data, passphrase)),
   decryptWithPassphrase: (encryptedData: any, passphrase: string) =>
     import('./core/encryption').then(m => m.decryptWithPassphrase(encryptedData, passphrase)),
