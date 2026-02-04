@@ -26,7 +26,7 @@ export interface Message {
 export interface Contact {
   displayName: string;
   contactId: string; // Contact ID
-  handleId: string; // Handle ID of contragent
+  userId: string; // UUID of contragent
 }
 
 export interface PublicKey {
@@ -40,7 +40,7 @@ export type MessageRetentionPeriod = '7' | '30' | '90' | 'forever';
 // Dexie схема
 export const SCHEMA = {
   messages: 'id, chatId, timestamp',
-  contacts: '++contactId, handleId',
+  contacts: '++contactId, userId',
   publicKey: 'id',
 };
 
@@ -49,3 +49,4 @@ export type MigrationStep = {
   description: string;
   migrate: (db: any) => Promise<void>;
 };
+
