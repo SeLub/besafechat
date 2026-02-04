@@ -6,7 +6,7 @@ import type {
   RefreshTokenResponse,
   Session,
 } from '@/types/account';
-import type { FullProfile } from '~/types/profile';
+import type { FullProfile } from '~/types/user';
 import { UserService } from './user.service';
 
 /**

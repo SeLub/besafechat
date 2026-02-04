@@ -64,7 +64,7 @@ export class ContactRequestService {
 
     // Send WebSocket notification
     await this.messagesGateway.notifyContactRequest(
-      toHandle.id,
+      toHandle.ownerIdentity.id,
       fromHandle,
       savedRequest.id,
       message?.trim()
@@ -76,15 +76,15 @@ export class ContactRequestService {
   async getIncomingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
       where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
-      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'fromHandle.profile', 'toHandle'],
+      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'fromHandle.profile'],
       order: { createdAt: 'DESC' },
     });
   }
 
   async getOutgoingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
-      where: { fromHandleId: handleId, status: ContactRequestStatus.PENDING },
-      relations: ['fromHandle', 'fromHandle.ownerIdentity', 'fromHandle.profile', 'toHandle'],
+      where: { fromHandleId: handleId },
+      relations: ['toHandle', 'toHandle.ownerIdentity', 'toHandle.profile'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -309,7 +309,7 @@ export class ContactRequestService {
     });
   }
 
-  async sendRequestByHandleId(fromIdentityId: string, toIdentityId: string, message?: string) {
+  async sendRequestByIdentity(fromIdentityId: string, toIdentityId: string, message?: string) {
     // Get primary handles for both identities
     const [fromHandle, toHandle] = await Promise.all([
       this.handleRepository.findOne({

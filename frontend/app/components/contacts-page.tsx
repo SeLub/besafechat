@@ -18,17 +18,17 @@ interface Contact {
 
 interface ContactRequest {
   id: string;
-  from: {
-    handleId: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
+  fromUser?: {
+    id: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
   };
-  to: {
-    handleId: string;
+  toUser?: {
+    id: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
   };
   message?: string;
   status?: string;
@@ -144,7 +144,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
     }
   };
 
-  const getInitials = (user: { displayName?: string; value?: string }) => {
+  const getInitials = (user: { displayName?: string; handle?: string }) => {
     if (user.displayName) {
       return user.displayName
         .split(' ')
@@ -153,8 +153,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
         .toUpperCase()
         .slice(0, 2);
     }
-    if (user.value) {
-      return user.value.slice(0, 2).toUpperCase();
+    if (user.handle) {
+      return user.handle.slice(0, 2).toUpperCase();
     }
     return 'U';
   };
@@ -302,11 +302,11 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getInitials(request.from || {})}
+                            {getInitials(request.fromUser || {})}
                           </AvatarFallback>
-                          {request.from?.avatarUrl ? (
+                          {request.fromUser?.avatarUrl ? (
                             <AvatarImage
-                              src={request.from.avatarUrl}
+                              src={request.fromUser.avatarUrl}
                               onError={e => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
@@ -319,8 +319,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.from?.displayName ||
-                                `@${request.from?.value}` ||
+                              {request.fromUser?.displayName ||
+                                `@${request.fromUser?.username}` ||
                                 'Anonymous User'}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -390,11 +390,11 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getInitials(request.from || {})}
+                            {getInitials(request.toUser || {})}
                           </AvatarFallback>
-                          {request.from?.avatarUrl ? (
+                          {request.toUser?.avatarUrl ? (
                             <AvatarImage
-                              src={request.from.avatarUrl}
+                              src={request.toUser.avatarUrl}
                               onError={e => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
@@ -407,8 +407,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.from?.displayName ||
-                                `@${request.from?.value}` ||
+                              {request.toUser?.displayName ||
+                                `@${request.toUser?.username}` ||
                                 'Anonymous User'}
                             </div>
                             <div className="flex items-center space-x-2">

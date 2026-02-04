@@ -67,10 +67,10 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
       } else {
         // User found, get request status
         const handle = result.handles[0]; // Take the first match
-
+        
         // Check if this is the current user by comparing identity IDs
         const isCurrentUser = user?.identity.id === handle.ownerIdentityId;
-
+        
         // Skip contact status check if it's the current user
         let requestStatus = 'none';
         if (!isCurrentUser) {
@@ -81,7 +81,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                 method: 'GET',
               }
             );
-
+            
             if (statusData && statusData.status) {
               requestStatus = statusData.status;
             }
@@ -356,4 +356,3 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
       </div>
     </>
   );
-}
