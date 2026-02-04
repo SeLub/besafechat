@@ -3,6 +3,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { HandleModule } from '../handle/handle.module';
 import { IdentityModule } from '../identity/identity.module';
 import { SessionModule } from '../session/session.module';
+import { S3Controller } from './controllers/s3.controller';
 import { S3Service } from './s3.service';
 
 @Module({
@@ -11,7 +12,7 @@ import { S3Service } from './s3.service';
     forwardRef(() => HandleModule),
     forwardRef(() => SessionModule),
   ],
-  controllers: [],
+  controllers: [S3Controller],
   providers: [S3Service],
   exports: [S3Service],
 })

@@ -12,7 +12,6 @@ interface Chat {
   unreadCount?: number;
   isOnline?: boolean;
   userId?: string;
-  avatarUrl?: string;
 }
 
 interface ChatListProps {
@@ -95,7 +94,7 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
           <AvatarFallback className="bg-primary text-primary-foreground">
             {getInitials(chat.name)}
           </AvatarFallback>
-          {chat.avatarUrl && <AvatarImage src={chat.avatarUrl} />}
+          {chat.userId && <AvatarImage src={getAvatarUrl(chat.userId)} />}
         </Avatar>
         {chat.isOnline && (
           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />

@@ -31,7 +31,7 @@ export function MiddleHeader({
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(selectedChat.name)}
             </AvatarFallback>
-            {selectedChat.avatarUrl && <AvatarImage src={selectedChat.avatarUrl} />}
+            {selectedChat.userId && <AvatarImage src={getAvatarUrl(selectedChat.userId)} />}
           </Avatar>
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>
