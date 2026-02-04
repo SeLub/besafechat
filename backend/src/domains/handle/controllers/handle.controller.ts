@@ -38,32 +38,50 @@ import { HandleService } from '../services/handle.service';
 import { SetUsernameDto } from '../dto/set-username.dto';
 import { CreateHandleDto } from '../dto/create-handle.dto';
 import { UpdateHandleDto } from '../dto/update-handle.dto';
-import { CheckAliasAvailabilityDto } from '../dto/check-alias-availability.dto';
 import { AuthenticatedRequest } from '../../../common/types/authenticated-request';
 import { Handle } from '../handle.entity';
 
 @ApiTags('handles')
 @Controller('handles')
-@UseGuards(JwtSessionGuard)
 @ApiBearerAuth()
 export class HandleController {
   constructor(private handleService: HandleService) {}
 
-  @Get('alias/check/:alias')
-  @ApiOperation({ summary: 'Check if an alias is available' })
+  @Get('username/search/:username')
+  @ApiOperation({ summary: 'Check if username is available or get user info if exists' })
   @ApiParam({
-    name: 'alias',
-    description: 'Alias to check for availability',
-    example: 'john-doe',
+    name: 'username',
+    description: 'Username to search for',
+    example: 'john_doe',
     type: String,
   })
-  @ApiResponse({ status: 200, description: 'Alias availability checked', type: ApiResponseDto })
-  async checkAliasAvailability(@Param('alias') alias: string) {
-    const result = await this.handleService.checkAliasAvailability(alias);
+  @ApiResponse({ status: 200, description: 'Username availability checked', type: ApiResponseDto })
+  async searchByUsername(@Param('username') username: string) {
+    const result = await this.handleService.searchByUsername(username);
     return new ApiResponseDto(true, result);
   }
 
+  @Post('username/set')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Set or update username' })
+  @ApiBody({ type: SetUsernameDto })
+  async setUsername(@Req() req: AuthenticatedRequest, @Body() dto: SetUsernameDto) {
+    const isSearchable = dto.isSearchable === 'yes';
+    // Используем identityId из JWT Guard
+    const identityId = req.identity?.id || req.user?.identityId;
+
+    if (!identityId) {
+      throw new UnauthorizedException('Identity not found');
+    }
+
+    await this.handleService.setUsername(identityId, dto.username, isSearchable);
+    return { success: true, message: 'Username updated successfully' };
+  }
+
   @Get()
+  @UseGuards(JwtSessionGuard)
   @ApiOperation({ summary: 'Get all handles for current identity' })
   @ApiResponse({ status: 200, description: 'List of handles', type: [Handle] })
   async getMyHandles(@CurrentIdentity() identity: any) {
@@ -71,6 +89,7 @@ export class HandleController {
   }
 
   @Post()
+  @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Create a new handle' })
@@ -118,6 +137,7 @@ export class HandleController {
   }
 
   @Put(':id')
+  @UseGuards(JwtSessionGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Update handle' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
@@ -142,6 +162,7 @@ export class HandleController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete handle' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
@@ -157,6 +178,7 @@ export class HandleController {
   }
 
   @Post(':id/alias')
+  @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set or remove alias for handle' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
@@ -181,6 +203,7 @@ export class HandleController {
   }
 
   @Post(':id/searchable')
+  @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set handle searchable status' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
@@ -205,14 +228,10 @@ export class HandleController {
   }
 
   @Post('primary/:id')
+  @UseGuards(JwtSessionGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Switch primary handle' })
-  @ApiParam({
-    name: 'id',
-    description: 'New primary handle ID',
-    type: String,
-    example: 'abc123-def456-ghi789',
-  })
+  @ApiParam({ name: 'id', description: 'New primary handle ID', type: String, example: 'abc123-def456-ghi789' })
   async switchPrimaryHandle(
     @CurrentIdentity() identity: any,
     @Param('id', ParseUUIDPipe) id: string

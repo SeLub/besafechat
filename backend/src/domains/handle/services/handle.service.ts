@@ -309,26 +309,4 @@ export class HandleService {
       .limit(limit)
       .getMany();
   }
-
-  async checkAliasAvailability(alias: string) {
-    // Check if alias already exists
-    const existingHandle = await this.handleRepository.findOne({
-      where: { alias },
-    });
-
-    if (existingHandle) {
-      return {
-        available: false,
-        conflict: {
-          handleId: existingHandle.id,
-          type: existingHandle.type,
-          ownerIdentityId: existingHandle.ownerIdentityId
-        }
-      };
-    }
-
-    return {
-      available: true
-    };
-  }
 }
