@@ -1,10 +1,10 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/profile/services/profile.service.ts
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { Profile } from '../profile.entity';
 import { HandleService } from '../../handle/services/handle.service';
 import { MediaService } from '../../media/media.service';
-import { Profile } from '../profile.entity';
 
 @Injectable()
 export class ProfileService {
@@ -71,11 +71,10 @@ export class ProfileService {
       throw new NotFoundException(`Profile not found for handle ${handleId}`);
     }
 
-    // Always generate avatarUrl dynamically if avatar exists
-    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(handleId);
+    // Always generate avatarUrl dynamically
     return {
       ...profile,
-      avatarUrl: avatarUrl,
+      avatarUrl: this.mediaService.getAvatarUrl(handleId)
     } as any;
   }
 
@@ -140,7 +139,6 @@ export class ProfileService {
 
   async getPublicProfile(handleValue: string): Promise<any> {
     const profile = await this.getProfileByHandleValue(handleValue);
-    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(profile.handleId);
 
     // Фильтруем приватные данные согласно настройкам
     const publicProfile: any = {
@@ -150,7 +148,7 @@ export class ProfileService {
         isSearchable: profile.handle.isSearchable,
       },
       displayName: profile.displayName,
-      avatarUrl: avatarUrl, // Always generate dynamically if avatar exists
+      avatarUrl: this.mediaService.getAvatarUrl(profile.handleId), // Always generate dynamically
       bio: profile.bio,
       metadata: profile.metadata,
       createdAt: profile.createdAt,
