@@ -14,12 +14,7 @@
     "incremental": true,
     "skipLibCheck": true, // ← временно скрывает ошибки в node_modules
     "strict": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"],
-    "lib": ["ES2021"],
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "useDefineForClassFields": false
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": ["src/**/*"]
 }

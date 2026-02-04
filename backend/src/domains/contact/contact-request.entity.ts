@@ -1,20 +1,18 @@
-// /home/selub/Documents/progs/besafechat/backend/src/domains/contact/contact-request.entity.ts
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Handle } from '../handle/handle.entity';
+import { User } from '../user/user.entity';
 
 export enum ContactRequestStatus {
   PENDING = 'pending',
   ACCEPTED = 'accepted',
   REJECTED = 'rejected',
-  CANCELED = 'canceled',
 }
 
 @Entity('contact_requests')
@@ -22,23 +20,22 @@ export class ContactRequest {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @ManyToOne(() => Handle, { onDelete: 'CASCADE', nullable: false })
-  @JoinColumn({ name: 'fromHandleId' })
-  fromHandle!: Handle;
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'fromUserId' })
+  fromUser!: User;
 
   @Column('uuid')
-  fromHandleId!: string;
+  fromUserId!: string;
 
-  @ManyToOne(() => Handle, { onDelete: 'CASCADE', nullable: false })
-  @JoinColumn({ name: 'toHandleId' })
-  toHandle!: Handle;
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'toUserId' })
+  toUser!: User;
 
   @Column('uuid')
-  toHandleId!: string;
+  toUserId!: string;
 
   @Column({
-    type: 'varchar',
-    length: 50,
+    type: 'enum',
     enum: ContactRequestStatus,
     default: ContactRequestStatus.PENDING,
   })
