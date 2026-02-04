@@ -50,9 +50,8 @@ export default function AuthRoute() {
       }
 
       // If not authenticated, check if we have a stored public key
-      // Only check if we're on a page where the database might be initialized
-      // For the auth page, we just proceed without checking (DB not initialized yet)
-      setHasKey(false);
+      const hasKey = await StorageService.hasStoredPublicKey();
+      setHasKey(hasKey);
     };
 
     attemptAutoLogin();
@@ -150,15 +149,13 @@ export default function AuthRoute() {
     return loginResult;
   };
 
-  const loginOnly = async (publicKeyBase64: string, privateKey?: Uint8Array) => {
+  const loginOnly = async (publicKeyBase64: string) => {
     const { deviceId, deviceName } = AccountService.getDeviceInfo();
-    const loginResult = await AuthService.login({
+    await AuthService.login({
       publicKey: publicKeyBase64,
-      privateKey,
       deviceId,
       deviceName,
     });
-    return loginResult;
   };
 
   const handleLogin = async () => {
@@ -199,22 +196,8 @@ export default function AuthRoute() {
   const handlePasswordRecovery = async (password: string) => {
     setLoading(true);
     try {
-      const { publicKeyBase64, privateKey } = await AccountService.recoverWithPassword(password);
-      const loginResult = await loginOnly(publicKeyBase64, privateKey);
-      // Initialize database after login with identityId
-      await StorageService.initialize(loginResult.identityId);
-      
-      // Verify that derived public key matches stored key
-      const storedKey = await StorageService.getPublicKey();
-      if (storedKey && storedKey !== publicKeyBase64) {
-        throw new Error('Seed verification failed: Public key mismatch. This password does not match your account.');
-      }
-      
-      // Store public key if not already stored
-      if (!storedKey) {
-        await StorageService.storePublicKey(publicKeyBase64);
-      }
-      
+      const { publicKeyBase64 } = await AccountService.recoverWithPassword(password);
+      await loginOnly(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
     } catch (error: any) {
@@ -225,37 +208,24 @@ export default function AuthRoute() {
   };
 
   const handleSeedRecovery = async (recoveredSeed: string[]) => {
-   setLoading(true);
-   try {
-     const { publicKeyBase64, privateKey } = await AccountService.recoverWithSeed(recoveredSeed);
-     const { deviceId, deviceName } = AccountService.getDeviceInfo();
-     const loginResult = await AuthService.login({
-       publicKey: publicKeyBase64,
-       privateKey,
-       deviceId,
-       deviceName,
-     });
-     // Initialize database after login with identityId (Phase 4)
-     await StorageService.initialize(loginResult.identityId);
-     
-     // Verify that derived public key matches stored key
-     const storedKey = await StorageService.getPublicKey();
-     if (storedKey && storedKey !== publicKeyBase64) {
-       throw new Error('Seed verification failed: Public key mismatch. This seed does not match your account.');
-     }
-     
-     // Store public key if not already stored
-     if (!storedKey) {
-       await StorageService.storePublicKey(publicKeyBase64);
-     }
-     
-     toast.success('Account recovered!');
-     window.location.href = '/';
-   } catch (error: any) {
-     throw new Error(error.message || 'Recovery failed');
-   } finally {
-     setLoading(false);
-   }
+    setLoading(true);
+    try {
+      const { publicKeyBase64 } = await AccountService.recoverWithSeed(recoveredSeed);
+      const { deviceId, deviceName } = AccountService.getDeviceInfo();
+      const loginResult = await AuthService.login({
+        publicKey: publicKeyBase64,
+        deviceId,
+        deviceName,
+      });
+      // Initialize database after login with identityId (Phase 4)
+      await StorageService.initialize(loginResult.identityId);
+      toast.success('Account recovered!');
+      window.location.href = '/';
+    } catch (error: any) {
+      throw new Error(error.message || 'Recovery failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (step === 'username-selection') {

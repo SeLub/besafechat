@@ -260,13 +260,7 @@ function ChatRouteContent() {
 
   // Cleanup old messages on app start
   useEffect(() => {
-    const cleanup = async () => {
-      const { isDbInitialized } = await import('@/lib/db/db');
-      if (isDbInitialized()) {
-        await StorageService.cleanupOldMessagesWithSettings();
-      }
-    };
-    cleanup().catch(err => console.error('Error cleaning up messages:', err));
+    StorageService.cleanupOldMessagesWithSettings();
   }, []);
 
   // Restore selected chat on page load
