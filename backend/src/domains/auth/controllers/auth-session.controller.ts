@@ -53,104 +53,6 @@ export class AuthSessionController {
     private sessionService: SessionService
   ) {}
 
-  @Post('dev-login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Development/Testing endpoint - Login without challenge-response',
-    description: 'Only available in development mode (NODE_ENV=development). Creates a session directly without signature verification. Use this for Swagger UI testing and development.',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        publicKey: {
-          type: 'string',
-          description: 'Base64-encoded Ed25519 public key',
-          example: 'k4xCEjdeLFvzEJ0OOamRdiDJbgKZQdGFyCPlMlr+fg8=',
-        },
-        deviceId: {
-          type: 'string',
-          description: 'Device identifier (hardcoded for dev)',
-          example: 'device-b737cab1',
-        },
-        deviceName: {
-          type: 'string',
-          description: 'Device name (hardcoded for dev)',
-          example: 'Chrome on Windows',
-        },
-      },
-      required: ['publicKey', 'deviceId', 'deviceName'],
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful - session created',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        data: {
-          type: 'object',
-          properties: {
-            identityId: { type: 'string' },
-            sessionId: { type: 'string' },
-            handleId: { type: 'string' },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - only available in development mode',
-  })
-  @ApiResponse({ status: 400, description: 'Invalid request data' })
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async devLogin(
-    @Body()
-    body: {
-      publicKey: string;
-      deviceId: string;
-      deviceName: string;
-    },
-    @Req() req: AuthenticatedRequest,
-    @Res({ passthrough: true }) res: ResponseWithCookies
-  ) {
-    // Only allow in development mode
-    if (process.env.NODE_ENV !== 'development') {
-      throw new BadRequestException(
-        'This endpoint is only available in development mode (NODE_ENV=development)'
-      );
-    }
-
-    const { publicKey, deviceId, deviceName } = body;
-    const ipAddress = req.ip || 'unknown';
-
-    if (!publicKey || !deviceId || !deviceName) {
-      throw new BadRequestException('publicKey, deviceId, and deviceName are required');
-    }
-
-    console.log(`[DEV] Authenticating with public key: ${publicKey.substring(0, 10)}...`);
-
-    // Perform login - this will create session if identity exists or create new one if first login
-    const result = await this.authService.loginWithPublicKey(
-      publicKey,
-      deviceName,
-      undefined, // deviceType
-      ipAddress,
-      undefined // userAgent - will be obtained from the actual request object
-    );
-
-    // Set HttpOnly cookies for security
-    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
-
-    return new ApiResponseDto(true, {
-      identityId: result.identity.id,
-      sessionId: result.session.id,
-      handleId: result.session.activeHandleId,
-    });
-  }
-
   @Post('login/challenge')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a challenge for login authentication' })
@@ -220,7 +122,7 @@ export class AuthSessionController {
     return new ApiResponseDto(true, {
       identityId: result.identity.id,
       sessionId: result.session.id,
-      handleId: result.session.activeHandleId,
+      hasHandle: result.session.activeHandleId !== null,
     });
   }
 
