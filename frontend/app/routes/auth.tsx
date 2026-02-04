@@ -172,7 +172,7 @@ export default function AuthRoute() {
   const handlePasswordRecovery = async (username: string, password: string) => {
     setLoading(true);
     try {
-      const { publicKeyBase64 } = await AccountService.recoverWithPassword(password);
+      const { publicKeyBase64 } = await AccountService.recoverWithPassword(username, password);
       await loginOnly(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
