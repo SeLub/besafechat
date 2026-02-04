@@ -1,4 +1,5 @@
 // app/services/s3-service.ts
+import type { ApiResponse } from '~/types';
 import { API_CONFIG } from './api-config';
 import { handleApiResponse } from './api-utils';
 

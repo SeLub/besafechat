@@ -18,7 +18,6 @@ const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<H
       ref={ref}
       className={cn('aspect-square h-full w-full object-cover relative z-10', className)}
       crossOrigin="anonymous"
-      alt=""
       {...props}
     />
   )
@@ -39,4 +38,4 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
 );
 AvatarFallback.displayName = 'AvatarFallback';
 
-export { Avatar, AvatarFallback, AvatarImage };
+export { Avatar, AvatarImage, AvatarFallback };

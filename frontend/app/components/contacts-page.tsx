@@ -1,10 +1,10 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/hooks/use-notifications';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl } from '@/lib/avatar-utils';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, ChevronDown, ChevronRight, MessageCircle, Check, X, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNotifications } from '@/hooks/use-notifications';
 
 interface Contact {
   id: string;
@@ -36,9 +36,10 @@ interface ContactRequest {
 interface ContactsPageProps {
   onBack: () => void;
   onChatSelect: (userId: string) => void;
+  onChatCreated?: (chatId: string) => void;
 }
 
-export function ContactsPage({ onBack }: ContactsPageProps) {
+export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPageProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
@@ -77,7 +78,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
         const outgoingData = await outgoingRes.json();
         setOutgoingRequests(outgoingData.requests || []);
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
@@ -93,14 +94,18 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
       });
 
       if (res.ok) {
+        const data = await res.json();
         toast.success('Request accepted');
         loadData();
 
         // Handle chat creation
+        if (data.chatId && onChatCreated) {
+          onChatCreated(data.chatId);
+        }
       } else {
         toast.error('Failed to accept request');
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -121,7 +126,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
       } else {
         toast.error('Failed to reject request');
       }
-    } catch {
+    } catch (error) {
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
@@ -131,18 +136,27 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
   const handleContactClick = async (userId: string) => {
     try {
       // Find or create chat with this contact
-      await fetch('http://localhost:4000/chats/find-or-create', {
+      const res = await fetch('http://localhost:4000/chats/find-or-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ otherUserId: userId }),
       });
-    } catch {
+
+      if (res.ok) {
+        const data = await res.json();
+        if (onChatCreated) {
+          onChatCreated(data.chatId);
+        }
+      } else {
+        toast.error('Failed to open chat');
+      }
+    } catch (error) {
       toast.error('Failed to open chat');
     }
   };
 
-  const getInitials = (user: { displayName?: string; handle?: string }) => {
+  const getInitials = (user: { displayName?: string; username?: string }) => {
     if (user.displayName) {
       return user.displayName
         .split(' ')
@@ -151,8 +165,8 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
         .toUpperCase()
         .slice(0, 2);
     }
-    if (user.handle) {
-      return user.handle.slice(0, 2).toUpperCase();
+    if (user.username) {
+      return user.username.slice(0, 2).toUpperCase();
     }
     return 'U';
   };
@@ -219,13 +233,6 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                   key={contact.id}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-accent cursor-pointer"
                   onClick={() => handleContactClick(contact.user.id)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      handleContactClick(contact.user.id);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
                 >
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">

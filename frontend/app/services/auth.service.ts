@@ -6,8 +6,6 @@ import type {
   RefreshTokenResponse,
   Session,
 } from '@/types/account';
-import { UserService } from './user.service';
-import type { FullProfile } from '~/types/user';
 
 /**
  * Базовые операции с бэкендом для аутентификации
@@ -20,10 +18,6 @@ export class AuthService {
    */
   static async login(credentials: LoginCredentials): Promise<LoginResponse> {
     const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
-    // Generate deviceName from available browser info if not provided
-    const deviceName =
-      credentials.deviceName ||
-      (typeof navigator !== 'undefined' ? `${navigator.platform || 'Web'} Device` : 'Web Device');
 
     const res = await fetch(`${this.API_BASE}/auth/login`, {
       method: 'POST',
@@ -31,8 +25,7 @@ export class AuthService {
       credentials: 'include',
       body: JSON.stringify({
         publicKey: credentials.publicKey,
-        deviceName, // Required by backend DTO
-        deviceId: finalDeviceId, // Still send deviceId for reference
+        deviceId: finalDeviceId,
       }),
     });
 
@@ -66,15 +59,15 @@ export class AuthService {
   /**
    * Получение информации о текущем пользователе
    */
-  static async getCurrentUser(): Promise<FullProfile | null> {
+  static async getCurrentUser(): Promise<ProfileResponse | null> {
     try {
-      const res = await fetch(`${this.API_BASE}/auth/profile`, {
+      const res = await fetch(`${this.API_BASE}/auth/me`, {
         credentials: 'include',
       });
 
       if (res.ok) {
-        const response: ApiResponse<FullProfile> = await res.json();
-        return response.success && response.data ? response.data : null;
+        const data: ApiResponse<ProfileResponse> = await res.json();
+        return data.data || null;
       }
       return null;
     } catch {
@@ -95,6 +88,42 @@ export class AuthService {
   }
 
   // ==================== Auth Endpoints ====================
+
+  /**
+   * Регистрация нового пользователя
+   */
+  static async register(credentials: {
+    publicKey: string;
+    deviceId?: string;
+  }): Promise<{ userId: string }> {
+    const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
+
+    const res = await fetch(`${this.API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        publicKey: credentials.publicKey,
+        deviceId: finalDeviceId,
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Registration failed: ${error}`);
+    }
+
+    const data: ApiResponse<{ userId: string }> = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Registration failed');
+    }
+
+    if (!data.data || !data.data.userId) {
+      throw new Error('Registration response does not contain userId');
+    }
+
+    return { userId: data.data.userId };
+  }
 
   /**
    * Получение списка активных сессий
@@ -249,11 +278,28 @@ export class AuthService {
   }
 
   /**
-   * Update username (now calls separate endpoints)
+   * Установка username
    */
-  static async setUsername(username: string, displayName?: string): Promise<void> {
-    // Call UserService to update the username properly via the handles endpoint
-    await UserService.setUsername(username, displayName);
+  static async setUsername(username: string): Promise<void> {
+    const res = await fetch(`${this.API_BASE}/username/set`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        username,
+        isSearchable: 'yes',
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Failed to set username: ${error}`);
+    }
+
+    const data: ApiResponse = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to set username');
+    }
   }
 
   // ==================== Online Status Endpoints ====================

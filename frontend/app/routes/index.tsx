@@ -1,14 +1,14 @@
-import { AuthGuard } from '@/components/auth-guard';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Socket } from 'socket.io-client';
 import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
-import { NewChatModal } from '@/components/new-chat-modal';
 import { RightPanel } from '@/components/right-panel';
+import { NewChatModal } from '@/components/new-chat-modal';
+import { AuthGuard } from '@/components/auth-guard';
 import { useAuth } from '@/hooks/use-auth';
 import { useChats } from '@/hooks/use-chats';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
 import { StorageService } from '@/services/storage.service';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Socket } from 'socket.io-client';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -22,32 +22,13 @@ function ChatRouteContent() {
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
-  const {
-    chats,
-    addChat,
-    updateChatLastMessage,
-    updateChatOnlineStatus,
-    getChatById,
-    loadOnlineStatuses,
-  } = useChats();
+  const { chats, addChat, updateChatLastMessage, updateChatOnlineStatus, getChatById } = useChats();
 
   const handleSendMessage = async (message: string) => {
     if (!socketRef.current || !selectedChatId || !user) return;
 
     const selectedChat = getChatById(selectedChatId);
-    const recipientHandleId = selectedChat?.userId; // This should be the handleId of the recipient for sending
-
-    // Use actual chat ID for storage, ensuring we have a proper chat ID
-    let chatStorageId = selectedChat?.id;
-    if (!chatStorageId) {
-      // If selectedChat.id is not available, try to extract it from selectedChatId if it starts with 'chat_'
-      if (selectedChatId && selectedChatId.startsWith('chat_')) {
-        chatStorageId = selectedChatId.substring(5); // Remove 'chat_' prefix to get the actual chat ID
-      } else {
-        // If we still don't have a proper chat ID, use selectedChatId as fallback
-        chatStorageId = selectedChatId;
-      }
-    }
+    const recipientId = selectedChat?.userId || selectedChat?.id || selectedChatId;
 
     // Encode Unicode to base64
     const encoder = new TextEncoder();
@@ -57,16 +38,14 @@ function ChatRouteContent() {
     const timestamp = new Date().toISOString();
 
     socketRef.current.emit('message', {
-      to: recipientHandleId,
+      to: recipientId,
       type: 'text',
       encryptedContent: base64Message,
       encryptedKey: 'dummy_key',
       timestamp,
     });
 
-    // Generate message ID using handle ID if available, fallback to identity ID
-    const senderIdForMessage = user.handle?.id || user.id;
-    const messageId = `${senderIdForMessage}_${Date.now()}`;
+    const messageId = `${user.id}_${Date.now()}`;
     const newMessage = {
       id: messageId,
       text: message,
@@ -75,23 +54,13 @@ function ChatRouteContent() {
 
     setMessages(prev => [...prev, newMessage]);
 
-    // Save sent message immediately using chatStorageId as chatId (not recipientHandleId)
-    if (!chatStorageId) {
-      console.error('❌ Cannot save message: no chat ID available');
-      return;
-    }
-
-    console.log(
-      '💾 Saving sent message with chatStorageId:',
-      chatStorageId,
-      'recipientHandleId:',
-      recipientHandleId
-    );
+    // Save sent message immediately using recipientId as chatId
+    console.log('💾 Saving sent message with recipientId:', recipientId);
     await StorageService.saveEncryptedMessage(
-      chatStorageId,
-      senderIdForMessage, // Use handle ID if available, fallback to identity ID
+      recipientId,
+      user.id,
       message,
-      user.id, // Keep identity ID for encryption
+      user.id,
       true,
       messageId
     );
@@ -109,15 +78,10 @@ function ChatRouteContent() {
 
     // Get chat to find userId
     const chat = getChatById(chatId);
-    // Use chat ID as the key for loading messages (not userId)
-    const loadKey = chat?.id || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
+    // Always use userId as the key
+    const loadKey = chat?.userId || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
 
-    console.log('📚 Loading messages for chatId:', loadKey);
-    if (!loadKey) {
-      console.error('❌ Cannot load messages: no chat ID available');
-      setMessages([]);
-      return;
-    }
+    console.log('📚 Loading messages for userId:', loadKey);
     // Load messages from IndexedDB
     const loadedMessages = user ? await StorageService.loadDecryptedMessages(loadKey, user.id) : [];
     console.log('📚 Loaded', loadedMessages.length, 'messages');
@@ -139,7 +103,7 @@ function ChatRouteContent() {
         if (res.ok) {
           const chatData = await res.json();
           // Find the other user in the chat
-          const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.id);
+          const otherMember = chatData.members?.find((m: any) => m.userId !== user?.id);
 
           const newChatId = addChat({
             id: chatId,
@@ -148,12 +112,9 @@ function ChatRouteContent() {
               `@${otherMember?.user?.username?.username}` ||
               'Unknown User',
             publicKey: otherMember?.user?.publicKey,
-            userId: otherMember?.handleId, // Use handleId instead of identityId
+            userId: otherMember?.user?.id,
           });
           setSelectedChatId(newChatId);
-
-          // Load online status for the newly added chat
-          await loadOnlineStatuses();
         } else {
           // Fallback if API fails
           const newChatId = addChat({ id: chatId });
@@ -167,7 +128,7 @@ function ChatRouteContent() {
       }
       setNewChatModalOpen(false);
     },
-    [user?.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses]
+    [user?.id, addChat, setSelectedChatId, setNewChatModalOpen]
   );
 
   const chatsRef = useRef(chats);
@@ -177,13 +138,6 @@ function ChatRouteContent() {
 
   const handleMessageReceived = useCallback(
     async (message: any) => {
-      // Skip processing if this is our own message (sender should not receive their own messages)
-      const currentUserHandleId = user?.handle?.id || user?.id;
-      if (message.fromUserId === currentUserHandleId) {
-        console.log('🚫 Skipping own message:', message.id);
-        return;
-      }
-
       const selectedChat = chatsRef.current.find(c => c.id === selectedChatId);
 
       // Check if message is for currently selected chat (by userId or chatId)
@@ -202,29 +156,22 @@ function ChatRouteContent() {
         });
       }
 
-      // Always save to IndexedDB using chatId (not senderId) as chatId
-      if (message.chatId && user) {
-        console.log('💾 Saving received message with chatId:', message.chatId);
-        try {
-          // Generate a fallback ID if the message doesn't have one
-          const messageId = message.id || `received_${message.fromUserId}_${Date.now()}`;
-
+      // Always save to IndexedDB using senderId as chatId (to match sent messages)
+      if (message.fromUserId) {
+        console.log('💾 Saving received message with senderId:', message.fromUserId);
+        if (user) {
           await StorageService.saveEncryptedMessage(
-            message.chatId, // Use actual chat ID for storage
+            message.fromUserId,
             message.fromUserId,
             message.text,
             user.id,
             false,
-            messageId
+            message.id
           );
-        } catch (error) {
-          console.error('❌ Error saving received message:', error);
         }
-      } else {
-        console.warn('⚠️ Received message without chatId or user, skipping storage');
       }
     },
-    [selectedChatId, user]
+    [selectedChatId]
   );
 
   const handleUserOnline = useCallback(

@@ -20,7 +20,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         // Use migrations instead of synchronize for production
         migrations: [__dirname + '/../migrations/*{.ts,.js}'],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only use sync in non-production
-        logging: false, // configService.get('NODE_ENV') === 'development', // Enable logging in development
+        logging: configService.get('NODE_ENV') === 'development', // Enable logging in development
       }),
       inject: [ConfigService],
     }),

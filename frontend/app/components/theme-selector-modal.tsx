@@ -1,3 +1,4 @@
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import { Check } from 'lucide-react';
@@ -44,14 +45,7 @@ export function ThemeSelectorModal({ isOpen, onClose }: ThemeSelectorModalProps)
             <div
               key={t.id}
               onClick={() => handleThemeSelect(t.id)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleThemeSelect(t.id);
-                }
-              }}
               className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent cursor-pointer transition-colors"
-              role="button"
-              tabIndex={0}
             >
               <div>
                 <div className="font-medium">{t.name}</div>
