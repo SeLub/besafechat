@@ -7,15 +7,25 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+// Remove direct Express import for future Fastify compatibility
 import { ApiOperation, ApiParam, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { SendRequestDto } from '../dto/send-request.dto';
 import { ContactRequestService } from '../services/contact-request.service';
+
+// Define interface for request with identity property
+interface RequestWithIdentity {
+  user?: {
+    id: string; // This is now identityId
+    sessionId: string;
+    publicKey: Buffer;
+  };
+}
 
 @ApiTags('Contacts')
 @Controller('contacts')
@@ -28,9 +38,9 @@ export class ContactRequestController {
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Send contact request' })
-  async sendRequest(@CurrentIdentity() identity: any, @Body() dto: SendRequestDto) {
+  async sendRequest(@Req() req: RequestWithIdentity, @Body() dto: SendRequestDto) {
     const request = await this.contactRequestService.sendRequest(
-      identity.id,
+      req.user!.id,
       dto.toIdentityId,
       dto.message
     );
@@ -44,8 +54,8 @@ export class ContactRequestController {
 
   @Get('requests/incoming')
   @ApiOperation({ summary: 'Get incoming contact requests' })
-  async getIncomingRequests(@CurrentIdentity() identity: any) {
-    const requests = await this.contactRequestService.getIncomingRequests(identity.id);
+  async getIncomingRequests(@Req() req: RequestWithIdentity) {
+    const requests = await this.contactRequestService.getIncomingRequests(req.user!.id);
 
     return {
       requests: requests.map((request) => ({
@@ -63,8 +73,8 @@ export class ContactRequestController {
 
   @Get('requests/outgoing')
   @ApiOperation({ summary: 'Get outgoing contact requests' })
-  async getOutgoingRequests(@CurrentIdentity() identity: any) {
-    const requests = await this.contactRequestService.getOutgoingRequests(identity.id);
+  async getOutgoingRequests(@Req() req: RequestWithIdentity) {
+    const requests = await this.contactRequestService.getOutgoingRequests(req.user!.id);
 
     return {
       requests: requests.map((request) => ({
@@ -91,10 +101,10 @@ export class ContactRequestController {
     example: 'abc123-def456-ghi789',
   })
   async acceptRequest(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithIdentity,
     @Param('id', ParseUUIDPipe) requestId: string
   ) {
-    return await this.contactRequestService.acceptRequest(requestId, identity.id);
+    return await this.contactRequestService.acceptRequest(requestId, req.user!.id);
   }
 
   @Post('requests/:id/reject')
@@ -107,10 +117,10 @@ export class ContactRequestController {
     example: 'abc123-def456-ghi789',
   })
   async rejectRequest(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithIdentity,
     @Param('id', ParseUUIDPipe) requestId: string
   ) {
-    return await this.contactRequestService.rejectRequest(requestId, identity.id);
+    return await this.contactRequestService.rejectRequest(requestId, req.user!.id);
   }
 
   @Get('check/:userId')
@@ -122,10 +132,10 @@ export class ContactRequestController {
     example: 'abc123-def456-ghi789',
   })
   async checkRequestStatus(
-    @CurrentIdentity() identity: any,
+    @Req() req: RequestWithIdentity,
     @Param('userId', ParseUUIDPipe) userId: string
   ) {
-    const status = await this.contactRequestService.checkRequestStatus(identity.id, userId);
+    const status = await this.contactRequestService.checkRequestStatus(req.user!.id, userId);
     return {
       success: true,
       data: { status },
@@ -134,8 +144,8 @@ export class ContactRequestController {
 
   @Get()
   @ApiOperation({ summary: 'Get accepted contacts' })
-  async getContacts(@CurrentIdentity() identity: any) {
-    const contacts = await this.contactRequestService.getAcceptedContacts(identity.id);
+  async getContacts(@Req() req: RequestWithIdentity) {
+    const contacts = await this.contactRequestService.getAcceptedContacts(req.user!.id);
     return { contacts };
   }
 }
