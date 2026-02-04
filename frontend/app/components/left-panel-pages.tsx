@@ -55,6 +55,7 @@ interface LeftPanelPageProps {
       bio: string | null;
       settings: Record<string, any>;
     };
+    hasHandle: boolean;
   };
   onChatCreated?: (chatId: string) => void;
 }
