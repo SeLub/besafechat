@@ -1,16 +1,14 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { HandleModule } from '../handle/handle.module';
 import { IdentityModule } from '../identity/identity.module';
-import { MediaModule } from '../media/media.module';
-import { MessageModule } from '../message/message.module';
-import { ProfileModule } from '../profile/profile.module';
-import { RedisModule } from '../redis/redis.module';
 import { SessionModule } from '../session/session.module';
+import { HandleModule } from '../handle/handle.module';
+import { ProfileModule } from '../profile/profile.module';
+import { MessageModule } from '../message/message.module';
+import { MediaModule } from '../media/media.module';
 import { AuthSessionController } from './controllers/auth-session.controller';
 import { AuthService } from './services/auth.service';
-import { ChallengeService } from './services/challenge.service';
 
 @Module({
   imports: [
@@ -21,10 +19,9 @@ import { ChallengeService } from './services/challenge.service';
     ProfileModule,
     MessageModule,
     MediaModule,
-    RedisModule,
   ],
-  providers: [AuthService, ChallengeService],
+  providers: [AuthService],
   controllers: [AuthSessionController],
-  exports: [AuthService, ChallengeService],
+  exports: [AuthService],
 })
 export class AuthModule {}

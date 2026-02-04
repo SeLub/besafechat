@@ -4,24 +4,22 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './db/database.module';
 import { AuthModule } from './domains/auth/auth.module';
-import { ChatModule } from './domains/chat/chat.module';
-import { ContactModule } from './domains/contact/contact.module';
 import { HandleModule } from './domains/handle/handle.module';
 import { IdentityModule } from './domains/identity/identity.module';
-import { MediaModule } from './domains/media/media.module';
-import { MessageModule } from './domains/message/message.module';
 import { ProfileModule } from './domains/profile/profile.module';
-import { S3Module } from './domains/s3/s3.module';
-import { SessionModule } from './domains/session/session.module';
 import { TeamModule } from './domains/team/team.module';
-import { RedisModule } from './domains/redis/redis.module';
+import { SessionModule } from './domains/session/session.module';
+import { MessageModule } from './domains/message/message.module';
+import { ContactModule } from './domains/contact/contact.module';
+import { ChatModule } from './domains/chat/chat.module';
+import { S3Module } from './domains/s3/s3.module';
+import { MediaModule } from './domains/media/media.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     DatabaseModule,
-    RedisModule,
     AuthModule,
     HandleModule,
     IdentityModule,

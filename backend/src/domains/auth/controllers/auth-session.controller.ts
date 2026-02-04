@@ -6,11 +6,11 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Req,
   Res,
-  UnauthorizedException,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -29,91 +29,51 @@ import {
   AuthenticatedUser,
 } from '../../../common/types/authenticated-request';
 import { ResponseWithCookies } from '../../../common/types/response-with-cookies';
-import { RedisService } from '../../../domains/redis/redis.service';
-import { MessagesGateway } from '../../message/gateways/messages.gateway';
 import {
+  CurrentHandle,
   CurrentIdentity,
   CurrentSession,
   CurrentUser,
 } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
-import { SessionService } from '../../session/services/session.service';
-import { CreateChallengeDto, ValidateChallengeDto } from '../dto/challenge.dto';
+import { LoginDto, RegisterWithHandleDto } from '../dto/login.dto';
 import { AuthService } from '../services/auth.service';
-import { ChallengeService } from '../services/challenge.service';
+import { RedisService } from '../../../common/redis.service';
+import { MessagesGateway } from '../../message/gateways/messages.gateway';
+import { SessionService } from '../../session/services/session.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthSessionController {
   constructor(
     private authService: AuthService,
-    private challengeService: ChallengeService,
     private redisService: RedisService,
     private messagesGateway: MessagesGateway,
     private sessionService: SessionService
   ) {}
 
-  @Post('login/challenge')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request a challenge for login authentication' })
-  @ApiBody({ type: CreateChallengeDto })
-  @ApiResponse({ status: 200, description: 'Challenge created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid request data' })
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async requestLoginChallenge(
-    @Body() createChallengeDto: CreateChallengeDto,
-    @Req() req: AuthenticatedRequest
-  ) {
-    const { publicKey, action } = createChallengeDto;
-    const ipAddress = req.ip || 'unknown';
-
-    if (action !== 'login') {
-      throw new BadRequestException('Action must be "login" for this endpoint');
-    }
-
-    const challengeResult = await this.challengeService.createChallenge(
-      publicKey,
-      action,
-      ipAddress
-    );
-
-    return new ApiResponseDto(true, challengeResult);
-  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login with challenge-response authentication' })
-  @ApiBody({ type: ValidateChallengeDto })
+  @ApiOperation({ summary: 'Login with public key' })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async loginWithChallenge(
-    @Body() validateChallengeDto: ValidateChallengeDto,
+  async login(
+    @Body() loginDto: LoginDto,
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
-    const { challengeId, publicKey, signature, deviceName } = validateChallengeDto;
+    const { publicKey, deviceName, deviceType, userAgent } = loginDto;
     const ipAddress = req.ip || 'unknown';
 
-    // Validate the challenge-response
-    const isValid = await this.challengeService.validateChallenge(
-      challengeId,
-      publicKey,
-      signature,
-      ipAddress
-    );
-
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid challenge response');
-    }
-
-    // Perform login - this will create session if identity exists or create new one if first login
     const result = await this.authService.loginWithPublicKey(
       publicKey,
-      deviceName || 'Unknown device',
-      undefined, // deviceType
+      deviceName,
+      deviceType,
       ipAddress,
-      undefined // userAgent - will be obtained from the actual request object
+      userAgent
     );
 
     // Set HttpOnly cookies for security
@@ -132,7 +92,7 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  async getProfile(@CurrentIdentity() identity: any) {
+  async getProfile(@CurrentIdentity() identity: any, @CurrentHandle() handle: any) {
     const profile = await this.authService.getIdentityProfile(identity.id);
     return new ApiResponseDto(true, profile);
   }
@@ -263,7 +223,7 @@ export class AuthSessionController {
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
 
     return new ApiResponseDto(true, {
-      identityId: result.identity?.id,
+      identityId: result.identity.id,
       activeHandleId: result.activeHandle?.id,
     });
   }
@@ -272,14 +232,14 @@ export class AuthSessionController {
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 60 * 1000, // 30 minutes
+      maxAge: 30 * 60 * 1000, // 30 минут
       sameSite: 'strict',
     });
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
       sameSite: 'strict',
     });
   }
