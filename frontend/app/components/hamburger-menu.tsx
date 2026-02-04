@@ -108,16 +108,8 @@ export function HamburgerMenu({
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {getInitials(userProfile?.profile?.displayName)}
                 </AvatarFallback>
-                {userProfile?.profile?.avatarUrl ? (
-                  <AvatarImage
-                    src={userProfile.profile.avatarUrl + '?' + Math.random().toString(36)}
-                    onError={e => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <AvatarImage src="" style={{ display: 'none' }} />
+                {userProfile?.profile?.avatarUrl && (
+                  <AvatarImage src={userProfile.profile.avatarUrl} />
                 )}
               </Avatar>
               <div className="flex-1 min-w-0">
