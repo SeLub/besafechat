@@ -40,31 +40,15 @@ export class UsernameController {
   }
 
   @Get('search/:username')
-  @UseGuards(JwtSessionGuard)
   async search(@Param('username') username: string) {
     const user = await this.usernameService.findUserByUsername(username);
     if (!user) {
-      // Return success response with available status instead of throwing 404
-      return {
-        success: true,
-        data: {
-          available: true,
-          username: username,
-        },
-      };
+      throw new NotFoundException('User not found');
     }
-
-    // User exists, return user data
     return {
-      success: true,
-      data: {
-        available: false,
-        user: {
-          id: user.id,
-          publicKey: user.publicKey,
-          displayName: user.displayName,
-        },
-      },
+      id: user.id,
+      publicKey: user.publicKey,
+      displayName: user.displayName,
     };
   }
 }

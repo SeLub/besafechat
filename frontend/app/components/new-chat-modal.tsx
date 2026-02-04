@@ -1,10 +1,9 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/use-auth';
-import { apiRequest } from '@/services/api-utils';
-import { Search, User, X } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { X, Search, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -27,65 +26,57 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
   const [creating, setCreating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { checkAuth } = useAuth();
-
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, []);
 
   if (!isOpen) return null;
 
-  const debouncedSearch = async (value: string) => {
-    if (!value.trim()) return;
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
 
     // Remove @ if user typed it
-    const cleanQuery = value.replace('@', '');
+    const cleanQuery = searchQuery.replace('@', '');
 
     setLoading(true);
     setSearchError(null);
     setSearchResults([]); // Clear previous results
 
     try {
-      const result = await apiRequest<{ available: boolean; user?: any; username?: string }>(
-        `/username/search/${encodeURIComponent(cleanQuery)}`,
-        {
-          method: 'GET',
-        }
-      );
+      const res = await fetch(`http://localhost:4000/username/search/${cleanQuery}`, {
+        credentials: 'include',
+      });
 
-      if (result.available) {
-        // Username not found
+      if (res.ok) {
+        const data = await res.json();
+        // Only add to results if we have valid data
+        if (data && data.publicKey) {
+          // Check request status
+          const statusRes = await fetch(`http://localhost:4000/contacts/check/${data.id}`, {
+            credentials: 'include',
+          });
+
+          let requestStatus = 'none';
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            requestStatus = statusData.status;
+          }
+
+          setSearchResults([
+            {
+              publicKey: data.publicKey,
+              username: cleanQuery,
+              displayName: data.displayName,
+              userId: data.id,
+              requestStatus,
+            },
+          ]);
+          setSearchError(null);
+        } else {
+          setSearchResults([]);
+          setSearchError('User not found');
+        }
+      } else {
         setSearchResults([]);
         setSearchError('User not found');
-      } else {
-        // User found, get request status
-        const statusData = await apiRequest<{ status: string }>(
-          `/contacts/check/${result.user.id}`,
-          {
-            method: 'GET',
-          }
-        );
-
-        let requestStatus = 'none';
-        if (statusData && statusData.status) {
-          requestStatus = statusData.status;
-        }
-
-        setSearchResults([
-          {
-            publicKey: result.user.publicKey,
-            username: cleanQuery,
-            displayName: result.user.displayName,
-            userId: result.user.id,
-            requestStatus,
-          },
-        ]);
-        setSearchError(null);
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -96,54 +87,37 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    await debouncedSearch(searchQuery);
-  };
-
-  const handleInputChange = (value: string) => {
-    setSearchQuery(value);
-
-    // Clear previous timer
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-
-    // Debounce search after 500ms delay
-    if (value.trim()) {
-      debounceTimer.current = setTimeout(() => {
-        debouncedSearch(value);
-      }, 500);
-    } else {
-      // Clear results if input is empty
-      setSearchResults([]);
-      setSearchError(null);
-    }
-  };
-
   const handleSendRequest = async (userId: string, username: string) => {
     setCreating(true);
     try {
-      await apiRequest('/contacts/request', {
+      const res = await fetch('http://localhost:4000/contacts/request', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           toUserId: userId,
           message: message.trim() || undefined,
         }),
       });
 
-      toast.success(`Request sent to @${username}`);
-      onClose();
-      setMessage('');
-      setSearchQuery('');
-      setSearchResults([]);
-    } catch (error: any) {
-      if (error.status === 401) {
+      if (res.status === 401) {
         await checkAuth();
         toast.error('Session expired. Please try again.');
-      } else {
-        toast.error(error.message || 'Failed to send request');
+        return;
       }
+
+      if (res.ok) {
+        toast.success(`Request sent to @${username}`);
+        onClose();
+        setMessage('');
+        setSearchQuery('');
+        setSearchResults([]);
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.message || 'Failed to send request');
+      }
+    } catch (error) {
+      toast.error('Failed to send request');
     } finally {
       setCreating(false);
     }
@@ -188,7 +162,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                 type="text"
                 placeholder="@username"
                 value={searchQuery}
-                onChange={e => handleInputChange(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
               />

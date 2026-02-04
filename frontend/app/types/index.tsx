@@ -27,5 +27,3 @@ export type {
   // RegisterCredentials,
   // User
 } from './auth';
-
-export type { User, Username } from './user';

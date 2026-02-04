@@ -1,176 +1,67 @@
-// app/components/username-setup-modal.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { X, AtSign, CheckCircle, XCircle } from 'lucide-react';
+import { X, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { UserService } from '@/services/user.service';
+import { useAuth } from '@/hooks/use-auth';
 
 interface UsernameSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUsername?: string;
-  currentIsSearchable?: boolean;
-  onSave: (username: string, isSearchable: boolean) => Promise<void>;
+  currentSearchable?: boolean;
 }
 
 export function UsernameSetupModal({
   isOpen,
   onClose,
-  currentUsername,
-  currentIsSearchable = true,
-  onSave,
+  currentUsername = '',
+  currentSearchable = false,
 }: UsernameSetupModalProps) {
-  const [username, setUsername] = useState(currentUsername || '');
-  const [isSearchable, setIsSearchable] = useState(currentIsSearchable);
+  const [username, setUsername] = useState(currentUsername);
+  const [isSearchable, setIsSearchable] = useState(currentSearchable);
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [availability, setAvailability] = useState<'unknown' | 'available' | 'taken' | 'current'>(
-    'unknown'
-  );
-  const [valid, setValid] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const { checkAuth } = useAuth();
 
-  // Сбрасываем состояние при открытии модалки
-  useEffect(() => {
-    console.log('@@@@@@@@@@ UsernameSetupModal useEffect called', {
-      isOpen,
-      currentUsername,
-      currentIsSearchable,
-      username: currentUsername || '',
-      isSearchable: currentIsSearchable,
-    });
-
-    if (isOpen) {
-      const initialUsername = currentUsername || '';
-      console.log('Setting initial state:', {
-        username: initialUsername,
-        isSearchable: currentIsSearchable,
-      });
-
-      setUsername(initialUsername);
-      setIsSearchable(currentIsSearchable);
-      setHasChanges(false);
-
-      // Если есть текущий username, он автоматически валиден
-      if (initialUsername) {
-        setValid(true);
-        setAvailability('current');
-        console.log('Current username detected, setting availability to "current"');
-      } else {
-        setValid(false);
-        setAvailability('unknown');
-      }
-    }
-  }, [isOpen, currentUsername, currentIsSearchable]);
-
-  const validateUsername = (value: string): boolean => {
-    // Используем серверную валидацию: ^[a-zA-Z][a-zA-Z0-9_]{4,31}$
-    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{4,31}$/;
-    return usernameRegex.test(value);
-  };
-
-  const handleUsernameChange = async (value: string) => {
-    const lowerValue = value.toLowerCase();
-    setUsername(lowerValue);
-
-    const isValid = validateUsername(lowerValue);
-    setValid(isValid);
-
-    // Проверяем, изменился ли username
-    const usernameChanged = lowerValue !== (currentUsername || '').toLowerCase();
-    const searchableChanged = isSearchable !== currentIsSearchable;
-    setHasChanges(usernameChanged || searchableChanged);
-
-    if (lowerValue === (currentUsername || '').toLowerCase()) {
-      // Если ввели текущий username
-      setAvailability('current');
-    } else if (isValid && lowerValue.length >= 5) {
-      // Если валидно и не текущий - проверяем доступность
-      await checkAvailability(lowerValue);
-    } else {
-      setAvailability('unknown');
-    }
-  };
-
-  const handleSearchableChange = (checked: boolean) => {
-    setIsSearchable(checked);
-
-    // Проверяем изменения
-    const usernameChanged = username !== (currentUsername || '');
-    const searchableChanged = checked !== currentIsSearchable;
-    setHasChanges(usernameChanged || searchableChanged);
-  };
-
-  const checkAvailability = async (usernameToCheck: string) => {
-    if (!validateUsername(usernameToCheck)) {
-      setAvailability('unknown');
-      return;
-    }
-
-    setChecking(true);
-    try {
-      const isAvailable = await UserService.checkUsernameAvailable(usernameToCheck);
-
-      if (isAvailable) {
-        setAvailability('available');
-      } else {
-        setAvailability('taken');
-      }
-    } catch (error) {
-      console.error('Failed to check username:', error);
-      setAvailability('unknown');
-    } finally {
-      setChecking(false);
-    }
-  };
+  if (!isOpen) return null;
 
   const handleSave = async () => {
-    if (!hasChanges) {
-      // Если ничего не изменилось, просто закрываем
-      onClose();
+    if (!username.trim()) {
+      toast.error('Username cannot be empty');
       return;
     }
 
-    // Если меняется username, нужна дополнительная проверка
-    if (username !== currentUsername) {
-      if (availability === 'taken') {
-        toast.error('This username is already taken');
-        return;
-      }
-
-      if (!valid) {
-        toast.error('Please enter a valid username');
-        return;
-      }
-
-      if (availability === 'unknown') {
-        toast.error('Please check username availability first');
-        return;
-      }
+    if (!/^[a-z0-9_]{5,32}$/.test(username)) {
+      toast.error('Username must be 5-32 characters (a-z, 0-9, _)');
+      return;
     }
 
     setLoading(true);
     try {
-      await onSave(username, isSearchable);
-      onClose();
+      const res = await fetch('http://localhost:4000/username/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: username.toLowerCase(),
+          isSearchable: isSearchable ? 'yes' : 'no',
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Username updated successfully', { duration: 3000 });
+        await checkAuth();
+        onClose();
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Failed to update username' }));
+        toast.error(errorData.message || 'Failed to update username', { duration: 3000 });
+      }
     } catch (error) {
-      console.error('Failed to update settings:', error);
-      toast.error('Failed to update. Please try again.');
+      toast.error('Failed to update username', { duration: 3000 });
     } finally {
       setLoading(false);
     }
   };
-
-  if (!isOpen) return null;
-
-  const isSaveButtonDisabled =
-    loading ||
-    (username && !valid) ||
-    availability === 'taken' ||
-    (username !== currentUsername && availability === 'unknown');
-
-  const saveButtonText = hasChanges ? (loading ? 'Saving...' : 'Save') : 'Close';
 
   return (
     <>
@@ -181,9 +72,7 @@ export function UsernameSetupModal({
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">
-            {currentUsername ? 'Edit Username' : 'Set Username'}
-          </h2>
+          <h2 className="text-lg font-semibold">Set Username</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
@@ -199,66 +88,13 @@ export function UsernameSetupModal({
                 type="text"
                 placeholder="username"
                 value={username}
-                onChange={e => handleUsernameChange(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20 ${
-                  availability === 'taken'
-                    ? 'border border-destructive'
-                    : availability === 'current'
-                      ? 'border border-green-500'
-                      : ''
-                }`}
+                onChange={e => setUsername(e.target.value.toLowerCase())}
+                className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
                 maxLength={32}
-                disabled={loading}
               />
             </div>
-
-            {/* Статус валидации */}
-            <div className="mt-2 space-y-1">
-              <div className="text-xs text-muted-foreground">
-                5-32 characters, start with a letter, and contain only letters, numbers, or
-                underscores
-              </div>
-
-              {username && (
-                <div className="flex items-center gap-2">
-                  {!valid && username.length > 0 && (
-                    <>
-                      <XCircle className="h-3 w-3 text-destructive" />
-                      <span className="text-xs text-destructive">Invalid username format</span>
-                    </>
-                  )}
-
-                  {valid && availability === 'unknown' && username !== currentUsername && (
-                    <>
-                      <div className="h-3 w-3 rounded-full bg-yellow-500" />
-                      <span className="text-xs text-yellow-600">
-                        {checking ? 'Checking...' : 'Check availability'}
-                      </span>
-                    </>
-                  )}
-
-                  {valid && availability === 'available' && (
-                    <>
-                      <CheckCircle className="h-3 w-3 text-green-600" />
-                      <span className="text-xs text-green-600">Username is available!</span>
-                    </>
-                  )}
-
-                  {valid && availability === 'current' && (
-                    <>
-                      <CheckCircle className="h-3 w-3 text-green-600" />
-                      <span className="text-xs text-green-600">Your current username</span>
-                    </>
-                  )}
-
-                  {valid && availability === 'taken' && (
-                    <>
-                      <XCircle className="h-3 w-3 text-destructive" />
-                      <span className="text-xs text-destructive">Username is already taken</span>
-                    </>
-                  )}
-                </div>
-              )}
+            <div className="text-xs text-muted-foreground mt-1">
+              5-32 characters, lowercase letters, numbers, and underscores only
             </div>
           </div>
 
@@ -269,33 +105,17 @@ export function UsernameSetupModal({
                 Let others search for you by username
               </div>
             </div>
-            <Switch
-              checked={isSearchable}
-              onCheckedChange={handleSearchableChange}
-              disabled={loading}
-            />
+            <Switch checked={isSearchable} onCheckedChange={setIsSearchable} />
           </div>
-
-          {/* Отображение текущего состояния */}
-          {currentIsSearchable !== undefined && (
-            <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-              Current setting:{' '}
-              {currentIsSearchable ? 'Searchable by others' : 'Not searchable by others'}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div className="flex justify-end space-x-2 p-4 border-t border-border">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaveButtonDisabled}
-            variant={hasChanges ? 'default' : 'outline'}
-          >
-            {saveButtonText}
+          <Button onClick={handleSave} disabled={loading || !username.trim()}>
+            {loading ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>
