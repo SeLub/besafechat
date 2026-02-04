@@ -1,119 +1,62 @@
 import {
+  decryptSeedFromCloud,
   deriveKeyPairFromSeed,
   encryptSeedForCloud,
   validateSeedPhrase,
-  generateSeedPhrase,
 } from '../lib/crypto';
-import { AuthService } from './auth.service';
-import { CloudBackupService } from './cloud-backup.service';
 import { DeviceService } from './device.service';
 import { StorageService } from './storage.service';
+import { CloudBackupService } from './cloud-backup.service';
 
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
 
 export class AccountService {
   /**
-   * Unified account creation flow with cloud backup
-   * Follows the unified pattern: generate seed → derive keys → store public key → register user → backup seed
+   * Create account with cloud backup
    */
-  static async createAccountWithCloud(password: string) {
-    // 1. Generate new seed
-    const seed = await generateSeedPhrase();
-    const keyPair = await deriveKeyPairFromSeed(seed);
-    const publicKeyBase64 = keyPair.publicKeyBase64;
+  static async createAccountWithCloud(password: string, userId: string) {
+    // 1. Get current key from IndexedDB
+    const publicKey = await StorageService.getPublicKey();
+    if (!publicKey) {
+      throw new Error('No key found in IndexedDB');
+    }
 
-    // 2. Сохранение публичного ключа в локальном хранилище
-    await StorageService.storePublicKey(publicKeyBase64);
+    // 2. Get seed from temporary memory storage
+    if (!temporarySeed) {
+      throw new Error('No seed found in temporary storage');
+    }
 
-    // 3. Генерация данных клиента
-    const deviceId = DeviceService.getDeviceId();
+    const seed = temporarySeed;
+    const publicKeyBase64 = publicKey;
 
-    // 4. Регистрация на сервере
-    const { userId } = await AuthService.register({
-      publicKey: publicKeyBase64,
-      deviceId,
-    });
-
-    // Wait briefly to ensure user profile is created on the backend
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // 5. Encrypt and backup seed to cloud
+    // 3. Encrypt seed for cloud
+    console.log('[account-service] Encrypting seed for cloud...');
     const encrypted = await encryptSeedForCloud(seed, password, userId);
+    console.log('[account-service] Encrypted data:', encrypted);
+
+    // 4. Upload to S3 via storage service
+    console.log('[account-service] Uploading to S3...');
     const uploadResult = await CloudBackupService.backupSeed(encrypted, password);
+    console.log('[account-service] Upload result:', uploadResult);
 
     if (!uploadResult.success) {
-      throw new Error(`Cloud backup failed: ${uploadResult.message || 'Unknown error'}`);
+      throw new Error(`Upload failed: ${uploadResult.message || 'Unknown error'}`);
     }
 
-    // 6. Download backup file for user
+    // 5. Update IndexedDB to mark as cloud backup (this is not needed anymore since we're using StorageService)
+
+    // 6. Download backup file
     AccountService.downloadBackupFile(encrypted, publicKeyBase64);
 
-    return {
-      privateKey: keyPair.privateKey,
-      publicKey: keyPair.publicKey,
-      publicKeyBase64,
-      userId,
-    };
+    // 7. Clear temporary seed storage after successful upload
+    temporarySeed = null;
   }
 
   /**
-   * Unified account creation flow with self-custody (no cloud backup)
-   * Follows the unified pattern: generate seed → derive keys → store public key → register user
+   * Create account with Self-Custody
    */
-  static async createAccountWithSelfCustody() {
-    // 1. Generate new seed
-    const seed = await generateSeedPhrase();
-    const keyPair = await deriveKeyPairFromSeed(seed);
-    const publicKeyBase64 = keyPair.publicKeyBase64;
-
-    // 2. Сохранение публичного ключа в локальном хранилище
-    await StorageService.storePublicKey(publicKeyBase64);
-
-    // 3. Генерация данных клиента
-    const deviceId = DeviceService.getDeviceId();
-
-    // 4. Регистрация на сервере
-    const { userId } = await AuthService.register({
-      publicKey: publicKeyBase64,
-      deviceId,
-    });
-
-    // Wait briefly to ensure user profile is created on the backend
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    return {
-      privateKey: keyPair.privateKey,
-      publicKey: keyPair.publicKey,
-      publicKeyBase64,
-      userId,
-    };
-  }
-
-  /**
-   * Recover account with password
-   */
-  static async recoverWithPassword(password: string) {
-    // Use the CloudBackupService method that handles both download and decryption
-    const seed = await CloudBackupService.restoreAndDecryptSeedByPassword(password);
-
-    if (!seed) {
-      throw new Error('No cloud backup found for this user or invalid password');
-    }
-
-    // Derive keys from the recovered seed
-    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
-
-    // Save to IndexedDB
-    await StorageService.storePublicKey(publicKeyBase64);
-
-    return { privateKey, publicKey, publicKeyBase64 };
-  }
-
-  /**
-   * Recover account with seed phrase
-   */
-  static async recoverWithSeed(seed: string[]) {
+  static async createAccountWithSeed(seed: string[]) {
     // Validate seed
     const validation = validateSeedPhrase(seed);
     if (!validation.isValid) {
@@ -126,7 +69,43 @@ export class AccountService {
     // Save public key to IndexedDB
     await StorageService.storePublicKey(publicKeyBase64);
 
+    // Store seed temporarily in memory only (not in IndexedDB)
+    temporarySeed = [...seed]; // Create a copy to avoid reference issues
+
     return { privateKey, publicKey, publicKeyBase64 };
+  }
+
+  /**
+   * Recover account with password
+   */
+  static async recoverWithPassword(password: string) {
+    // 2. Use the CloudBackupService method that handles both download and decryption
+    const seed = await CloudBackupService.restoreAndDecryptSeedByPassword(password);
+
+    if (!seed) {
+      throw new Error('No cloud backup found for this user or invalid password');
+    }
+
+    // 3. Derive keys from the recovered seed
+    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
+
+    // 4. Save to IndexedDB
+    await StorageService.storePublicKey(publicKeyBase64);
+
+    return { privateKey, publicKey, publicKeyBase64 };
+  }
+
+  /**
+   * Recover account with seed phrase
+   */
+  static async recoverWithSeed(seed: string[]) {
+    // For recovery, we don't need to keep the seed in temporary storage
+    // So we call createAccountWithSeed which will temporarily store it,
+    // but we'll clear it after since it's for recovery, not for cloud backup
+    const result = await AccountService.createAccountWithSeed(seed);
+    // Clear the temporary seed after recovery since we don't need it for cloud backup
+    temporarySeed = null;
+    return result;
   }
 
   /**
@@ -165,29 +144,6 @@ export class AccountService {
     a.download = `besafe-backup-${Date.now()}.enc`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  /**
-   * Create account with Self-Custody (legacy method for compatibility)
-   * @deprecated Use createAccountWithSelfCustody instead
-   */
-  static async createAccountWithSeed(seed: string[]) {
-    // Validate seed
-    const validation = validateSeedPhrase(seed);
-    if (!validation.isValid) {
-      throw new Error('Invalid seed phrase');
-    }
-
-    // Derive keys
-    const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
-
-    // Save public key to IndexedDB
-    await StorageService.storePublicKey(publicKeyBase64);
-
-    // Store seed temporarily in memory only (not in IndexedDB)
-    temporarySeed = [...seed]; // Create a copy to avoid reference issues
-
-    return { privateKey, publicKey, publicKeyBase64 };
   }
 
   /**
