@@ -6,8 +6,8 @@ import type {
   RefreshTokenResponse,
   Session,
 } from '@/types/account';
-import type { FullProfile } from '~/types/user';
 import { UserService } from './user.service';
+import type { FullProfile } from '~/types/user';
 
 /**
  * Базовые операции с бэкендом для аутентификации
@@ -25,68 +25,23 @@ export class AuthService {
       credentials.deviceName ||
       (typeof navigator !== 'undefined' ? `${navigator.platform || 'Web'} Device` : 'Web Device');
 
-    // First, request a challenge from the server
-    const challengeRes = await fetch(`${this.API_BASE}/auth/login/challenge`, {
+    const res = await fetch(`${this.API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         publicKey: credentials.publicKey,
-        action: 'login',
-      }),
-    });
-
-    if (!challengeRes.ok) {
-      const error = await challengeRes.text().catch(() => 'Unknown error');
-      throw new Error(`Challenge request failed: ${error}`);
-    }
-
-    const challengeData: ApiResponse<{
-      challengeId: string;
-      challenge: string;
-      expiresAt: number;
-    }> = await challengeRes.json();
-    if (!challengeData.success || !challengeData.data) {
-      throw new Error(challengeData.error || 'Failed to get challenge');
-    }
-
-    const { challengeId, challenge } = challengeData.data!;
-
-    // Get the private key to sign the challenge
-    // In the current architecture, the private key is temporarily available
-    // through the AccountService when the account is unlocked
-    const { getTemporaryPrivateKey } = await import('./account.service');
-    const privateKey = getTemporaryPrivateKey();
-    console.log('Private key retrieved for signing:', privateKey);
-
-    if (!privateKey) {
-      throw new Error('Private key not available. Please log in to your account first.');
-    }
-
-    // Sign the challenge using the private key
-    const { signMessageToBase64 } = await import('../lib/crypto/core/signatures');
-    const signature = await signMessageToBase64(privateKey, challenge);
-
-    // Send the signature back to the server to complete authentication
-    const authRes = await fetch(`${this.API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        challengeId,
-        publicKey: credentials.publicKey,
-        signature,
         deviceName, // Required by backend DTO
         deviceId: finalDeviceId, // Still send deviceId for reference
       }),
     });
 
-    if (!authRes.ok) {
-      const error = await authRes.text().catch(() => 'Unknown error');
-      throw new Error(`Backend authentication failed: ${error}`);
+    if (!res.ok) {
+      const error = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Backend login failed: ${error}`);
     }
 
-    const data: ApiResponse<LoginResponse> = await authRes.json();
+    const data: ApiResponse<LoginResponse> = await res.json();
     if (!data.success) {
       throw new Error(data.error || 'Login failed');
     }

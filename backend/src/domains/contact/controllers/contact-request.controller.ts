@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -13,22 +14,22 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiBody,
-  ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
-  ApiResponse,
   ApiSecurity,
   ApiTags,
+  ApiBody,
+  ApiResponse,
+  ApiBadRequestResponse,
   ApiUnauthorizedResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { RedisService } from '../../../domains/redis/redis.service';
-import { HandleService } from '../../handle/services/handle.service';
 import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { SendRequestDto } from '../dto/send-request.dto';
 import { ContactRequestService } from '../services/contact-request.service';
+import { HandleService } from '../../handle/services/handle.service';
+import { RedisService } from '../../../common/redis.service';
 
 @ApiTags('Contacts')
 @Controller('contacts')
