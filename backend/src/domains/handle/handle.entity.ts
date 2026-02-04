@@ -36,7 +36,7 @@ export class Handle {
   })
   type!: HandleType;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, unique: true, nullable: true })
   alias?: string | null;
 
   @Column({ type: 'boolean', default: false })
