@@ -99,10 +99,7 @@ export class AuthService {
   /**
    * Регистрация нового пользователя
    */
-  static async register(credentials: {
-    publicKey: string;
-    deviceId?: string;
-  }): Promise<{ userId: string }> {
+  static async register(credentials: { publicKey: string; deviceId?: string }): Promise<void> {
     const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
 
     const res = await fetch(`${this.API_BASE}/auth/register`, {
@@ -120,16 +117,10 @@ export class AuthService {
       throw new Error(`Registration failed: ${error}`);
     }
 
-    const data: ApiResponse<{ userId: string }> = await res.json();
+    const data: ApiResponse = await res.json();
     if (!data.success) {
       throw new Error(data.error || 'Registration failed');
     }
-
-    if (!data.data || !data.data.userId) {
-      throw new Error('Registration response does not contain userId');
-    }
-
-    return { userId: data.data.userId };
   }
 
   /**
@@ -244,7 +235,7 @@ export class AuthService {
    * Получение профиля текущего пользователя
    */
   static async getProfile(): Promise<ProfileResponse> {
-    const res = await fetch(`${this.API_BASE}/auth/profile`, {
+    const res = await fetch(`${this.API_BASE}/profile`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -288,7 +279,7 @@ export class AuthService {
    * Установка username
    */
   static async setUsername(username: string): Promise<void> {
-    const res = await fetch(`${this.API_BASE}/username/set`, {
+    const res = await fetch(`${this.API_BASE}/profile/username`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -314,21 +305,15 @@ export class AuthService {
    */
   static async checkUsernameAvailable(username: string): Promise<boolean> {
     try {
-      const res = await fetch(`${this.API_BASE}/username/search/${encodeURIComponent(username)}`, {
-        credentials: 'include',
-      });
+      const res = await fetch(
+        `${this.API_BASE}/profile/username/search/${encodeURIComponent(username)}`,
+        { credentials: 'include' }
+      );
 
-      // If status is 404, username is available
-      if (res.status === 404) {
-        return true;
+      if (res.ok) {
+        const data: ApiResponse<UsernameCheckResponse> = await res.json();
+        return data.success && data.data?.available === true;
       }
-
-      // If status is 20, username exists (not available)
-      if (res.status === 200) {
-        return false;
-      }
-
-      // For any other status, return false (not available)
       return false;
     } catch {
       return false;

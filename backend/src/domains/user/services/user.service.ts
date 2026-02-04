@@ -10,7 +10,8 @@ export class UserService {
     private userRepository: Repository<User>
   ) {}
 
-  async registerUser(publicKeyBase64: string): Promise<User> {
+  async registerUser(publicKeyBase64: string, displayName?: string) {
+    // Декодируем base64 → Buffer
     let publicKeyBuffer: Buffer;
     try {
       publicKeyBuffer = Buffer.from(publicKeyBase64, 'base64');
@@ -27,28 +28,15 @@ export class UserService {
     });
 
     if (existingUser) {
-      // ✅ Убедимся, что existingUser не null
       return existingUser;
     }
 
-    // Создаём нового
-    const user = this.userRepository.create({
-      publicKey: publicKeyBuffer,
-    });
-    const savedUser = await this.userRepository.save(user);
+    // Создаём нового → явно указываем тип и избегаем null
+    const user = new User();
+    user.publicKey = publicKeyBuffer;
+    user.displayName = displayName?.trim() || undefined; // ← null → undefined
 
-    // Загружаем пользователя с профилем
-    const userWithProfile = await this.userRepository.findOne({
-      where: { id: savedUser.id },
-      relations: ['username'],
-    });
-
-    // ✅ Гарантируем, что userWithProfile не null
-    if (!userWithProfile) {
-      throw new Error('Failed to retrieve newly created user');
-    }
-
-    return userWithProfile;
+    return await this.userRepository.save(user);
   }
 
   async findByPublicKey(publicKeyBase64: string) {

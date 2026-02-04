@@ -15,7 +15,7 @@ export class AccountService {
   /**
    * Create account with cloud backup
    */
- static async createAccountWithCloud(password: string, userId: string) {
+  static async createAccountWithCloud(password: string) {
     // 1. Get current key from IndexedDB
     const publicKey = await StorageService.getPublicKey();
     if (!publicKey) {
@@ -32,12 +32,12 @@ export class AccountService {
 
     // 3. Encrypt seed for cloud
     console.log('[account-service] Encrypting seed for cloud...');
-    const encrypted = await encryptSeedForCloud(seed, password, userId);
+    const encrypted = await encryptSeedForCloud(seed, password, publicKeyBase64);
     console.log('[account-service] Encrypted data:', encrypted);
 
     // 4. Upload to S3 via storage service
     console.log('[account-service] Uploading to S3...');
-    const uploadResult = await CloudBackupService.backupSeed(encrypted, userId);
+    const uploadResult = await CloudBackupService.backupSeed(encrypted);
     console.log('[account-service] Upload result:', uploadResult);
 
     if (!uploadResult.success) {
@@ -79,42 +79,18 @@ export class AccountService {
    * Recover account with password
    */
   static async recoverWithPassword(username: string, password: string) {
+    // 1. Use the CloudBackupService method that handles both download and decryption
     const cloudService = new CloudBackupService();
-    
-    // 1. Get userId by looking up the username using the new endpoint
-    const apiBaseUrl = 'http://localhost:4000'; // This should match the CloudBackupService default
-    const userResponse = await fetch(`${apiBaseUrl}/username/search/${encodeURIComponent(username)}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-
-    if (!userResponse.ok) {
-      if (userResponse.status === 404) {
-        throw new Error('Username not found. Please check the spelling and try again.');
-      }
-      throw new Error('Failed to look up username. Please try again.');
-    }
-
-    const userData = await userResponse.json();
-    // Backend returns { id, publicKey, displayName }
-    const userId = userData.id;
-
-    if (!userId) {
-      throw new Error('Account not found for this username');
-    }
-
-    // 2. Use the CloudBackupService method that handles both download and decryption
-    const seed = await cloudService.restoreAndDecryptSeedByUserId(userId, password);
+    const seed = await cloudService.restoreAndDecryptSeedByUsername(username, password);
 
     if (!seed) {
-      throw new Error('No cloud backup found for this user or invalid password');
+      throw new Error('No cloud backup found for this username or invalid password');
     }
 
-    // 3. Derive keys from the recovered seed
+    // 2. Derive keys from the recovered seed
     const { privateKey, publicKey, publicKeyBase64 } = await deriveKeyPairFromSeed(seed);
 
-    // 4. Save to IndexedDB
+    // 3. Save to IndexedDB
     await StorageService.storePublicKey(publicKeyBase64);
 
     return { privateKey, publicKey, publicKeyBase64 };
