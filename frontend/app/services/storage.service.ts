@@ -12,7 +12,7 @@ import {
   deriveEncryptionKeyFromHash,
 } from '@/lib/crypto';
 import { getSessionPrivateKeyHash } from './account.service';
-import { getDb, initializeDb, closeDb } from '@/lib/db/db';
+import { db } from '@/lib/db/db';
 import type { Contact, Message, MessageRetentionPeriod, PublicKey } from '@/lib/db/schema';
 // Conversion utilities for IndexedDB storage
 const convertUint8ToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
@@ -104,41 +104,6 @@ export class StorageService {
   private static readonly AES_KEY_LENGTH = 256;
 
   // ==========================================================================
-  // Database Initialization & Cleanup (Phase 4)
-  // ==========================================================================
-
-  /**
-   * Initialize database for a specific user account
-   * Must be called after successful login, before any storage operations
-   * 
-   * @param identityId User's identity from server (from login response)
-   * @throws Error if database initialization fails
-   */
-  static async initialize(identityId: string): Promise<void> {
-    try {
-      await initializeDb(identityId);
-      console.log(`StorageService initialized for identity: ${identityId}`);
-    } catch (error) {
-      console.error('Failed to initialize StorageService:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Close and cleanup the current database
-   * Should be called on logout or account switch
-   */
-  static async cleanup(): Promise<void> {
-    try {
-      await closeDb();
-      console.log('StorageService cleaned up');
-    } catch (error) {
-      console.error('Failed to cleanup StorageService:', error);
-      throw error;
-    }
-  }
-
-  // ==========================================================================
   // Key Management
   // ==========================================================================
 
@@ -147,7 +112,7 @@ export class StorageService {
    */
   static async hasStoredPublicKey(): Promise<boolean> {
     try {
-      const count = await getDb().publicKey.count();
+      const count = await db.publicKey.count();
       return count > 0;
     } catch (error) {
       console.error('Error checking for stored key:', error);
@@ -166,7 +131,7 @@ export class StorageService {
         createdAt: Date.now(),
       };
 
-      await getDb().publicKey.put(record);
+      await db.publicKey.put(record);
       console.log('Public key stored successfully');
     } catch (error) {
       console.error('Error storing public key:', error);
@@ -181,7 +146,7 @@ export class StorageService {
    */
   static async clearStoredKey(): Promise<void> {
     try {
-      await getDb().publicKey.clear();
+      await db.publicKey.clear();
       console.log('Key cleared');
     } catch (error) {
       console.error('Error clearing key:', error);
@@ -196,7 +161,7 @@ export class StorageService {
    */
   static async getKeyRecord(): Promise<PublicKey | null> {
     try {
-      const record = await getDb().publicKey.get('current');
+      const record = await db.publicKey.get('current');
       return record || null;
     } catch (error) {
       console.error('Error getting key record:', error);
@@ -430,7 +395,7 @@ export class StorageService {
         messageId || `${senderId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Check if message already exists to prevent duplicates
-      const existingMessage = await getDb().messages.get(id);
+      const existingMessage = await db.messages.get(id);
       if (existingMessage) {
         console.log(`⚠️ Message ${id} already exists, skipping save`);
         return id;
@@ -510,7 +475,7 @@ export class StorageService {
         authTag,
       };
 
-      await getDb().messages.put(message);
+      await db.messages.put(message);
 
       return id;
     } catch (error) {
@@ -537,7 +502,7 @@ export class StorageService {
     }>
   > {
     try {
-      const messages = await getDb().messages.where('chatId').equals(chatId).sortBy('timestamp');
+      const messages = await db.messages.where('chatId').equals(chatId).sortBy('timestamp');
 
       const decryptedMessages = [];
 
@@ -646,7 +611,7 @@ export class StorageService {
       }
 
       const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-      const deleted = await getDb().messages.where('timestamp').below(cutoffTime).delete();
+      const deleted = await db.messages.where('timestamp').below(cutoffTime).delete();
 
       console.log(`Cleaned up ${deleted} old messages`);
       return deleted;
@@ -691,7 +656,7 @@ export class StorageService {
    */
   static async getTotalMessageCount(): Promise<number> {
     try {
-      return await getDb().messages.count();
+      return await db.messages.count();
     } catch (error) {
       console.error('Error getting total message count:', error);
       return 0;
@@ -703,8 +668,8 @@ export class StorageService {
    */
   static async clearAllMessages(): Promise<void> {
     try {
-      const count = await getDb().messages.count();
-      await getDb().messages.clear();
+      const count = await db.messages.count();
+      await db.messages.clear();
       console.log(`Cleared all ${count} messages`);
     } catch (error) {
       console.error('Error clearing all messages:', error);
@@ -731,7 +696,7 @@ export class StorageService {
         displayName: displayName || '',
       };
 
-      await getDb().contacts.put(contact);
+      await db.contacts.put(contact);
     } catch (error) {
       console.error('Error saving contact:', error);
       throw error;
@@ -743,7 +708,7 @@ export class StorageService {
    */
   static async removeContact(contactId: string, handleId: string): Promise<void> {
     try {
-      await getDb().contacts.where('handleId').equals(handleId).delete();
+      await db.contacts.where('handleId').equals(handleId).delete();
     } catch (error) {
       console.error('Error removing contact:', error);
       throw error;
@@ -755,7 +720,7 @@ export class StorageService {
    */
   static async getAllContacts(): Promise<Contact[]> {
     try {
-      return await getDb().contacts.toArray();
+      return await db.contacts.toArray();
     } catch (error) {
       console.error('Error getting all contacts:', error);
       throw error;
@@ -767,7 +732,7 @@ export class StorageService {
    */
   static async contactExists(id: string): Promise<boolean> {
     try {
-      const count = await getDb().contacts.where('id').equals(id).count();
+      const count = await db.contacts.where('id').equals(id).count();
       return count > 0;
     } catch (error) {
       console.error(`Error checking if contact exists ${id}:`, error);
@@ -780,7 +745,7 @@ export class StorageService {
    */
   static async getContactCount(): Promise<number> {
     try {
-      return await getDb().contacts.count();
+      return await db.contacts.count();
     } catch (error) {
       console.error('Error getting contact count:', error);
       return 0;
@@ -792,8 +757,8 @@ export class StorageService {
    */
   static async clearAllContacts(): Promise<void> {
     try {
-      const count = await getDb().contacts.count();
-      await getDb().contacts.clear();
+      const count = await db.contacts.count();
+      await db.contacts.clear();
       console.log(`Cleared ${count} contacts`);
     } catch (error) {
       console.error('Error clearing all contacts:', error);
@@ -810,7 +775,7 @@ export class StorageService {
    */
   static async isAvailable(): Promise<boolean> {
     try {
-      await getDb().open();
+      await db.open();
       return true;
     } catch (error) {
       console.error('IndexedDB is not available:', error);
@@ -823,10 +788,10 @@ export class StorageService {
    */
   static async getStorageInfo(): Promise<StorageInfo> {
     try {
-      const messagesCount = await getDb().messages.count();
-      const contactsCount = await getDb().contacts.count();
+      const messagesCount = await db.messages.count();
+      const contactsCount = await db.contacts.count();
       const hasKey = await StorageService.hasStoredPublicKey();
-      const keyRecord = await getDb().publicKey.get('current');
+      const keyRecord = await db.publicKey.get('current');
 
       const estimatedMessageSize = messagesCount * 500;
       const estimatedContactSize = contactsCount * 200;
@@ -836,9 +801,9 @@ export class StorageService {
 
       const quota = await this.getQuotaUsage();
 
-      const messages = await getDb().messages.orderBy('timestamp').limit(1).toArray();
+      const messages = await db.messages.orderBy('timestamp').limit(1).toArray();
 
-      const newestMessages = await getDb().messages.orderBy('timestamp').reverse().limit(1).toArray();
+      const newestMessages = await db.messages.orderBy('timestamp').reverse().limit(1).toArray();
 
       return {
         totalSize,
@@ -911,8 +876,8 @@ export class StorageService {
     contacts: { total: number; successful: number; failed: number };
   }> {
     try {
-      const messages = await getDb().messages.toArray();
-      const contacts = await getDb().contacts.toArray();
+      const messages = await db.messages.toArray();
+      const contacts = await db.contacts.toArray();
 
       let successfulMessages = 0;
       let failedMessages = 0;
@@ -965,9 +930,9 @@ export class StorageService {
    */
   static async clearAllData(): Promise<void> {
     try {
-      await getDb().messages.clear();
-      await getDb().contacts.clear();
-      await getDb().publicKey.clear();
+      await db.messages.clear();
+      await db.contacts.clear();
+      await db.publicKey.clear();
       localStorage.removeItem(StorageService.RETENTION_KEY);
       console.log('All storage data cleared');
     } catch (error) {
@@ -1027,7 +992,7 @@ export class StorageService {
 
   private static async enforceMessageLimit(chatId: string, limit: number): Promise<void> {
     try {
-      const messages = await getDb().messages
+      const messages = await db.messages
         .where('chatId')
         .equals(chatId)
         .reverse()
@@ -1035,7 +1000,7 @@ export class StorageService {
 
       if (messages.length > limit) {
         const toDelete = messages.slice(limit).map(m => m.id);
-        await getDb().messages.bulkDelete(toDelete);
+        await db.messages.bulkDelete(toDelete);
         console.log(`Enforced limit: deleted ${toDelete.length} messages from chat ${chatId}`);
       }
     } catch (error) {
