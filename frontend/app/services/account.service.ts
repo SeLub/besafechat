@@ -15,7 +15,7 @@ export class AccountService {
   /**
    * Create account with cloud backup
    */
-  static async createAccountWithCloud(password: string, userId: string) {
+ static async createAccountWithCloud(password: string, userId: string) {
     // 1. Get current key from IndexedDB
     const publicKey = await StorageService.getPublicKey();
     if (!publicKey) {
@@ -37,7 +37,7 @@ export class AccountService {
 
     // 4. Upload to S3 via storage service
     console.log('[account-service] Uploading to S3...');
-    const uploadResult = await CloudBackupService.backupSeed(encrypted, password);
+    const uploadResult = await CloudBackupService.backupSeed(encrypted, userId);
     console.log('[account-service] Upload result:', uploadResult);
 
     if (!uploadResult.success) {
@@ -80,17 +80,14 @@ export class AccountService {
    */
   static async recoverWithPassword(username: string, password: string) {
     const cloudService = new CloudBackupService();
-
+    
     // 1. Get userId by looking up the username using the new endpoint
     const apiBaseUrl = 'http://localhost:4000'; // This should match the CloudBackupService default
-    const userResponse = await fetch(
-      `${apiBaseUrl}/username/search/${encodeURIComponent(username)}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      }
-    );
+    const userResponse = await fetch(`${apiBaseUrl}/username/search/${encodeURIComponent(username)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
 
     if (!userResponse.ok) {
       if (userResponse.status === 404) {

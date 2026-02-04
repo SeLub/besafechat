@@ -1,6 +1,5 @@
 import { decryptSeedFromCloud, deriveKeyPairFromSeed, encryptSeedForCloud } from '../lib/crypto';
 import type { EncryptedSeedData, KeyPair } from '../lib/crypto/types';
-import { S3Service } from './s3-service';
 import { UserService } from './user.service';
 
 // ============================================================================
@@ -80,35 +79,6 @@ export class CloudBackupService {
     this.timeout = options.timeout ?? 30000; // 30 seconds
   }
 
-  /**
-   * Compute storage path from password using Argon2id
-   */
-  static async computeStoragePath(password: string): Promise<string> {
-    // Use a fixed public salt that's built into the client code
-    // This provides protection against rainbow table attacks but doesn't need to be secret
-    const encoder = new TextEncoder();
-    const publicSalt = encoder.encode('besafe_seed_salt_v1'); // Should be configurable
-
-    // Use Argon2id similar to how it's used in encryptSeedForCloud
-    // Import the argon2id function from hash-wasm that's already used in the project
-    const { argon2id } = await import('hash-wasm');
-
-    // Combine password with public salt
-    const combinedSalt = new Uint8Array([...publicSalt]);
-
-    const hash = await argon2id({
-      password,
-      salt: combinedSalt,
-      iterations: 3, // timeCost
-      memorySize: 65536, // memoryCost in KB
-      parallelism: 4, // parallelism
-      hashLength: 32, // hashLength in bytes
-      outputType: 'hex', // Return hex string directly
-    });
-
-    return hash;
-  }
-
   // ==========================================================================
   // Configuration
   // ==========================================================================
@@ -185,87 +155,74 @@ export class CloudBackupService {
   // ==========================================================================
 
   /**
-   * Backup encrypted seed to cloud storage using password-derived storage path
-   */
-  static async backupSeedWithPassword(
-    encryptedSeed: EncryptedSeedData,
-    password: string
-  ): Promise<BackupResult> {
-    try {
-      // Compute storage path from password
-      const storagePath = await CloudBackupService.computeStoragePath(password);
-
-      // Use frontend S3Service to upload the seed
-      await S3Service.uploadFile(
-        new Blob([
-          JSON.stringify({
-            encrypted: encryptedSeed.encrypted,
-            salt: encryptedSeed.salt,
-            iv: encryptedSeed.iv,
-            authTag: encryptedSeed.authTag,
-            version: encryptedSeed.version,
-            kdfParams: encryptedSeed.kdfParams,
-          }),
-        ]),
-        {
-          path: `seeds/${storagePath}`,
-          fileName: 'encrypted_seed.bin',
-          contentType: 'application/json',
-        }
-      );
-
-      return {
-        success: true,
-        message: 'Seed backup created successfully',
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      console.error('Seed backup failed:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Backup failed',
-      };
-    }
-  }
-
-  /**
-   * Backup encrypted seed to cloud storage (original method for compatibility)
-   * Updated to use direct S3Service for proper path handling
+   * Backup encrypted seed to cloud storage
    */
   static async backupSeed(
     encryptedSeed: EncryptedSeedData,
-    password: string
+    userId?: string
   ): Promise<BackupResult> {
-    if (!password) {
-      throw new Error('Password is required for backup');
+    // If userId is not provided, try to get it from profile
+    if (!userId) {
+      const profile = await UserService.getProfile();
+      userId = profile.userId;
     }
 
-    // Compute storage path from password
-    const storagePath = await CloudBackupService.computeStoragePath(password);
+    if (!userId) {
+      throw new Error('User ID is required for backup');
+    }
 
     try {
-      // Use frontend S3Service to upload the seed to the correct path
-      await S3Service.uploadFile(
-        new Blob([
-          JSON.stringify({
-            encrypted: encryptedSeed.encrypted,
-            salt: encryptedSeed.salt,
-            iv: encryptedSeed.iv,
-            authTag: encryptedSeed.authTag,
-            version: encryptedSeed.version,
-            kdfParams: encryptedSeed.kdfParams,
-          }),
-        ]),
-        {
-          path: `seeds/${storagePath}`,
-          fileName: 'encrypted-seed.enc',
+      // Create an instance to access fetchWithRetry
+      const instance = new CloudBackupService();
+
+      // Get presigned URL for upload
+      const presignedResponse = await instance.fetchWithRetry(`${instance.apiBaseUrl}/s3/upload`, {
+        method: 'POST',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
           contentType: 'application/json',
-        }
-      );
+          fileType: 'seed',
+        }),
+      });
+
+      if (!presignedResponse.ok) {
+        const error = await presignedResponse.json().catch(() => ({}));
+        throw new Error(`Failed to get presigned URL: ${error.message || 'Unknown error'}`);
+      }
+
+      const responseJson = await presignedResponse.json();
+      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
+      const uploadUrl = presignedData.uploadUrl;
+      const fileKey = presignedData.fileKey;
+
+      if (!uploadUrl) {
+        throw new Error('No upload URL provided by the server');
+      }
+
+      // Upload the encrypted seed data to S3 using the presigned URL
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          encrypted: encryptedSeed.encrypted,
+          salt: encryptedSeed.salt,
+          iv: encryptedSeed.iv,
+          authTag: encryptedSeed.authTag,
+          version: encryptedSeed.version,
+          kdfParams: encryptedSeed.kdfParams,
+        }),
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(
+          `S3 upload failed: ${uploadResponse.status} - ${uploadResponse.statusText}`
+        );
+      }
 
       return {
         success: true,
-        backupId: storagePath,
+        backupId: userId,
         message: 'Backup created successfully',
         timestamp: Date.now(),
       };
@@ -279,25 +236,6 @@ export class CloudBackupService {
   }
 
   /**
-   * Restore seed from cloud backup by password (new method using storage path)
-   */
-  static async restoreSeedByPassword(password: string): Promise<EncryptedSeedData | null> {
-    try {
-      // Compute storage path from password
-      const storagePath = await CloudBackupService.computeStoragePath(password);
-
-      // Use frontend S3Service to download the seed
-      const blob = await S3Service.downloadFile(`seeds/${storagePath}`, 'encrypted_seed.bin');
-      const text = await blob.text();
-      const encryptedSeed: EncryptedSeedData = JSON.parse(text);
-      return encryptedSeed;
-    } catch (error) {
-      console.error('Seed restore failed:', error);
-      return null;
-    }
-  }
-
-  /**
    * Restore seed from cloud backup by userId (requires active session)
    */
   async restoreSeedByUserId(userId: string): Promise<EncryptedSeedData | null> {
@@ -306,10 +244,39 @@ export class CloudBackupService {
     }
 
     try {
-      // Use frontend S3Service to download the seed
-      const blob = await S3Service.downloadFile(`users/${userId}`, 'encrypted-seed.enc');
-      const text = await blob.text();
-      const encryptedSeed: EncryptedSeedData = JSON.parse(text);
+      // Get presigned URL for download
+      const presignedResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
+        method: 'POST',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
+        }),
+      });
+
+      if (!presignedResponse.ok) {
+        const error = await presignedResponse.json().catch(() => ({}));
+        throw new Error(error.message || 'No cloud backup found for this user');
+      }
+
+      const responseJson = await presignedResponse.json();
+      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
+      const downloadUrl = presignedData.downloadUrl;
+
+      if (!downloadUrl) {
+        throw new Error('No download URL provided by the server');
+      }
+
+      // Download the encrypted seed data from S3 using the presigned URL
+      const downloadResponse = await fetch(downloadUrl);
+
+      if (!downloadResponse.ok) {
+        throw new Error(
+          `S3 download failed: ${downloadResponse.status} - ${downloadResponse.statusText}`
+        );
+      }
+
+      // The S3 returns the encrypted seed data
+      const encryptedSeed: EncryptedSeedData = await downloadResponse.json();
       return encryptedSeed;
     } catch (error) {
       console.error('Restore failed:', error);
@@ -330,39 +297,43 @@ export class CloudBackupService {
         throw new Error('User ID is required for restore');
       }
 
-      // Use frontend S3Service to download the seed
-      const blob = await S3Service.downloadFile(`users/${userId}`, 'encrypted-seed.enc');
-      const text = await blob.text();
-      const encryptedSeed: EncryptedSeedData = JSON.parse(text);
+      // Get presigned URL for download
+      const presignedResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
+        method: 'POST',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
+        }),
+      });
+
+      if (!presignedResponse.ok) {
+        const error = await presignedResponse.json().catch(() => ({}));
+        throw new Error(error.message || 'No cloud backup found');
+      }
+
+      const responseJson = await presignedResponse.json();
+      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
+      const downloadUrl = presignedData.downloadUrl;
+
+      if (!downloadUrl) {
+        throw new Error('No download URL provided by the server');
+      }
+
+      // Download the encrypted seed data from S3 using the presigned URL
+      const downloadResponse = await fetch(downloadUrl);
+
+      if (!downloadResponse.ok) {
+        throw new Error(
+          `S3 download failed: ${downloadResponse.status} - ${downloadResponse.statusText}`
+        );
+      }
+
+      // The S3 returns the encrypted seed data
+      const encryptedSeed: EncryptedSeedData = await downloadResponse.json();
       return encryptedSeed;
     } catch (error) {
       console.error('Restore failed:', error);
       return null;
-    }
-  }
-
-  /**
-   * Restore seed by password and decrypt it
-   * Used for account recovery flow
-   */
-  static async restoreAndDecryptSeedByPassword(
-    password: string,
-    userId: string
-  ): Promise<string[] | null> {
-    // 1. Download encrypted seed by password
-    const encryptedSeed = await CloudBackupService.restoreSeedByPassword(password);
-
-    if (!encryptedSeed) {
-      throw new Error('No backup found for this password');
-    }
-
-    // 2. Decrypt the seed using the password and userId
-    try {
-      const seed = await decryptSeedFromCloud(encryptedSeed, password, userId);
-      return seed;
-    } catch (error) {
-      console.error('Decryption failed:', error);
-      throw new Error('Invalid password or corrupted backup');
     }
   }
 
@@ -445,23 +416,7 @@ export class CloudBackupService {
   }
 
   /**
-   * Delete seed backup by password
-   */
-  static async deleteSeedBackupByPassword(password: string): Promise<void> {
-    try {
-      // Compute storage path from password
-      const storagePath = await CloudBackupService.computeStoragePath(password);
-
-      // Use frontend S3Service to delete the seed
-      await S3Service.deleteFile(`seeds/${storagePath}`, 'encrypted_seed.bin');
-    } catch (error) {
-      console.error('Seed backup deletion failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete cloud backup (original method for compatibility)
+   * Delete cloud backup
    */
   async deleteBackup(userId?: string): Promise<void> {
     // If userId is not provided, try to get it from profile
@@ -475,8 +430,19 @@ export class CloudBackupService {
     }
 
     try {
-      // Use frontend S3Service to delete the seed
-      await S3Service.deleteFile(`users/${userId}`, 'encrypted-seed.enc');
+      // Get presigned URL for deletion
+      const deleteResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/delete`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
+        }),
+      });
+
+      if (!deleteResponse.ok) {
+        const error = await deleteResponse.json().catch(() => ({}));
+        throw new Error(error.message || 'Failed to delete backup');
+      }
     } catch (error) {
       console.error('Delete backup failed:', error);
       throw error;
@@ -502,9 +468,16 @@ export class CloudBackupService {
     }
 
     try {
-      // Use frontend S3Service to check if the file exists by attempting to get its URL
-      const url = await S3Service.getFileUrl(`users/${userId}`, 'encrypted-seed.enc');
-      return url.length > 0;
+      // For S3, we'll try to get a presigned URL to check if the file exists
+      const response = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
+        method: 'POST',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
+        }),
+      });
+
+      return response.ok;
     } catch {
       return false;
     }
@@ -525,10 +498,16 @@ export class CloudBackupService {
     }
 
     try {
-      // Use frontend S3Service to check if the file exists by attempting to get its URL
-      const url = await S3Service.getFileUrl(`users/${userId}`, 'encrypted-seed.enc');
+      // For S3, we'll try to get a presigned URL to check if the file exists
+      const response = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
+        method: 'POST',
+        body: JSON.stringify({
+          path: `users/${userId}`,
+          filename: 'encrypted-seed.enc',
+        }),
+      });
 
-      if (!url) {
+      if (!response.ok) {
         return null;
       }
 
@@ -612,23 +591,7 @@ export class CloudBackupService {
   }
 
   /**
-   * Encrypt and backup seed in one operation (password-based approach)
-   */
-  static async encryptAndBackupSeedWithPassword(
-    seedWords: string[],
-    password: string
-  ): Promise<BackupResult> {
-    // Generate a temporary userId for encryption (the actual value doesn't matter for the encryption)
-    // but we need it for compatibility with the encryptSeedForCloud function
-    const tempUserId =
-      'temp-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
-    const encryptedSeed = await encryptSeedForCloud(seedWords, password, tempUserId);
-
-    return CloudBackupService.backupSeedWithPassword(encryptedSeed, password);
-  }
-
-  /**
-   * Encrypt and backup seed in one operation (original method for compatibility)
+   * Encrypt and backup seed in one operation
    */
   static async encryptAndBackupSeed(
     seedWords: string[],
@@ -651,24 +614,8 @@ export class CloudBackupService {
   }
 
   /**
-   * Restore, decrypt and derive keys from backup using password-derived path (public - no session required)
-   * Used for account recovery flow with password only
-   */
-  static async restoreAccountWithPassword(password: string, userId: string): Promise<KeyPair> {
-    const seedWords = await CloudBackupService.restoreAndDecryptSeedByPassword(password, userId);
-
-    if (!seedWords) {
-      throw new Error('Failed to restore seed from backup');
-    }
-
-    const keyPair = await deriveKeyPairFromSeed(seedWords);
-
-    return keyPair;
-  }
-
-  /**
    * Restore, decrypt and derive keys from backup (public - no session required)
-   * Used for account recovery flow with userId
+   * Used for account recovery flow
    */
   async restoreAccount(userId: string, password: string): Promise<KeyPair> {
     const seedWords = await this.restoreAndDecryptSeedByUserId(userId, password);
