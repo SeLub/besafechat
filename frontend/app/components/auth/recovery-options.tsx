@@ -1,23 +1,24 @@
 import { useState } from 'react';
 
 interface RecoveryOptionsProps {
-  onPasswordRecovery: (password: string) => void;
+  onPasswordRecovery: (username: string, password: string) => void;
   onSeedRecovery: (seed: string[]) => void;
 }
 
 export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: RecoveryOptionsProps) {
   const [method, setMethod] = useState<'password' | 'seed' | null>(null);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [seedInput, setSeedInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handlePasswordSubmit = async () => {
-    if (!password) return;
+    if (!username || !password) return;
     setLoading(true);
     setError('');
     try {
-      await onPasswordRecovery(password);
+      await onPasswordRecovery(username, password);
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {
@@ -80,9 +81,19 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
         </button>
 
         <h2 className="text-2xl font-bold mb-4">Cloud Recovery</h2>
-        <p className="text-muted-foreground mb-6">Enter your password</p>
+        <p className="text-muted-foreground mb-6">Enter your username and password</p>
 
         <div className="space-y-4 mb-6">
+          <input
+            type="text"
+            value={username}
+            onChange={e => {
+              setUsername(e.target.value);
+              setError('');
+            }}
+            placeholder="@username"
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
           <input
             type="password"
             value={password}
@@ -104,7 +115,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
 
         <button
           onClick={handlePasswordSubmit}
-          disabled={!password || loading}
+          disabled={!username || !password || loading}
           className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition disabled:opacity-50"
         >
           {loading ? 'Recovering...' : 'Recover Account →'}

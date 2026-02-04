@@ -1,8 +1,8 @@
-import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
+import { UserService } from '@/services/user.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { FullProfile } from '~/types/user';
+import type { FullProfile } from '~/types';
 
 interface AuthContextType {
   user: FullProfile | null;
@@ -35,32 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
         }
       } else if (res.status === 401) {
-        // Try to refresh the tokens first
-        try {
-          const refreshResponse = await fetch('http://localhost:4000/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-          });
-
-          if (refreshResponse.ok) {
-            // Retry fetching profile after refresh
-            const retryRes = await fetch('http://localhost:4000/auth/profile', {
-              credentials: 'include',
-            });
-
-            if (retryRes.ok) {
-              const retryResponse = await retryRes.json();
-              if (retryResponse.success && retryResponse.data) {
-                setUser(retryResponse.data);
-                return;
-              }
-            }
-          }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-        }
-
-        // If refresh failed, clear auth
         clearAuthCookies();
         setUser(null);
       } else {
@@ -119,10 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear all authentication data
       clearAuthCookies();
-      await StorageService.clearStoredKey(); // Clear stored public key
-      AccountService.clearTemporarySeed(); // Clear any temporary seed storage
       setUser(null);
     }
   };
@@ -147,33 +118,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('Failed to refresh user profile: invalid response data');
         }
       } else if (res.status === 401) {
-        // Try to refresh the tokens first
-        try {
-          const refreshResponse = await fetch('http://localhost:4000/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-          });
-
-          if (refreshResponse.ok) {
-            // Retry fetching profile after refresh
-            const retryRes = await fetch('http://localhost:4000/auth/profile', {
-              credentials: 'include',
-            });
-
-            if (retryRes.ok) {
-              const retryResponse = await retryRes.json();
-              if (retryResponse.success && retryResponse.data) {
-                setUser(retryResponse.data);
-                console.log('User profile refreshed after token refresh', retryResponse.data);
-                return;
-              }
-            }
-          }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-        }
-
-        // If refresh failed, clear auth
         clearAuthCookies();
         setUser(null);
         console.log('User session expired, cleared auth');
@@ -183,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('User refresh error:', error);
     }
-  };
+ };
 
   return (
     <AuthContext.Provider
