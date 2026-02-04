@@ -80,18 +80,14 @@ export default function AuthRoute() {
       // 1. Derive keys and save to IndexedDB
       const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
 
-      // 2. Register to backend and get userId
-      const registrationResult = await loginToBackend(publicKeyBase64);
-      if (!registrationResult || !registrationResult.userId) {
-        throw new Error('Registration failed: No userId returned');
-      }
-      const userId = registrationResult.userId;
+      // 2. Login to backend
+      await loginToBackend(publicKeyBase64);
 
       // 3. Set username
       await setUsernameOnBackend(username);
 
       // 4. Upload encrypted seed to S3
-      await AccountService.createAccountWithCloud(password, userId);
+      await AccountService.createAccountWithCloud(password);
 
       setStep('complete');
       toast.success('Account created with cloud backup!');
@@ -107,7 +103,7 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
-      await loginOnly(publicKeyBase64);
+      await loginToBackend(publicKeyBase64);
       await setUsernameOnBackend(username);
       setStep('complete');
       toast.success('Account created!');
@@ -125,16 +121,6 @@ export default function AuthRoute() {
 
   const loginToBackend = async (publicKeyBase64: string) => {
     const { deviceId } = AccountService.getDeviceInfo();
-    // Register the user and get the userId
-    const registrationResult = await AuthService.register({
-      publicKey: publicKeyBase64,
-      deviceId,
-    });
-    return registrationResult;
-  };
-
-  const loginOnly = async (publicKeyBase64: string) => {
-    const { deviceId } = AccountService.getDeviceInfo();
     await AuthService.login({
       publicKey: publicKeyBase64,
       deviceId,
@@ -149,7 +135,7 @@ export default function AuthRoute() {
         toast.error('No stored key found');
         return;
       }
-      await loginOnly(publicKey);
+      await loginToBackend(publicKey);
       window.location.href = '/';
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
@@ -173,7 +159,7 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       const { publicKeyBase64 } = await AccountService.recoverWithPassword(username, password);
-      await loginOnly(publicKeyBase64);
+      await loginToBackend(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
     } catch (error: any) {
@@ -187,7 +173,7 @@ export default function AuthRoute() {
     setLoading(true);
     try {
       const { publicKeyBase64 } = await AccountService.recoverWithSeed(recoveredSeed);
-      await loginOnly(publicKeyBase64);
+      await loginToBackend(publicKeyBase64);
       toast.success('Account recovered!');
       window.location.href = '/';
     } catch (error: any) {

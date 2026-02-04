@@ -1,3 +1,4 @@
+// src/domains/user/controllers/auth.controller.ts
 import {
   Controller,
   Post,
@@ -6,54 +7,26 @@ import {
   ValidationPipe,
   HttpCode,
   HttpStatus,
-  Req,
-  Res,
 } from '@nestjs/common';
 import { RegisterDto } from '../dto/register.dto';
-import { AuthService } from '../services/auth.service';
-import { AuthenticatedRequest, NestResponse } from '../../../common/types/authenticated-request';
+import { UserService } from '../services/user.service'; // ← импорт
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private userService: UserService) {} // ← инъекция
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async register(
-    @Body() registerDto: RegisterDto,
-    @Req() req: AuthenticatedRequest,
-    @Res({ passthrough: true }) res: NestResponse
-  ) {
-    const ipAddress = req.ip || req.socket?.remoteAddress || undefined;
-    const { user, tokens } = await this.authService.register(
+  async register(@Body() registerDto: RegisterDto) {
+    const user = await this.userService.registerUser(
       registerDto.publicKey,
-      registerDto.deviceId,
-      registerDto.deviceModel,
-      ipAddress
+      registerDto.displayName
     );
-
-    // Set cookies for automatic authentication
-    res.cookie('access_token', tokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 60 * 1000, // 30 minutes
-    });
-
-    res.cookie('refresh_token', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 1000, // 30 days
-    });
-
     return {
       success: true,
-      data: {
-        userId: user.id,
-        message: 'User registered successfully',
-      },
+      message: 'User registered successfully',
+      userId: user.id,
     };
   }
 }

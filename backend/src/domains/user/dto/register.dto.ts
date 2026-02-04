@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDtoBe64 } from '../../../common/validators/is-dto-be64.validator';
+import { IsDtoBe64 } from 'src/common/validators/is-dto-be64.validator';
 
 export class RegisterDto {
   @ApiProperty({
@@ -13,16 +13,12 @@ export class RegisterDto {
   publicKey!: string;
 
   @ApiProperty({
-    description: 'Generated Device ID',
-    example: 'web-as77-600x400',
+    description: 'Display name for the user',
+    example: 'Alice',
+    required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  deviceId!: string;
-
-  @ApiProperty({
-    description: 'Generated Device Name',
-    example: '"iPhone 13", "Windows"',
-  })
-  deviceModel?: string;
+  @Length(1, 64)
+  displayName?: string;
 }

@@ -1,6 +1,6 @@
-import { decryptSeedFromCloud, deriveKeyPairFromSeed, encryptSeedForCloud } from '../lib/crypto';
-import type { EncryptedSeedData, KeyPair } from '../lib/crypto/types';
+import { decryptSeedFromCloud, encryptSeedForCloud, deriveKeyPairFromSeed } from '../lib/crypto';
 import { UserService } from './user.service';
+import type { EncryptedSeedData, KeyPair } from '../lib/crypto/types';
 
 // ============================================================================
 // Types
@@ -159,13 +159,10 @@ export class CloudBackupService {
    */
   static async backupSeed(
     encryptedSeed: EncryptedSeedData,
-    userId?: string
+    username?: string
   ): Promise<BackupResult> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
     if (!userId) {
       throw new Error('User ID is required for backup');
@@ -175,35 +172,9 @@ export class CloudBackupService {
       // Create an instance to access fetchWithRetry
       const instance = new CloudBackupService();
 
-      // Get presigned URL for upload
-      const presignedResponse = await instance.fetchWithRetry(`${instance.apiBaseUrl}/s3/upload`, {
+      // Backend handles presigned URL generation and S3 upload internally
+      const response = await instance.fetchWithRetry(`${instance.apiBaseUrl}/storage/auth/upload`, {
         method: 'POST',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-          contentType: 'application/json',
-          fileType: 'seed',
-        }),
-      });
-
-      if (!presignedResponse.ok) {
-        const error = await presignedResponse.json().catch(() => ({}));
-        throw new Error(`Failed to get presigned URL: ${error.message || 'Unknown error'}`);
-      }
-
-      const responseJson = await presignedResponse.json();
-      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
-      const uploadUrl = presignedData.uploadUrl;
-      const fileKey = presignedData.fileKey;
-
-      if (!uploadUrl) {
-        throw new Error('No upload URL provided by the server');
-      }
-
-      // Upload the encrypted seed data to S3 using the presigned URL
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encrypted: encryptedSeed.encrypted,
           salt: encryptedSeed.salt,
@@ -214,11 +185,12 @@ export class CloudBackupService {
         }),
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error(
-          `S3 upload failed: ${uploadResponse.status} - ${uploadResponse.statusText}`
-        );
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(`Failed to backup seed: ${error.message || 'Unknown error'}`);
       }
+
+      const result = await response.json();
 
       return {
         success: true,
@@ -236,47 +208,26 @@ export class CloudBackupService {
   }
 
   /**
-   * Restore seed from cloud backup by userId (requires active session)
+   * Restore seed from cloud backup by username (public endpoint - no session required)
    */
-  async restoreSeedByUserId(userId: string): Promise<EncryptedSeedData | null> {
-    if (!userId) {
-      throw new Error('User ID is required for restore');
+  async restoreSeedByUsername(username: string): Promise<EncryptedSeedData | null> {
+    if (!username) {
+      throw new Error('Username is required for restore');
     }
 
     try {
-      // Get presigned URL for download
-      const presignedResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
-        method: 'POST',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-        }),
-      });
+      // Download seed backup by username - this is a public endpoint
+      const response = await this.fetchWithRetry(
+        `${this.apiBaseUrl}/storage/auth/download/by-username/${encodeURIComponent(username)}`
+      );
 
-      if (!presignedResponse.ok) {
-        const error = await presignedResponse.json().catch(() => ({}));
-        throw new Error(error.message || 'No cloud backup found for this user');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'No cloud backup found for this username');
       }
 
-      const responseJson = await presignedResponse.json();
-      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
-      const downloadUrl = presignedData.downloadUrl;
-
-      if (!downloadUrl) {
-        throw new Error('No download URL provided by the server');
-      }
-
-      // Download the encrypted seed data from S3 using the presigned URL
-      const downloadResponse = await fetch(downloadUrl);
-
-      if (!downloadResponse.ok) {
-        throw new Error(
-          `S3 download failed: ${downloadResponse.status} - ${downloadResponse.statusText}`
-        );
-      }
-
-      // The S3 returns the encrypted seed data
-      const encryptedSeed: EncryptedSeedData = await downloadResponse.json();
+      // The backend returns the encrypted seed data directly (downloads from S3 internally)
+      const encryptedSeed: EncryptedSeedData = await response.json();
       return encryptedSeed;
     } catch (error) {
       console.error('Restore failed:', error);
@@ -289,47 +240,16 @@ export class CloudBackupService {
    */
   async restoreSeed(): Promise<EncryptedSeedData | null> {
     try {
-      // Get userId from profile
-      const profile = await UserService.getProfile();
-      const { userId } = profile;
-
-      if (!userId) {
-        throw new Error('User ID is required for restore');
-      }
-
-      // Get presigned URL for download
-      const presignedResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
-        method: 'POST',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-        }),
+      // Restore by user ID - requires session
+      const response = await this.fetchWithRetry(`${this.apiBaseUrl}/storage/auth/download`, {
+        method: 'GET',
       });
 
-      if (!presignedResponse.ok) {
-        const error = await presignedResponse.json().catch(() => ({}));
-        throw new Error(error.message || 'No cloud backup found');
+      if (!response.ok) {
+        throw new Error('No cloud backup found');
       }
 
-      const responseJson = await presignedResponse.json();
-      const presignedData = responseJson.data || responseJson; // Handle both nested and direct structures
-      const downloadUrl = presignedData.downloadUrl;
-
-      if (!downloadUrl) {
-        throw new Error('No download URL provided by the server');
-      }
-
-      // Download the encrypted seed data from S3 using the presigned URL
-      const downloadResponse = await fetch(downloadUrl);
-
-      if (!downloadResponse.ok) {
-        throw new Error(
-          `S3 download failed: ${downloadResponse.status} - ${downloadResponse.statusText}`
-        );
-      }
-
-      // The S3 returns the encrypted seed data
-      const encryptedSeed: EncryptedSeedData = await downloadResponse.json();
+      const encryptedSeed: EncryptedSeedData = await response.json();
       return encryptedSeed;
     } catch (error) {
       console.error('Restore failed:', error);
@@ -338,22 +258,41 @@ export class CloudBackupService {
   }
 
   /**
-   * Restore seed by userId and decrypt it (requires active session)
+   * Restore seed by username and decrypt it (public - no session required)
    * Used for account recovery flow
    */
-  async restoreAndDecryptSeedByUserId(userId: string, password: string): Promise<string[] | null> {
-    if (!userId) {
-      throw new Error('User ID is required for restore');
+  async restoreAndDecryptSeedByUsername(
+    username: string,
+    password: string
+  ): Promise<string[] | null> {
+    // 1. Get userId by looking up the username
+    const userResponse = await this.fetchWithRetry(
+      `${this.apiBaseUrl}/profile/username/search/${encodeURIComponent(username)}`
+    );
+
+    if (!userResponse.ok) {
+      if (userResponse.status === 404) {
+        throw new Error('Username not found. Please check the spelling and try again.');
+      }
+      throw new Error('Failed to look up username. Please try again.');
     }
 
-    // 1. Download encrypted seed by userId
-    const encryptedSeed = await this.restoreSeedByUserId(userId);
+    const userData = await userResponse.json();
+    // Backend returns { success: true, data: { id, publicKey, displayName } }
+    const userId = userData.data?.id || userData.id;
+
+    if (!userId) {
+      throw new Error('Account not found for this username');
+    }
+
+    // 2. Download encrypted seed by username
+    const encryptedSeed = await this.restoreSeedByUsername(username);
 
     if (!encryptedSeed) {
-      throw new Error('No backup found for this user');
+      throw new Error('No backup found for this username');
     }
 
-    // 2. Decrypt the seed
+    // 3. Decrypt the seed
     try {
       const seed = await decryptSeedFromCloud(encryptedSeed, password, userId);
       return seed;
@@ -368,14 +307,11 @@ export class CloudBackupService {
    */
   async updateBackup(
     newPassword: string,
-    userId?: string,
+    username?: string,
     newSeed?: string[]
   ): Promise<BackupResult> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
     if (!userId) {
       throw new Error('User ID is required for update');
@@ -383,26 +319,47 @@ export class CloudBackupService {
 
     try {
       // 1. Get current backup info
-      const backupInfo = await this.getBackupInfo(userId);
+      const backupInfo = await this.getBackupInfo(username);
       if (!backupInfo) {
         throw new Error('No existing backup found to update');
       }
 
       // 2. Encrypt with new password
+      if (!username) {
+        throw new Error('Username is required to retrieve existing seed for update');
+      }
       const seedToEncrypt =
-        newSeed || (await this.restoreAndDecryptSeedByUserId(userId, newPassword));
+        newSeed || (await this.restoreAndDecryptSeedByUsername(username, newPassword));
       if (!seedToEncrypt) {
         throw new Error('Could not retrieve seed for update');
       }
 
-      const encryptedSeed = await encryptSeedForCloud(seedToEncrypt, newPassword, userId);
+      const encryptedSeed = await encryptSeedForCloud(
+        seedToEncrypt,
+        newPassword,
+        userId
+      );
 
       // 3. Create new backup (overwrites old one via same URL)
-      const result = await CloudBackupService.backupSeed(encryptedSeed, userId);
+      const result = await CloudBackupService.backupSeed(encryptedSeed, username);
 
       if (result.success) {
-        // Update backup timestamp in server (if needed)
-        // Note: With S3, we're not using the old storage registry anymore
+        // Update backup timestamp in server
+        await this.fetchWithRetry(`${this.apiBaseUrl}/storage/auth/upload`, {
+          method: 'POST',
+          body: JSON.stringify({
+            backupId: backupInfo.backupId,
+            userId: userId,
+            username: username,
+            backupUrl: result.url?.split('?')[0],
+            metadata: {
+              ...encryptedSeed,
+              timestamp: Date.now(),
+              size: JSON.stringify(encryptedSeed).length,
+              updatedAt: Date.now(),
+            },
+          }),
+        });
       }
 
       return result;
@@ -418,31 +375,35 @@ export class CloudBackupService {
   /**
    * Delete cloud backup
    */
-  async deleteBackup(userId?: string): Promise<void> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
+  async deleteBackup(username?: string): Promise<void> {
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
     if (!userId) {
       throw new Error('User ID is required for deletion');
     }
 
     try {
-      // Get presigned URL for deletion
-      const deleteResponse = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/delete`, {
+      // 1. Get backup info to get the S3 path
+      const backupInfo = await this.getBackupInfo(username);
+      if (!backupInfo) {
+        return; // Nothing to delete
+      }
+
+      // 2. Delete from S3
+      const path = new URL(backupInfo.location).pathname;
+      await this.fetchWithRetry(`${this.apiBaseUrl}/storage${path}`, {
         method: 'DELETE',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-        }),
       });
 
-      if (!deleteResponse.ok) {
-        const error = await deleteResponse.json().catch(() => ({}));
-        throw new Error(error.message || 'Failed to delete backup');
-      }
+      // 3. Delete from server registry
+      await this.fetchWithRetry(`${this.apiBaseUrl}/storage/auth/delete`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          backupId: backupInfo.backupId,
+          userId: userId,
+        }),
+      });
     } catch (error) {
       console.error('Delete backup failed:', error);
       throw error;
@@ -456,27 +417,20 @@ export class CloudBackupService {
   /**
    * Check if user has a cloud backup
    */
-  async hasBackup(userId?: string): Promise<boolean> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
+  async hasBackup(username?: string): Promise<boolean> {
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
-    if (!userId) {
+    if (!userId && !username) {
       return false;
     }
 
     try {
-      // For S3, we'll try to get a presigned URL to check if the file exists
-      const response = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
-        method: 'POST',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-        }),
-      });
+      const url = username
+        ? `${this.apiBaseUrl}/storage/auth/check/by-username/${username}`
+        : `${this.apiBaseUrl}/storage/auth/check`;
 
+      const response = await this.fetchWithRetry(url, { method: 'HEAD' });
       return response.ok;
     } catch {
       return false;
@@ -486,43 +440,38 @@ export class CloudBackupService {
   /**
    * Get backup information
    */
-  async getBackupInfo(userId?: string): Promise<BackupInfo | null> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
+  async getBackupInfo(username?: string): Promise<BackupInfo | null> {
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
-    if (!userId) {
+    if (!userId && !username) {
       return null;
     }
 
     try {
-      // For S3, we'll try to get a presigned URL to check if the file exists
-      const response = await this.fetchWithRetry(`${this.apiBaseUrl}/s3/download`, {
-        method: 'POST',
-        body: JSON.stringify({
-          path: `users/${userId}`,
-          filename: 'encrypted-seed.enc',
-        }),
-      });
+      const url = username
+        ? `${this.apiBaseUrl}/storage/auth/download/by-username/${username}`
+        : `${this.apiBaseUrl}/storage/auth/download`;
+
+      const response = await this.fetchWithRetry(url);
 
       if (!response.ok) {
         return null;
       }
 
-      // Since we don't have the same metadata structure with S3,
-      // we'll create a basic backup info structure
+      const data = await response.json();
+
       return {
-        backupId: userId,
-        userId: userId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 0, // Size will be unknown without downloading
-        location: `users/${userId}/encrypted-seed.enc`,
-        encryptionAlgorithm: 'AES-GCM',
-        version: 1,
-        isActive: true,
+        backupId: data.backupId || this.generateBackupId(),
+        userId: userId || data.userId,
+        username: username || data.username,
+        createdAt: data.createdAt || data.timestamp || Date.now(),
+        updatedAt: data.updatedAt,
+        size: data.size || data.metadata?.size || 0,
+        location: data.backupUrl || data.url || data.location,
+        encryptionAlgorithm: data.encryptionAlgorithm || data.metadata?.encryptedWith || 'AES-GCM',
+        version: data.version || data.metadata?.version || 1,
+        isActive: data.isActive !== false,
       };
     } catch (error) {
       console.error('Failed to get backup info:', error);
@@ -533,13 +482,13 @@ export class CloudBackupService {
   /**
    * Verify backup integrity (download and validate structure)
    */
-  async verifyBackupIntegrity(userId?: string): Promise<boolean> {
+  async verifyBackupIntegrity(username?: string): Promise<boolean> {
     try {
-      if (!userId) {
-        // If no userId provided, we can't restore by userId, so return false
+      if (!username) {
+        // If no username provided, we can't restore by username, so return false
         return false;
       }
-      const encryptedSeed = await this.restoreSeedByUserId(userId);
+      const encryptedSeed = await this.restoreSeedByUsername(username);
 
       if (!encryptedSeed) {
         return false;
@@ -596,29 +545,22 @@ export class CloudBackupService {
   static async encryptAndBackupSeed(
     seedWords: string[],
     password: string,
-    userId?: string
+    username?: string
   ): Promise<BackupResult> {
-    // If userId is not provided, try to get it from profile
-    if (!userId) {
-      const profile = await UserService.getProfile();
-      userId = profile.userId;
-    }
-
-    if (!userId) {
-      throw new Error('User ID is required for backup');
-    }
+    const profile = await UserService.getProfile();
+    const { userId } = profile;
 
     const encryptedSeed = await encryptSeedForCloud(seedWords, password, userId);
 
-    return CloudBackupService.backupSeed(encryptedSeed, userId);
+    return CloudBackupService.backupSeed(encryptedSeed, username);
   }
 
   /**
    * Restore, decrypt and derive keys from backup (public - no session required)
    * Used for account recovery flow
    */
-  async restoreAccount(userId: string, password: string): Promise<KeyPair> {
-    const seedWords = await this.restoreAndDecryptSeedByUserId(userId, password);
+  async restoreAccount(username: string, password: string): Promise<KeyPair> {
+    const seedWords = await this.restoreAndDecryptSeedByUsername(username, password);
 
     if (!seedWords) {
       throw new Error('Failed to restore seed from backup');
