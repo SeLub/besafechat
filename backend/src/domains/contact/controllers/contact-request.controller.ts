@@ -13,7 +13,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 // Remove direct Express import for future Fastify compatibility
-import { ApiOperation, ApiParam, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { SendRequestDto } from '../dto/send-request.dto';
 import { ContactRequestService } from '../services/contact-request.service';
@@ -62,7 +62,7 @@ export class ContactRequestController {
         id: request.id,
         fromHandle: {
           id: request.fromHandle.id,
-          displayName: request.fromHandle.profile?.displayName,
+          displayName: request.fromHandle.ownerIdentity.profiles?.[0]?.displayName,
           handle: request.fromHandle.value,
         },
         message: request.message,
@@ -81,7 +81,7 @@ export class ContactRequestController {
         id: request.id,
         toHandle: {
           id: request.toHandle.id,
-          displayName: request.toHandle.profile?.displayName,
+          displayName: request.toHandle.ownerIdentity.profiles?.[0]?.displayName,
           handle: request.toHandle.value,
         },
         message: request.message,
@@ -94,12 +94,6 @@ export class ContactRequestController {
   @Post('requests/:id/accept')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept contact request' })
-  @ApiParam({
-    name: 'id',
-    description: 'Contact request ID to accept',
-    type: String,
-    example: 'abc123-def456-ghi789',
-  })
   async acceptRequest(
     @Req() req: RequestWithIdentity,
     @Param('id', ParseUUIDPipe) requestId: string
@@ -110,12 +104,6 @@ export class ContactRequestController {
   @Post('requests/:id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject contact request' })
-  @ApiParam({
-    name: 'id',
-    description: 'Contact request ID to reject',
-    type: String,
-    example: 'abc123-def456-ghi789',
-  })
   async rejectRequest(
     @Req() req: RequestWithIdentity,
     @Param('id', ParseUUIDPipe) requestId: string
@@ -125,12 +113,6 @@ export class ContactRequestController {
 
   @Get('check/:userId')
   @ApiOperation({ summary: 'Check contact request status with user' })
-  @ApiParam({
-    name: 'userId',
-    description: 'User ID to check contact request status with',
-    type: String,
-    example: 'abc123-def456-ghi789',
-  })
   async checkRequestStatus(
     @Req() req: RequestWithIdentity,
     @Param('userId', ParseUUIDPipe) userId: string

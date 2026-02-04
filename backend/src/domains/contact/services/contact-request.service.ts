@@ -181,7 +181,7 @@ export class ContactRequestService {
         id: request.id,
         user: {
           id: otherHandle.ownerIdentity.id,
-          displayName: otherHandle.profile?.displayName,
+          displayName: otherHandle.ownerIdentity.profiles?.[0]?.displayName,
           handle: otherHandle.value,
         },
         acceptedAt: request.updatedAt,

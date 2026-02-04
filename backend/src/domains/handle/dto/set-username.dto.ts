@@ -1,4 +1,3 @@
-// /home/selub/Documents/progs/besafechat/backend/src/domains/handle/dto/set-username.dto.ts
 import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
 
 export class SetUsernameDto {
