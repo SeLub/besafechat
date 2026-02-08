@@ -1,22 +1,50 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth';
 import { useNotifications } from './use-notifications';
 
+interface ContactRequestData {
+  requestId: string;
+  fromHandle: {
+    id: string;
+    value: string;
+    alias: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+  message?: string;
+}
+
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
-  onUserOffline?: (handleId: string) => void
+  onUserOffline?: (handleId: string) => void,
+  onContactRequest?: (request: ContactRequestData) => void
 ) {
   const { user } = useAuth();
   const { incrementRequests, incrementAccepted } = useNotifications();
 
-  const callbacksRef = useRef({ onChatCreated, onMessageReceived, onUserOnline, onUserOffline });
+  const callbacksRef = useRef({
+    onChatCreated,
+    onMessageReceived,
+    onUserOnline,
+    onUserOffline,
+    onContactRequest,
+  });
 
   useEffect(() => {
-    callbacksRef.current = { onChatCreated, onMessageReceived, onUserOnline, onUserOffline };
+    callbacksRef.current = {
+      onChatCreated,
+      onMessageReceived,
+      onUserOnline,
+      onUserOffline,
+      onContactRequest,
+    };
   });
 
   useEffect(() => {
@@ -32,11 +60,28 @@ export function useWebSocketNotifications(
     // Contact request received
     socket.on('contact_request_received', data => {
       console.log('Contact request received:', data);
-      const { fromHandle, message } = data;
-      const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
+      const { requestId, fromHandle, message } = data;
 
-      toast.success(`${displayName} wants to connect`, {
-        description: message || 'New contact request',
+      console.log('Triggering modal with data:', {
+        requestId,
+        fromHandle,
+        message,
+      });
+
+      // Trigger modal callback
+      callbacksRef.current.onContactRequest?.({
+        requestId,
+        fromHandle: {
+          id: fromHandle.id,
+          value: fromHandle.value || fromHandle.handle,
+          alias: fromHandle.alias || null,
+          displayName: fromHandle.displayName,
+          firstName: fromHandle.firstName || null,
+          lastName: fromHandle.lastName || null,
+          avatarUrl: fromHandle.avatarUrl || null,
+          bio: fromHandle.bio || null,
+        },
+        message,
       });
 
       incrementRequests();

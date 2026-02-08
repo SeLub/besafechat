@@ -1,3 +1,4 @@
+import { ContactRequestModal } from '@/components/contact-request-modal';
 import { AuthGuard } from '@/components/auth-guard';
 import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
@@ -20,6 +21,11 @@ function ChatRouteContent() {
     null
   );
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
+  const [contactRequestModal, setContactRequestModal] = useState<{
+    isOpen: boolean;
+    request: any;
+  }>({ isOpen: false, request: null });
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
   const {
@@ -243,12 +249,77 @@ function ChatRouteContent() {
     [updateChatOnlineStatus]
   );
 
+  const handleContactRequest = useCallback((request: any) => {
+    console.log('handleContactRequest called with:', request);
+    console.log('request.fromHandle:', request.fromHandle);
+    
+    // Transform data to match modal expectations
+    const transformedRequest = {
+      id: request.requestId,
+      from: {
+        handleId: request.fromHandle.id,
+        value: request.fromHandle.value,
+        alias: request.fromHandle.alias,
+        displayName: request.fromHandle.displayName,
+        firstName: request.fromHandle.firstName,
+        lastName: request.fromHandle.lastName,
+        avatarUrl: request.fromHandle.avatarUrl,
+        bio: request.fromHandle.bio,
+      },
+      message: request.message,
+    };
+    
+    console.log('Transformed request:', transformedRequest);
+    setContactRequestModal({ isOpen: true, request: transformedRequest });
+  }, []);
+
+  const handleAcceptRequest = async (requestId: string) => {
+    setRequestActionLoading(true);
+    try {
+      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/accept`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setContactRequestModal({ isOpen: false, request: null });
+        toast.success('Request accepted');
+      } else {
+        toast.error('Failed to accept request');
+      }
+    } catch {
+      toast.error('Failed to accept request');
+    } finally {
+      setRequestActionLoading(false);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    setRequestActionLoading(true);
+    try {
+      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/reject`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setContactRequestModal({ isOpen: false, request: null });
+        toast.success('Request rejected');
+      } else {
+        toast.error('Failed to reject request');
+      }
+    } catch {
+      toast.error('Failed to reject request');
+    } finally {
+      setRequestActionLoading(false);
+    }
+  };
+
   // Enable WebSocket notifications and messaging
   useWebSocketNotifications(
     handleChatCreated,
     handleMessageReceived,
     handleUserOnline,
-    handleUserOffline
+    handleUserOffline,
+    handleContactRequest
   );
 
   // Get socket reference for sending messages
@@ -334,6 +405,16 @@ function ChatRouteContent() {
         isOpen={newChatModalOpen}
         onClose={() => setNewChatModalOpen(false)}
         onChatCreated={handleChatCreated}
+      />
+
+      {/* Contact Request Modal */}
+      <ContactRequestModal
+        isOpen={contactRequestModal.isOpen}
+        onClose={() => setContactRequestModal({ isOpen: false, request: null })}
+        request={contactRequestModal.request}
+        onAccept={handleAcceptRequest}
+        onReject={handleRejectRequest}
+        loading={requestActionLoading}
       />
     </div>
   );

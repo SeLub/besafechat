@@ -195,6 +195,20 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 onEdit={() => setUsernameModalOpen(true)}
               />
 
+              {userProfile?.handle?.alias && (
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="text-sm text-muted-foreground mb-1">Alias</div>
+                  <div className="font-medium">@{userProfile.handle.alias}</div>
+                </div>
+              )}
+
+              {userProfile?.profile?.bio && (
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="text-sm text-muted-foreground mb-1">Bio</div>
+                  <div>{userProfile.profile.bio}</div>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">

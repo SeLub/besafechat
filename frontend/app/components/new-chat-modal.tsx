@@ -292,17 +292,21 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
               )}
 
               <div className="border-t border-border pt-4">
-                <textarea
-                  placeholder="Hi! Let's connect (optional)"
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  className="w-full p-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                  rows={2}
-                  maxLength={200}
-                />
-                <div className="text-xs text-muted-foreground mt-1 mb-3">
-                  {message.length}/200 characters
-                </div>
+                {!contact.isCurrentUser && contact.requestStatus !== 'connected' && (
+                  <>
+                    <textarea
+                      placeholder="Hi! Let's connect (optional)"
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      className="w-full p-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                      rows={2}
+                      maxLength={200}
+                    />
+                    <div className="text-xs text-muted-foreground mt-1 mb-3">
+                      {message.length}/200 characters
+                    </div>
+                  </>
+                )}
 
                 {contact.isCurrentUser ? (
                   <Button className="w-full" disabled>

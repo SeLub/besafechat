@@ -102,7 +102,7 @@ export function HamburgerMenu({
 
           {/* User Profile Section */}
           <div className="p-4 border-b border-border">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 mb-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {getInitials(userProfile?.profile?.displayName)}
@@ -124,10 +124,15 @@ export function HamburgerMenu({
                   {userProfile?.profile?.displayName || 'Anonymous User'}
                 </div>
                 <div className="text-sm text-muted-foreground truncate">
-                  {(userProfile?.identity?.publicKey || '').slice(0, 16)}...
+                  @{userProfile?.handle?.alias || userProfile?.handle?.value || 'unknown'}
                 </div>
               </div>
             </div>
+            {userProfile?.profile?.bio && (
+              <div className="text-sm text-muted-foreground">
+                {userProfile.profile.bio}
+              </div>
+            )}
           </div>
 
           {/* Menu Items */}

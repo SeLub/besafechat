@@ -27,7 +27,7 @@ export class ContactRequestService {
   async sendRequest(fromHandleId: string, toHandleId: string, message?: string) {
     // Check if handles exist
     const [fromHandle, toHandle] = await Promise.all([
-      this.handleRepository.findOne({ where: { id: fromHandleId }, relations: ['ownerIdentity'] }),
+      this.handleRepository.findOne({ where: { id: fromHandleId }, relations: ['ownerIdentity', 'profile'] }),
       this.handleRepository.findOne({ where: { id: toHandleId }, relations: ['ownerIdentity'] }),
     ]);
 
@@ -61,10 +61,13 @@ export class ContactRequestService {
 
     const savedRequest = await this.contactRequestRepository.save(request);
 
+    // Load avatarUrl for WebSocket notification
+    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(fromHandle.id);
+
     // Send WebSocket notification
     await this.messagesGateway.notifyContactRequest(
       toHandle.id,
-      fromHandle,
+      { ...fromHandle, profile: { ...fromHandle.profile, avatarUrl } },
       savedRequest.id,
       message?.trim()
     );
