@@ -138,25 +138,32 @@ export class ProfileService {
       .getMany();
   }
 
-  async getPublicProfile(handleValue: string): Promise<any> {
-    const profile = await this.getProfileByHandleValue(handleValue);
-    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(profile.handleId);
+  async getPublicProfile(handleQuery: string): Promise<any> {
+    const result = await this.handleService.findByValueOrAlias(handleQuery);
 
-    // Фильтруем приватные данные согласно настройкам
+    if (!result) {
+      throw new NotFoundException(`Handle "${handleQuery}" not found`);
+    }
+
+    const { handle, matchedBy } = result;
+    const profile = await this.getProfileByHandle(handle.id);
+    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(handle.id);
+
     const publicProfile: any = {
       handle: {
-        value: profile.handle.value,
-        alias: profile.handle.alias,
-        isSearchable: profile.handle.isSearchable,
+        id: handle.id,
+        value: handle.value,
+        alias: handle.alias,
+        matchedBy,
       },
       displayName: profile.displayName,
-      avatarUrl: avatarUrl, // Always generate dynamically if avatar exists
+      firstName: profile.firstName || null,
+      lastName: profile.lastName || null,
+      avatarUrl,
       bio: profile.bio,
-      metadata: profile.metadata,
       createdAt: profile.createdAt,
     };
 
-    // Добавляем приватные данные только если разрешено в настройках
     if (profile.settings.showEmail && profile.email) {
       publicProfile.email = profile.email;
     }
@@ -165,7 +172,7 @@ export class ProfileService {
       publicProfile.phone = profile.phone;
     }
 
-    if (profile.settings.showLastSeen && profile.metadata.lastActive) {
+    if (profile.settings.showLastSeen && profile.metadata?.lastActive) {
       publicProfile.lastActive = profile.metadata.lastActive;
     }
 

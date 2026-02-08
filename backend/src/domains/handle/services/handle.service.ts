@@ -115,6 +115,28 @@ export class HandleService {
     });
   }
 
+  async findByValueOrAlias(query: string): Promise<{ handle: Handle; matchedBy: 'value' | 'alias' } | null> {
+    const byValue = await this.handleRepository.findOne({
+      where: { value: query },
+      relations: ['ownerIdentity', 'profile'],
+    });
+
+    if (byValue) {
+      return { handle: byValue, matchedBy: 'value' };
+    }
+
+    const byAlias = await this.handleRepository.findOne({
+      where: { alias: query },
+      relations: ['ownerIdentity', 'profile'],
+    });
+
+    if (byAlias) {
+      return { handle: byAlias, matchedBy: 'alias' };
+    }
+
+    return null;
+  }
+
   async getPrimaryHandle(identityId: string): Promise<Handle> {
     const handle = await this.handleRepository.findOne({
       where: {

@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,8 +23,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { RedisService } from '../../../domains/redis/redis.service';
-import { HandleService } from '../../handle/services/handle.service';
-import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
+import { CurrentHandle } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { SendRequestDto } from '../dto/send-request.dto';
 import { ContactRequestService } from '../services/contact-request.service';
@@ -37,7 +35,6 @@ import { ContactRequestService } from '../services/contact-request.service';
 export class ContactRequestController {
   constructor(
     private contactRequestService: ContactRequestService,
-    private handleService: HandleService,
     private redisService: RedisService
   ) {}
 
@@ -66,25 +63,10 @@ export class ContactRequestController {
     description: 'Invalid request data (e.g. invalid UUID, message too long)',
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
-  async sendRequest(@CurrentIdentity() identity: any, @Body() dto: SendRequestDto) {
-    // Get the primary handle ID for the sender
-    const fromHandle = await this.contactRequestService.getPrimaryHandleForIdentity(identity.id);
-
-    if (!fromHandle) {
-      throw new NotFoundException('Sender does not have a primary handle');
-    }
-
-    // Validate that the target handle exists
-    const toHandle = await this.handleService.findById(dto.toHandleId);
-
-    if (!toHandle) {
-      throw new NotFoundException('Target handle not found');
-    }
-
-    // Use the existing sendRequest method with handle IDs directly
+  async sendRequest(@CurrentHandle() handle: any, @Body() dto: SendRequestDto) {
     const request = await this.contactRequestService.sendRequest(
-      fromHandle.id,
-      dto.toHandleId, // Use the handle ID directly from the DTO
+      handle.id,
+      dto.toHandleId,
       dto.message
     );
 
@@ -139,14 +121,7 @@ export class ContactRequestController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
-  async getIncomingRequests(@CurrentIdentity() identity: any) {
-    // Get the current active handle for the user's session (or primary handle)
-    const handle = await this.contactRequestService.getPrimaryHandleForIdentity(identity.id);
-
-    if (!handle) {
-      throw new NotFoundException('User does not have a primary handle');
-    }
-
+  async getIncomingRequests(@CurrentHandle() handle: any) {
     const requests = await this.contactRequestService.getIncomingRequests(handle.id);
 
     return {
@@ -219,14 +194,7 @@ export class ContactRequestController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
-  async getOutgoingRequests(@CurrentIdentity() identity: any) {
-    // Get the current active handle for the user's session (or primary handle)
-    const handle = await this.contactRequestService.getPrimaryHandleForIdentity(identity.id);
-
-    if (!handle) {
-      throw new NotFoundException('User does not have a primary handle');
-    }
-
+  async getOutgoingRequests(@CurrentHandle() handle: any) {
     const requests = await this.contactRequestService.getOutgoingRequests(handle.id);
 
     return {
@@ -267,10 +235,10 @@ export class ContactRequestController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
   @ApiNotFoundResponse({ description: 'Contact request not found' })
   async acceptRequest(
-    @CurrentIdentity() identity: any,
+    @CurrentHandle() handle: any,
     @Param('id', ParseUUIDPipe) requestId: string
   ) {
-    return await this.contactRequestService.acceptRequestByIdentity(requestId, identity.id);
+    return await this.contactRequestService.acceptRequest(requestId, handle.id);
   }
 
   @Post('requests/:id/reject')
@@ -290,21 +258,21 @@ export class ContactRequestController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
   @ApiNotFoundResponse({ description: 'Contact request not found' })
   async rejectRequest(
-    @CurrentIdentity() identity: any,
+    @CurrentHandle() handle: any,
     @Param('id', ParseUUIDPipe) requestId: string
   ) {
-    return await this.contactRequestService.rejectRequestByIdentity(requestId, identity.id);
+    return await this.contactRequestService.rejectRequest(requestId, handle.id);
   }
 
-  @Get('check/:userId')
+  @Get('check/:handleId')
   @ApiOperation({
-    summary: 'Check contact request status with user',
+    summary: 'Check contact request status with handle',
     description:
-      'Checks the current status of the contact relationship with another user. Possible statuses: none (no request exchanged), sent (request sent by current user), received (request received from other user), connected (mutual connection established).',
+      'Checks the current status of the contact relationship with another handle. Possible statuses: none (no request exchanged), sent (request sent by current user), received (request received from other user), connected (mutual connection established).',
   })
   @ApiParam({
-    name: 'userId',
-    description: 'User ID to check contact request status with',
+    name: 'handleId',
+    description: 'Handle ID to check contact request status with',
     type: String,
     example: 'abc123-def456-ghi789',
   })
@@ -330,26 +298,12 @@ export class ContactRequestController {
   })
   @ApiBadRequestResponse({ description: 'Invalid request data (e.g. invalid UUID format)' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
-  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiNotFoundResponse({ description: 'Handle not found' })
   async checkRequestStatus(
-    @CurrentIdentity() identity: any,
-    @Param('userId', ParseUUIDPipe) userId: string
+    @CurrentHandle() handle: any,
+    @Param('handleId', ParseUUIDPipe) handleId: string
   ) {
-    // Get the current active handle for the user's session (or primary handle)
-    const handle = await this.contactRequestService.getPrimaryHandleForIdentity(identity.id);
-
-    if (!handle) {
-      throw new NotFoundException('User does not have a primary handle');
-    }
-
-    // Convert userId to corresponding handleId
-    const otherHandle = await this.contactRequestService.getPrimaryHandleForIdentity(userId);
-
-    if (!otherHandle) {
-      throw new NotFoundException('Target user does not have a primary handle');
-    }
-
-    const status = await this.contactRequestService.checkRequestStatus(handle.id, otherHandle.id);
+    const status = await this.contactRequestService.checkRequestStatus(handle.id, handleId);
     return {
       success: true,
       data: { status },
@@ -382,16 +336,8 @@ export class ContactRequestController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
-  async getContacts(@CurrentIdentity() identity: any) {
-    // Get the current active handle for the user's session (or primary handle)
-    const handle = await this.contactRequestService.getPrimaryHandleForIdentity(identity.id);
-
-    if (!handle) {
-      throw new NotFoundException('User does not have a primary handle');
-    }
-
+  async getContacts(@CurrentHandle() handle: any) {
     const contacts = await this.contactRequestService.getAcceptedContacts(handle.id);
-    // contacts already has the correct structure based on service implementation
     return { contacts };
   }
 
@@ -429,7 +375,6 @@ export class ContactRequestController {
     const { userIds } = body;
     const redis = this.redisService.getClient();
 
-    // Get online status for each handle ID
     const statuses: Record<string, boolean> = {};
 
     for (const handleId of userIds) {

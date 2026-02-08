@@ -85,7 +85,7 @@ export class ProfileController {
 
   @Get('public/:handle')
   @ApiOperation({ summary: 'Get public profile by handle value' })
-  @ApiParam({ name: 'handle', description: 'Handle value (username)', example: 'john_doe' })
+  @ApiParam({ name: 'handle', description: 'Handle value or alias', example: 'john_doe' })
   async getPublicProfile(@Param('handle') handleValue: string) {
     const profile = await this.profileService.getPublicProfile(handleValue);
     return new ApiResponseDto(true, { profile });
@@ -220,7 +220,7 @@ export class ProfileController {
     name: 'handleId',
     description: 'Handle ID',
     type: String,
-    example: 'abc123-def456-ghi789'
+    example: 'abc123-def456-ghi789',
   })
   @UseGuards(JwtSessionGuard)
   @ApiBearerAuth()
