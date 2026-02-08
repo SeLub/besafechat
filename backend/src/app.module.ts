@@ -11,7 +11,6 @@ import { IdentityModule } from './domains/identity/identity.module';
 import { MediaModule } from './domains/media/media.module';
 import { MessageModule } from './domains/message/message.module';
 import { ProfileModule } from './domains/profile/profile.module';
-import { S3Module } from './domains/s3/s3.module';
 import { SessionModule } from './domains/session/session.module';
 import { TeamModule } from './domains/team/team.module';
 import { RedisModule } from './domains/redis/redis.module';
@@ -31,7 +30,6 @@ import { RedisModule } from './domains/redis/redis.module';
     MessageModule,
     ContactModule,
     ChatModule,
-    S3Module,
     MediaModule,
   ],
 })
