@@ -10,8 +10,11 @@ interface Contact {
   user: {
     id: string;
     displayName?: string;
-    username?: string;
+    handle?: string;
     avatarUrl?: string;
+    firstName?: string;
+    lastName?: string;
+    bio?: string;
   };
   acceptedAt: string;
 }
@@ -249,12 +252,12 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
                     <div>
                       <div className="font-medium">
                         {contact.user.displayName ||
-                          `@${contact.user.username}` ||
+                          `@${contact.user.handle}` ||
                           'Anonymous User'}
                       </div>
-                      {contact.user.username && (
+                      {contact.user.handle && (
                         <div className="text-sm text-muted-foreground">
-                          @{contact.user.username}
+                          @{contact.user.handle}
                         </div>
                       )}
                     </div>

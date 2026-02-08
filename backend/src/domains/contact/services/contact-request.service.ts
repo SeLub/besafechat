@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Handle } from '../../handle/handle.entity';
 import { MessagesGateway } from '../../message/gateways/messages.gateway';
 import { ChatRoomService } from '../../message/services/chat-room.service';
+import { MediaService } from '../../media/media.service';
 import { ContactRequest, ContactRequestStatus } from '../contact-request.entity';
 
 @Injectable()
@@ -19,7 +20,8 @@ export class ContactRequestService {
     @InjectRepository(Handle)
     private handleRepository: Repository<Handle>,
     private messagesGateway: MessagesGateway,
-    private chatRoomService: ChatRoomService
+    private chatRoomService: ChatRoomService,
+    private mediaService: MediaService
   ) {}
 
   async sendRequest(fromHandleId: string, toHandleId: string, message?: string) {
@@ -197,19 +199,26 @@ export class ContactRequestService {
       order: { updatedAt: 'DESC' },
     });
 
-    return requests.map((request) => {
-      // Get the other user (not the current user)
-      const otherHandle = request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
+    return Promise.all(
+      requests.map(async (request) => {
+        // Get the other user (not the current user)
+        const otherHandle = request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
+        const avatarUrl = await this.mediaService.getAvatarUrlIfExists(otherHandle.id);
 
-      return {
-        id: request.id,
-        user: {
-          id: otherHandle.id, // Use handle ID instead of identity ID
-          displayName: otherHandle.profile?.displayName,
-          handle: otherHandle.value,
-        },
-        acceptedAt: request.updatedAt,
-      };
-    });
+        return {
+          id: request.id,
+          user: {
+            id: otherHandle.id, // Use handle ID instead of identity ID
+            displayName: otherHandle.profile?.displayName,
+            handle: otherHandle.value,
+            avatarUrl,
+            firstName: otherHandle.profile?.firstName,
+            lastName: otherHandle.profile?.lastName,
+            bio: otherHandle.profile?.bio,
+          },
+          acceptedAt: request.updatedAt,
+        };
+      })
+    );
   }
 }

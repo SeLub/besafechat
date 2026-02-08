@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './use-auth';
+import { API_CONFIG } from '../services/api-config';
 
 interface Chat {
   id: string;
@@ -12,6 +13,11 @@ interface Chat {
   username?: string;
   publicKey?: string;
   handleId?: string;
+  avatarUrl?: string;
+  bio?: string;
+  firstName?: string;
+  lastName?: string;
+  alias?: string;
 }
 
 export function useChats() {
@@ -49,7 +55,7 @@ export function useChats() {
   const loadChatsFromBackend = async () => {
     try {
       // Load actual chats from the chats API
-      const chatsRes = await fetch('http://localhost:4000/chats', {
+      const chatsRes = await fetch(`${API_CONFIG.BASE_URL}/chats`, {
         credentials: 'include',
       });
 
@@ -64,11 +70,17 @@ export function useChats() {
           const otherMember = chat.otherMembers?.[0];
 
           return {
-            id: chat.id, // Use actual chat ID
+            id: chat.id,
             name:
               otherMember?.user?.displayName || `@${otherMember?.user?.handle}` || 'Unknown User',
-            handleId: otherMember?.handleId, // Use handleId of the other user
+            handleId: otherMember?.handleId,
             publicKey: otherMember?.user?.publicKey,
+            avatarUrl: otherMember?.user?.avatarUrl || undefined,
+            bio: otherMember?.user?.bio || undefined,
+            firstName: otherMember?.user?.firstName || undefined,
+            lastName: otherMember?.user?.lastName || undefined,
+            username: otherMember?.user?.handle || undefined,
+            alias: otherMember?.user?.alias || undefined,
             isOnline: false,
           };
         });
@@ -150,7 +162,7 @@ export function useChats() {
     if (handleIds.length === 0) return;
 
     try {
-      const res = await fetch('http://localhost:4000/contacts/bulk-online-status', {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

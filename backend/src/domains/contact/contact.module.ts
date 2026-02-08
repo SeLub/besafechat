@@ -10,6 +10,7 @@ import { MessagesGateway } from '../message/gateways/messages.gateway';
 import { MessageMetadata } from '../message/message-metadata.entity';
 import { ChatRoomService } from '../message/services/chat-room.service';
 import { MessageMetadataService } from '../message/services/message-metadata.service';
+import { MediaModule } from '../media/media.module';
 import { SessionModule } from '../session/session.module';
 import { ContactRequest } from './contact-request.entity';
 import { ContactRequestController } from './controllers/contact-request.controller';
@@ -20,6 +21,7 @@ import { ContactRequestService } from './services/contact-request.service';
     TypeOrmModule.forFeature([ContactRequest, Handle, MessageMetadata, Chat, ChatMember]),
     SessionModule,
     HandleModule,
+    MediaModule,
   ],
   providers: [
     ContactRequestService,

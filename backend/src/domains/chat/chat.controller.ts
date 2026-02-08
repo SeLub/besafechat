@@ -6,6 +6,7 @@ import { Not, Repository } from 'typeorm';
 import { ChatRoomService } from '../message/services/chat-room.service';
 import { CurrentUser } from '../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../session/guards/jwt-session.guard';
+import { MediaService } from '../media/media.service';
 import { ChatMember } from './chat-member.entity';
 import { Chat } from './chat.entity';
 
@@ -17,7 +18,8 @@ export class ChatController {
     private chatRepository: Repository<Chat>,
     @InjectRepository(ChatMember)
     private chatMemberRepository: Repository<ChatMember>,
-    private chatRoomService: ChatRoomService
+    private chatRoomService: ChatRoomService,
+    private mediaService: MediaService
   ) {}
 
   @Get(':id')
@@ -60,21 +62,30 @@ export class ChatController {
     // Формируем ответ с участниками
     return {
       ...chat,
-      members: members.map((member) => ({
-        handleId: member.memberHandleId,
-        role: member.role,
-        canSendMessages: member.canSendMessages,
-        joinedAt: member.joinedAt,
-        user: {
-          id: member.memberHandle?.ownerIdentityId,
-          displayName: member.memberHandle?.profile?.displayName,
-          handle: member.memberHandle?.value,
-        },
-        handle: {
-          value: member.memberHandle?.value,
-          alias: member.memberHandle?.alias,
-        },
-      })),
+      members: await Promise.all(
+        members.map(async (member) => {
+          const avatarUrl = member.memberHandleId
+            ? await this.mediaService.getAvatarUrlIfExists(member.memberHandleId)
+            : null;
+
+          return {
+            handleId: member.memberHandleId,
+            role: member.role,
+            canSendMessages: member.canSendMessages,
+            joinedAt: member.joinedAt,
+            user: {
+              id: member.memberHandle?.ownerIdentityId,
+              displayName: member.memberHandle?.profile?.displayName,
+              firstName: member.memberHandle?.profile?.firstName || null,
+              lastName: member.memberHandle?.profile?.lastName || null,
+              handle: member.memberHandle?.value,
+              alias: member.memberHandle?.alias || null,
+              bio: member.memberHandle?.profile?.bio || null,
+              avatarUrl,
+            },
+          };
+        })
+      ),
     };
   }
 
@@ -104,15 +115,28 @@ export class ChatController {
           type: membership.chat.type,
           createdAt: membership.chat.createdAt,
           lastMessageAt: membership.chat.lastMessageAt,
-          otherMembers: otherMembers.map((member) => ({
-            handleId: member.memberHandleId,
-            user: {
-              id: member.memberHandle?.ownerIdentityId,
-              displayName: member.memberHandle?.profile?.displayName,
-              handle: member.memberHandle?.value,
-              publicKey: member.memberHandle?.ownerIdentity?.masterPublicKey?.toString('base64'),
-            },
-          })),
+          otherMembers: await Promise.all(
+            otherMembers.map(async (member) => {
+              const avatarUrl = member.memberHandleId
+                ? await this.mediaService.getAvatarUrlIfExists(member.memberHandleId)
+                : null;
+
+              return {
+                handleId: member.memberHandleId,
+                user: {
+                  id: member.memberHandle?.ownerIdentityId,
+                  displayName: member.memberHandle?.profile?.displayName,
+                  firstName: member.memberHandle?.profile?.firstName || null,
+                  lastName: member.memberHandle?.profile?.lastName || null,
+                  handle: member.memberHandle?.value,
+                  alias: member.memberHandle?.alias || null,
+                  bio: member.memberHandle?.profile?.bio || null,
+                  avatarUrl,
+                  publicKey: member.memberHandle?.ownerIdentity?.masterPublicKey?.toString('base64'),
+                },
+              };
+            })
+          ),
         };
       })
     );

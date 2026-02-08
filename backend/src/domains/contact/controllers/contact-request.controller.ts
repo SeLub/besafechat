@@ -26,6 +26,7 @@ import { RedisService } from '../../../domains/redis/redis.service';
 import { CurrentHandle } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { SendRequestDto } from '../dto/send-request.dto';
+import { MediaService } from '../../media/media.service';
 import { ContactRequestService } from '../services/contact-request.service';
 
 @ApiTags('Contacts')
@@ -35,7 +36,8 @@ import { ContactRequestService } from '../services/contact-request.service';
 export class ContactRequestController {
   constructor(
     private contactRequestService: ContactRequestService,
-    private redisService: RedisService
+    private redisService: RedisService,
+    private mediaService: MediaService
   ) {}
 
   @Post('request')
@@ -125,23 +127,31 @@ export class ContactRequestController {
     const requests = await this.contactRequestService.getIncomingRequests(handle.id);
 
     return {
-      requests: requests.map((request) => ({
-        id: request.id,
-        from: {
-          handleId: request.fromHandle?.id || '',
-          value: request.fromHandle?.value || '',
-          displayName: request.fromHandle?.profile?.displayName,
-          firstName: request.fromHandle?.profile?.firstName,
-          lastName: request.fromHandle?.profile?.lastName,
-          avatarUrl: null, // avatarUrl is not stored in the Profile entity
-          bio: request.fromHandle?.profile?.bio,
-        },
-        to: {
-          handleId: request.toHandle?.id || '',
-        },
-        message: request.message,
-        createdAt: request.createdAt,
-      })),
+      requests: await Promise.all(
+        requests.map(async (request) => {
+          const avatarUrl = request.fromHandle?.id
+            ? await this.mediaService.getAvatarUrlIfExists(request.fromHandle.id)
+            : null;
+
+          return {
+            id: request.id,
+            from: {
+              handleId: request.fromHandle?.id || '',
+              value: request.fromHandle?.value || '',
+              displayName: request.fromHandle?.profile?.displayName,
+              firstName: request.fromHandle?.profile?.firstName,
+              lastName: request.fromHandle?.profile?.lastName,
+              avatarUrl,
+              bio: request.fromHandle?.profile?.bio,
+            },
+            to: {
+              handleId: request.toHandle?.id || '',
+            },
+            message: request.message,
+            createdAt: request.createdAt,
+          };
+        })
+      ),
     };
   }
 
@@ -198,24 +208,32 @@ export class ContactRequestController {
     const requests = await this.contactRequestService.getOutgoingRequests(handle.id);
 
     return {
-      requests: requests.map((request) => ({
-        id: request.id,
-        from: {
-          handleId: request.fromHandle?.id || '',
-          value: request.fromHandle?.value || '',
-          displayName: request.fromHandle?.profile?.displayName || '',
-          firstName: request.fromHandle?.profile?.firstName || null,
-          lastName: request.fromHandle?.profile?.lastName || null,
-          avatarUrl: null, // avatarUrl is not stored in the Profile entity
-          bio: request.fromHandle?.profile?.bio || null,
-        },
-        to: {
-          handleId: request.toHandle?.id || '',
-        },
-        message: request.message,
-        status: request.status,
-        createdAt: request.createdAt,
-      })),
+      requests: await Promise.all(
+        requests.map(async (request) => {
+          const avatarUrl = request.fromHandle?.id
+            ? await this.mediaService.getAvatarUrlIfExists(request.fromHandle.id)
+            : null;
+
+          return {
+            id: request.id,
+            from: {
+              handleId: request.fromHandle?.id || '',
+              value: request.fromHandle?.value || '',
+              displayName: request.fromHandle?.profile?.displayName || '',
+              firstName: request.fromHandle?.profile?.firstName || null,
+              lastName: request.fromHandle?.profile?.lastName || null,
+              avatarUrl,
+              bio: request.fromHandle?.profile?.bio || null,
+            },
+            to: {
+              handleId: request.toHandle?.id || '',
+            },
+            message: request.message,
+            status: request.status,
+            createdAt: request.createdAt,
+          };
+        })
+      ),
     };
   }
 
