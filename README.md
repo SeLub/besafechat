@@ -57,6 +57,66 @@ To prevent collisions where users with identical passwords would have their encr
 - Hierarchical team structures
 - Private, group, and team chats
 
+## Authentication System Overview
+
+### Core Authentication Flow
+
+BeSafeChat uses **Ed25519 public key cryptography** combined with **challenge-response authentication** instead of traditional passwords:
+
+```
+1. Client generates Ed25519 key pair from seed phrase
+2. Client requests authentication challenge from server
+3. Server generates 256-bit random challenge (stored in Redis, 2-min TTL)
+4. Client signs challenge with Ed25519 private key
+5. Client sends signature to server
+6. Server verifies signature with public key
+7. On first login: System creates Identity with default Handle and Profile
+8. Server creates Session with access and refresh tokens
+9. Client destroys private key from memory
+```
+
+### Session Management
+
+- **Access Token**: 30 minutes (HttpOnly cookie)
+- **Refresh Token**: 30 days (HttpOnly cookie)
+- **Session Limit**: Maximum 5 active sessions per identity
+- **Device Tracking**: Records device name, type, IP address
+- **Multi-Device**: Users can view and revoke sessions from other devices
+
+### Default Identity Creation
+
+When a user logs in with a new public key:
+
+```
+1. System creates Identity linked to Ed25519 public key
+2. Generates default Handle: user_{SHA256(publicKey)[0:12]}
+   Example: user_a1b2c3d4e5f6
+3. Creates default Profile with displayName: "Anonym User"
+4. User can customize handle and profile later in settings
+```
+
+### Authentication Security Features
+
+- **Challenge-Response**: Prevents replay attacks (one-time use)
+- **IP Validation**: Challenge must come from same IP as request
+- **Attempt Limiting**: Maximum 5 failed attempts per challenge
+- **Private Key**: Never stored; destroyed immediately after use
+- **Token Hashing**: Access tokens hashed in database (never plaintext)
+- **Rate Limiting**: Per-IP request limiting on auth endpoints
+- **Timing Attack Protection**: Random delays (50-150ms)
+
+### Key Authentication Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/auth/login/challenge` | POST | Request challenge |
+| `/auth/login` | POST | Submit signed challenge |
+| `/auth/profile` | GET | Get current user profile |
+| `/auth/sessions` | GET | List active sessions |
+| `/auth/sessions/revoke/:id` | POST | Revoke specific session |
+| `/auth/logout` | POST | Logout current session |
+| `/auth/refresh` | POST | Refresh access token |
+
 ## Architecture Components
 
 ### Identity Entity
