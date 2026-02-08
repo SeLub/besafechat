@@ -2,10 +2,10 @@ import {
   deriveKeyPairFromSeed,
   encryptSeedForCloud,
   generateSeedPhrase,
-  validateSeedPhrase,
   hashPrivateKey,
+  pkcs8ToRawPrivateKey,
+  validateSeedPhrase,
 } from '../lib/crypto';
-import { pkcs8ToRawPrivateKey } from '../lib/crypto';
 import { AuthService } from './auth.service';
 import { CloudBackupService } from './cloud-backup.service';
 import { DeviceService } from './device.service';
@@ -88,10 +88,10 @@ export class AccountService {
     // 5. Login (creates identity if first time) on server
     // Private key is used for signing auth challenges
     const result = await AuthService.login({
-     publicKey: publicKeyBase64,
-     privateKey: keyPair.privateKey,
-     deviceId,
-     deviceName,
+      publicKey: publicKeyBase64,
+      privateKey: keyPair.privateKey,
+      deviceId,
+      deviceName,
     });
 
     // 6. Initialize database FIRST with this account's identityId (before storing keys)
@@ -113,7 +113,7 @@ export class AccountService {
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const encrypted = await encryptSeedForCloud(seed, password, result.userId);
+    const encrypted = await encryptSeedForCloud(seed, password, result.identityId);
 
     // 8. Claim the password hash before backup
     const claimResult = await PasswordRecoveryService.claimPasswordWithRetry(password);
@@ -140,7 +140,7 @@ export class AccountService {
       privateKey: keyPair.privateKey,
       publicKey: keyPair.publicKey,
       publicKeyBase64,
-      userId: result.userId,
+      userId: result.identityId,
     };
   }
 
@@ -190,7 +190,7 @@ export class AccountService {
       privateKey: keyPair.privateKey,
       publicKey: keyPair.publicKey,
       publicKeyBase64,
-      userId: result.userId,
+      userId: result.identityId,
     };
   }
 
@@ -207,7 +207,7 @@ export class AccountService {
 
     // Derive keys from the recovered seed
     const keyPair = await deriveKeyPairFromSeed(seed);
-    
+
     // Keep a reference to the private key BEFORE clearing
     const privateKeyForLogin = keyPair.privateKey.slice(); // Make a copy to preserve
 
@@ -239,7 +239,7 @@ export class AccountService {
 
     // Derive keys
     const keyPair = await deriveKeyPairFromSeed(seed);
-    
+
     // Keep a reference to the private key BEFORE clearing
     const privateKeyForLogin = keyPair.privateKey.slice(); // Make a copy to preserve
 

@@ -1,9 +1,9 @@
 export type {
   ApiResponse,
+  HandleCheckResponse,
   // LoginRequest,
   LoginResponse,
   ProfileResponse,
-  UsernameCheckResponse,
 } from './api';
 
 export type {
@@ -24,4 +24,4 @@ export type {
   LoginCredentials,
 } from './auth';
 
-export type { Identity, Handle, Profile } from './profile';
+export type { Handle, Identity, Profile } from './profile';

@@ -5,21 +5,35 @@ export interface ApiResponse<T = any> {
   message?: string; // иногда может быть message вместо error
 }
 export interface LoginResponse {
-  success: boolean;
-  userId: string;
-  username?: string;
+  identityId: string;
+  sessionId: string;
+  handleId: string;
 }
 export interface ProfileResponse {
-  userId: string;
-  username?: string;
-  displayName?: string;
-  publicKey: string;
-  createdAt: string;
-  isSearchable: boolean;
-  avatarUrl?: string | null;
+  identity: {
+    id: string;
+    publicKey: string;
+    createdAt: string;
+  };
+  handle: {
+    id: string;
+    value: string;
+    alias?: string | null;
+    isSearchable: boolean;
+    isPrimary: boolean;
+    createdAt: string;
+  };
+  profile: {
+    displayName?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarUrl?: string | null;
+    bio?: string | null;
+    settings: Record<string, any>;
+  };
 }
 
-export interface UsernameCheckResponse {
+export interface HandleCheckResponse {
   available: boolean;
   suggested?: string;
 }
