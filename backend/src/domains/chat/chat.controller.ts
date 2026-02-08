@@ -141,6 +141,14 @@ export class ChatController {
       })
     );
 
+    // Sort by lastMessageAt (most recent first), null values go to the end
+    chats.sort((a, b) => {
+      if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+      if (!a.lastMessageAt) return 1;
+      if (!b.lastMessageAt) return -1;
+      return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+    });
+
     return { chats };
   }
 

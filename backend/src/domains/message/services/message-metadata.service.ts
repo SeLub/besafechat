@@ -39,6 +39,9 @@ export class MessageMetadataService {
     const savedMetadata = await this.messageMetadataRepository.save(metadata);
     console.log(`✅ Metadata saved successfully with ID: ${savedMetadata.id}`);
 
+    // 3. Обновить lastMessageAt в чате
+    await this.chatRepository.update(chat.id, { lastMessageAt: new Date() });
+
     return { chatId: chat.id, messageId: savedMetadata.id };
   }
 }
