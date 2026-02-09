@@ -1,4 +1,5 @@
 import { ContactsPage } from '@/components/contacts-page';
+import { NotificationList } from '@/components/notification-list';
 import { DevicesSettingsModal } from '@/components/devices-settings-modal';
 import { DisplayNameModal } from '@/components/display-name-modal';
 import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
 import { useAuth } from '@/hooks/use-auth';
+import { useNotificationHistory } from '@/hooks/use-notification-history';
 import { MediaService } from '@/services/media.service';
 import {
   ArrowLeft,
@@ -31,7 +33,7 @@ import { toast } from 'sonner';
 import { UserService } from '~/services';
 
 interface LeftPanelPageProps {
-  page: 'profile' | 'settings' | 'contacts' | null;
+  page: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
   onBack: () => void;
   userProfile?: {
     identity: {
@@ -61,6 +63,7 @@ interface LeftPanelPageProps {
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
   const { user, logout, checkAuth, refreshUser } = useAuth();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotificationHistory();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -251,6 +254,19 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           onChatCreated?.(userId);
           onBack();
         }}
+      />
+    );
+  }
+
+  if (page === 'notifications') {
+    return (
+      <NotificationList
+        notifications={notifications}
+        unreadCount={unreadCount}
+        loading={loading}
+        onBack={onBack}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
       />
     );
   }

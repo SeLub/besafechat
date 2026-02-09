@@ -10,6 +10,7 @@ import { HandleModule } from './domains/handle/handle.module';
 import { IdentityModule } from './domains/identity/identity.module';
 import { MediaModule } from './domains/media/media.module';
 import { MessageModule } from './domains/message/message.module';
+import { NotificationModule } from './domains/notification/notification.module';
 import { ProfileModule } from './domains/profile/profile.module';
 import { SessionModule } from './domains/session/session.module';
 import { TeamModule } from './domains/team/team.module';
@@ -28,6 +29,7 @@ import { RedisModule } from './domains/redis/redis.module';
     TeamModule,
     SessionModule,
     MessageModule,
+    NotificationModule,
     ContactModule,
     ChatModule,
     MediaModule,

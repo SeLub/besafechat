@@ -2,7 +2,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useNotifications } from '@/hooks/use-notifications';
-import { Menu, Moon, Settings, Sun, User, Users, X } from 'lucide-react';
+import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { Menu, Moon, Settings, Sun, User, Users, Bell, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
@@ -33,6 +34,7 @@ interface HamburgerMenuProps {
   onProfileClick?: () => void;
   onContactsClick?: () => void;
   onSettingsClick?: () => void;
+  onNotificationsClick?: () => void;
 }
 
 export function HamburgerMenu({
@@ -40,10 +42,12 @@ export function HamburgerMenu({
   onProfileClick,
   onContactsClick,
   onSettingsClick,
+  onNotificationsClick,
 }: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { counts, clearNotifications } = useNotifications();
+  const { unreadCount } = useNotificationHistory();
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
@@ -145,6 +149,21 @@ export function HamburgerMenu({
                 onProfileClick?.();
               }}
             />
+            <div className="relative">
+              <MenuItem
+                icon={<Bell className="h-5 w-5" />}
+                label="Notifications"
+                onClick={() => {
+                  setIsOpen(false);
+                  onNotificationsClick?.();
+                }}
+              />
+              {unreadCount > 0 && (
+                <div className="absolute top-2 right-4 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
             <div className="relative">
               <MenuItem
                 icon={<Users className="h-5 w-5" />}

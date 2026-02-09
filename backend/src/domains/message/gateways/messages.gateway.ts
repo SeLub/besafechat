@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { RedisService } from '../../../domains/redis/redis.service';
 import { SessionService } from '../../session/services/session.service';
+import { NotificationService } from '../../notification/services/notification.service';
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
@@ -28,7 +29,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private sessionService: SessionService,
     private redisService: RedisService,
     private messageMetadataService: MessageMetadataService,
-    private chatRoomService: ChatRoomService
+    private chatRoomService: ChatRoomService,
+    private notificationService: NotificationService
   ) {}
 
   async handleConnection(client: Socket) {
@@ -87,6 +89,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
         // 6. Уведомляем контакты о том, что пользователь онлайн
         await this.notifyContactsUserOnline(session.activeHandleId);
+        
+        // 7. Синхронизация уведомлений при подключении
+        await this.syncNotifications(client, session.activeHandleId);
       }
     } catch (error) {
       console.error('❌ WebSocket connection error:', error);
@@ -164,6 +169,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     requestId: string,
     message?: string
   ) {
+    const notification = await this.notificationService.createNotification(toHandleId, 'contact_request', {
+      fromHandle: {
+        id: fromHandle.id,
+        value: fromHandle.value,
+        displayName: fromHandle.profile?.displayName,
+      },
+      requestId,
+      message,
+    });
+
+    this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_received', {
       requestId,
       fromHandle: {
@@ -183,6 +199,16 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
+    const notification = await this.notificationService.createNotification(toHandleId, 'contact_accepted', {
+      fromHandle: {
+        id: byHandle.id,
+        value: byHandle.value,
+        displayName: byHandle.profile?.displayName,
+      },
+      chatId,
+    });
+
+    this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_accepted', {
       byHandle: {
         id: byHandle.id,
@@ -195,6 +221,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async notifyRequestRejected(toHandleId: string, byHandle: any) {
+    const notification = await this.notificationService.createNotification(toHandleId, 'contact_rejected', {
+      fromHandle: {
+        id: byHandle.id,
+        value: byHandle.value,
+        displayName: byHandle.profile?.displayName,
+      },
+    });
+
+    this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_rejected', {
       byHandle: {
         id: byHandle.id,
@@ -205,8 +240,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  // Notify the user who accepted a contact request that a new chat is available
   async notifyNewChatAvailable(toHandleId: string, fromHandle: any, chatId?: string) {
+    const notification = await this.notificationService.createNotification(toHandleId, 'new_chat', {
+      fromHandle: {
+        id: fromHandle.id,
+        value: fromHandle.value,
+        displayName: fromHandle.profile?.displayName,
+      },
+      chatId,
+    });
+
+    this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('new_chat_available', {
       fromHandle: {
         id: fromHandle.id,
@@ -225,6 +269,57 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       const redis = this.redisService.getClient();
       // Refresh online status with extended expiry
       await redis.setex(`online:${client.data.activeHandleId}`, 120, '1');
+    }
+  }
+
+  // Синхронизация уведомлений при подключении
+  private async syncNotifications(client: Socket, handleId: string) {
+    try {
+      const notifications = await this.notificationService.getUnreadNotifications(handleId);
+      const unreadCount = await this.notificationService.getUnreadCount(handleId);
+      
+      client.emit('notifications:sync', {
+        notifications,
+        unreadCount,
+        timestamp: new Date().toISOString(),
+      });
+      
+      console.log(`🔔 Synced ${notifications.length} notifications for handle: ${handleId}`);
+    } catch (error) {
+      console.error('❌ Error syncing notifications:', error);
+    }
+  }
+
+  @SubscribeMessage('notifications:request-sync')
+  async handleNotificationSync(client: Socket) {
+    if (client.data?.activeHandleId) {
+      await this.syncNotifications(client, client.data.activeHandleId);
+    }
+  }
+
+  @SubscribeMessage('notification:mark-read')
+  async handleMarkAsRead(client: Socket, payload: { notificationId: string }) {
+    if (client.data?.activeHandleId) {
+      await this.notificationService.markAsRead(client.data.activeHandleId, payload.notificationId);
+      const unreadCount = await this.notificationService.getUnreadCount(client.data.activeHandleId);
+      
+      // Уведомляем все устройства пользователя
+      this.server.to(`user:${client.data.activeHandleId}`).emit('notification:read', {
+        notificationId: payload.notificationId,
+        unreadCount,
+      });
+    }
+  }
+
+  @SubscribeMessage('notification:mark-all-read')
+  async handleMarkAllAsRead(client: Socket) {
+    if (client.data?.activeHandleId) {
+      await this.notificationService.markAllAsRead(client.data.activeHandleId);
+      
+      // Уведомляем все устройства пользователя
+      this.server.to(`user:${client.data.activeHandleId}`).emit('notification:all-read', {
+        unreadCount: 0,
+      });
     }
   }
 

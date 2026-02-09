@@ -3,13 +3,14 @@ import { ChatList } from '@/components/chat-list';
 import { LeftPanelPages } from '@/components/left-panel-pages';
 
 interface LeftColumnProps {
-  leftPanelPage: 'profile' | 'settings' | 'contacts' | null;
+  leftPanelPage: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
   userProfile: any;
   chats: any[];
   selectedChatId?: string;
   onProfileClick: () => void;
   onContactsClick: () => void;
   onSettingsClick: () => void;
+  onNotificationsClick: () => void;
   onBackToChats: () => void;
   onChatSelect: (chatId: string) => void;
   onNewChat: () => void;
@@ -24,6 +25,7 @@ export function LeftColumn({
   onProfileClick,
   onContactsClick,
   onSettingsClick,
+  onNotificationsClick,
   onBackToChats,
   onChatSelect,
   onNewChat,
@@ -47,6 +49,7 @@ export function LeftColumn({
               onProfileClick={onProfileClick}
               onContactsClick={onContactsClick}
               onSettingsClick={onSettingsClick}
+              onNotificationsClick={onNotificationsClick}
             />
             <h2 className="text-lg font-semibold">BeSafeChat</h2>
             <div className="w-10" />

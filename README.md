@@ -364,17 +364,121 @@ VITE_API_BASE_URL=http://localhost:4000
 
 ## Development
 
-### Running Tests
+### Testing
+
+BeSafeChat uses a comprehensive testing strategy with **80 test cases** across **19 test files**.
+
+#### Test Infrastructure
+
+- **Backend**: Jest (15 test files, 47 tests)
+- **Frontend**: Vitest (4 test files, 33 tests)
+- **Coverage**: Authentication, password recovery, notifications, identity management
+
+#### Backend Tests
 
 ```bash
-# Backend tests
 cd backend
-npm run test
-npm run test:e2e
 
-# Frontend tests
+# Run all tests
+npm test
+
+# Run specific domain
+npm test -- tests/unit/notification.service.spec.ts
+npm test -- tests/integration
+
+# Watch mode
+npm test -- --watch
+```
+
+**Test Structure**:
+```
+backend/tests/
+├── unit/                    # Isolated component tests
+│   ├── auth-service-minimal-fixed.spec.ts
+│   ├── challenge-service-minimal-fixed.spec.ts
+│   ├── session-refresh-minimal.spec.ts
+│   ├── password-recovery.service.spec.ts
+│   ├── notification.service.spec.ts
+│   └── ...
+└── integration/             # Cross-component tests
+    ├── auth-integration-minimal-fixed.spec.ts
+    ├── password-recovery.integration.spec.ts
+    ├── notification.integration.spec.ts
+    └── ...
+```
+
+#### Frontend Tests
+
+```bash
 cd frontend
-npm run test
+
+# Run all tests
+npm test
+
+# Run specific test
+npm test -- tests/unit/notification-history.spec.ts
+
+# Run once (no watch)
+npm test -- --run
+```
+
+**Test Structure**:
+```
+frontend/tests/
+└── unit/
+    ├── notification-history.spec.ts
+    ├── password-recovery-simple.spec.ts
+    ├── auth-guard-minimal.spec.ts
+    └── phase5-encryption-validation.spec.ts
+```
+
+#### Test Coverage by Domain
+
+| Domain | Unit Tests | Integration Tests | Total |
+|--------|------------|-------------------|-------|
+| Authentication | 3 | 1 | 4 |
+| Password Recovery | 2 | 1 | 3 |
+| Notifications | 1 | 1 | 2 |
+| Identity/Handle | 2 | 3 | 5 |
+| Frontend | 4 | - | 4 |
+| **Total** | **12** | **6** | **18** |
+
+#### Key Test Files
+
+**Authentication**:
+- `auth-service-minimal-fixed.spec.ts` - Login, identity creation, session management
+- `challenge-service-minimal-fixed.spec.ts` - Challenge-response, signature verification
+- `session-refresh-minimal.spec.ts` - Token refresh, expiration handling
+
+**Password Recovery**:
+- `password-recovery.service.spec.ts` - Hash uniqueness, claiming, conflicts
+- `password-recovery.integration.spec.ts` - End-to-end recovery flow
+- `password-recovery-simple.spec.ts` (frontend) - Availability check, retry logic
+
+**Notifications**:
+- `notification.service.spec.ts` - Redis operations, unread tracking
+- `notification.integration.spec.ts` - Multi-device sync, mark as read
+- `notification-history.spec.ts` (frontend) - Type validation, data structures
+
+**Identity Management**:
+- `test-handle-generation.spec.ts` - Default handle from public key
+- `test-alias-availability.spec.ts` - Uniqueness validation
+- `test-full-registration-flow.spec.ts` - Complete user registration
+
+For detailed testing documentation, see `.kilocode/rules/memory-bank/TESTING_SUMMARY.md`.
+
+### Running Tests
+
+### Running the Application
+
+```bash
+# Backend
+cd backend
+npm run start:dev
+
+# Frontend
+cd frontend
+npm run dev
 ```
 
 ### Architecture Philosophy

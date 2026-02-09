@@ -17,7 +17,7 @@ function ChatRouteContent() {
   >([]);
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [leftPanelPage, setLeftPanelPage] = useState<'profile' | 'settings' | 'contacts' | null>(
+  const [leftPanelPage, setLeftPanelPage] = useState<'profile' | 'settings' | 'contacts' | 'notifications' | null>(
     null
   );
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
@@ -363,6 +363,10 @@ function ChatRouteContent() {
     setLeftPanelPage('settings');
   };
 
+  const handleNotificationsClick = () => {
+    setLeftPanelPage('notifications');
+  };
+
   const handleBackToChats = () => {
     setLeftPanelPage(null);
   };
@@ -379,6 +383,7 @@ function ChatRouteContent() {
         onProfileClick={handleProfileClick}
         onContactsClick={handleContactsClick}
         onSettingsClick={handleSettingsClick}
+        onNotificationsClick={handleNotificationsClick}
         onBackToChats={handleBackToChats}
         onChatSelect={handleChatSelect}
         onNewChat={handleNewChat}

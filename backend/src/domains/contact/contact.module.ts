@@ -11,6 +11,7 @@ import { MessageMetadata } from '../message/message-metadata.entity';
 import { ChatRoomService } from '../message/services/chat-room.service';
 import { MessageMetadataService } from '../message/services/message-metadata.service';
 import { MediaModule } from '../media/media.module';
+import { NotificationModule } from '../notification/notification.module';
 import { SessionModule } from '../session/session.module';
 import { ContactRequest } from './contact-request.entity';
 import { ContactRequestController } from './controllers/contact-request.controller';
@@ -22,6 +23,7 @@ import { ContactRequestService } from './services/contact-request.service';
     SessionModule,
     HandleModule,
     MediaModule,
+    NotificationModule,
   ],
   providers: [
     ContactRequestService,
