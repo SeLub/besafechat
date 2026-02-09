@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from './use-auth';
+import { useAuth } from './use-auth-context';
 import { API_CONFIG } from '../services/api-config';
 
 export type Notification = {

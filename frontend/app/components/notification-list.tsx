@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check } from 'lucide-react';
 import { type Notification } from '@/hooks/use-notification-history';
@@ -118,6 +118,15 @@ export function NotificationList({
                   !notification.read ? 'bg-primary/5' : ''
                 }`}
                 onClick={() => !notification.read && onMarkAsRead(notification.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    if (!notification.read) {
+                      onMarkAsRead(notification.id);
+                    }
+                  }
+                }}
               >
                 <div className="flex items-start space-x-3">
                   <Avatar className="h-10 w-10">

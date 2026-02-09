@@ -142,7 +142,7 @@ export class PasswordRecoveryService {
       // Attempt to decrypt with the provided password
       try {
         const { decryptSeedFromCloud } = await import('../lib/crypto');
-        const seed = await decryptSeedFromCloud(encryptedSeed, password);
+        const seed = await decryptSeedFromCloud(encryptedSeed, password, identityId);
         return seed;
       } catch (decryptionError) {
         console.error('Decryption failed - likely wrong password:', decryptionError);

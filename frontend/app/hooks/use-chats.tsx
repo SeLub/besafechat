@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from './use-auth';
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from './use-auth-context';
 import { API_CONFIG } from '../services/api-config';
 
 interface Chat {
@@ -25,34 +25,7 @@ export function useChats() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Mock data for now - will be replaced with real API calls
-  const mockChats: Chat[] = [
-    // {
-    //   id: "6d36bdb6-8651-4d72-94f4-3c9aa13f489d",
-    //   name: "John Doe",
-    //   lastMessage: "Hello there!",
-    //   timestamp: "12:30",
-    //   unreadCount: 3,
-    //   isOnline: true,
-    //   phone: "+1 234 567 8900",
-    //   username: "johndoe",
-    //   publicKey: "fxhKP0trJd8XJR3IPTVOmA+BFXpFgWtJDRLC8LOZnMI=",
-    // },
-    // {
-    //   id: "saved-messages",
-    //   name: "Saved Messages",
-    //   lastMessage: "You: Test message",
-    //   timestamp: "11:45",
-    //   isOnline: false,
-    // },
-  ];
-
-  useEffect(() => {
-    if (user) {
-      loadChatsFromBackend();
-    }
-  }, [user]);
-  const loadChatsFromBackend = async () => {
+  const loadChatsFromBackend = useCallback(async () => {
     try {
       // Load actual chats from the chats API
       const chatsRes = await fetch(`${API_CONFIG.BASE_URL}/chats`, {
@@ -84,18 +57,51 @@ export function useChats() {
             isOnline: false,
           };
         });
-        setChats([...mockChats, ...actualChats]);
+        setChats(actualChats);
       } else {
-        // Fallback to mock chats only
-        setChats(mockChats);
+        // Fallback to empty array if no chats or API fails
+        setChats([]);
       }
     } catch (error) {
       console.error('Error loading chats:', error);
-      setChats(mockChats);
+      setChats([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Removed user from dependency array
+
+  useEffect(() => {
+    if (user) {
+      loadChatsFromBackend();
+    }
+  }, [user, loadChatsFromBackend]);
+
+  const loadOnlineStatuses = useCallback(async () => {
+    const handleIds = chats.map(chat => chat.handleId).filter(Boolean);
+    if (handleIds.length === 0) return;
+
+    try {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ userIds: handleIds }),
+      });
+
+      if (res.ok) {
+        const { statuses } = await res.json();
+        setChats(prev =>
+          prev.map(chat => ({
+            ...chat,
+            isOnline: chat.handleId ? statuses[chat.handleId] || false : false,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load online statuses:', error);
+    }
+  }, [chats]); // Add chats as dependency for useCallback
+
   // Load online statuses after chats are loaded
   useEffect(() => {
     if (chats.length > 0) {
@@ -108,7 +114,7 @@ export function useChats() {
 
       return () => clearInterval(interval);
     }
-  }, [chats.length]);
+  }, [chats.length, loadOnlineStatuses]);
 
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {
@@ -157,35 +163,9 @@ export function useChats() {
     setChats(prev => prev.map(chat => (chat.handleId === handleId ? { ...chat, isOnline } : chat)));
   };
 
-  const loadOnlineStatuses = async () => {
-    const handleIds = chats.map(chat => chat.handleId).filter(Boolean);
-    if (handleIds.length === 0) return;
-
-    try {
-      const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userIds: handleIds }),
-      });
-
-      if (res.ok) {
-        const { statuses } = await res.json();
-        setChats(prev =>
-          prev.map(chat => ({
-            ...chat,
-            isOnline: chat.handleId ? statuses[chat.handleId] || false : false,
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Failed to load online statuses:', error);
-    }
-  };
-
-  const getChatById = (chatId: string) => {
+  const getChatById = useCallback((chatId: string) => {
     return chats.find(chat => chat.id === chatId);
-  };
+  }, [chats]);
 
   return {
     chats,

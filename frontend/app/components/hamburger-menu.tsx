@@ -1,11 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotifications } from '~/hooks/use-notifications-context';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
 import { Menu, Moon, Settings, Sun, User, Users, Bell, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { useAvatarUpdate } from '~/hooks/avatar-update-context';
 
 interface HamburgerMenuProps {
   userProfile?: {
@@ -48,6 +49,7 @@ export function HamburgerMenu({
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { counts, clearNotifications } = useNotifications();
   const { unreadCount } = useNotificationHistory();
+  const { lastAvatarUpdateTimestamp } = useAvatarUpdate();
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
@@ -113,7 +115,7 @@ export function HamburgerMenu({
                 </AvatarFallback>
                 {userProfile?.profile?.avatarUrl ? (
                   <AvatarImage
-                    src={userProfile.profile.avatarUrl + '?' + Math.random().toString(36)}
+                    src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
                     onError={e => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';

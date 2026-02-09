@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Notification } from '../../app/hooks/use-notification-history';
 
 // Mock fetch
-global.fetch = vi.fn();
+globalThis.fetch = vi.fn();
 
 describe('useNotificationHistory types', () => {
   beforeEach(() => {

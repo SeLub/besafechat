@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock crypto API
 const mockDigest = vi.fn();
-Object.defineProperty(global, 'crypto', {
+Object.defineProperty(globalThis, 'crypto', {
   value: {
     subtle: {
       digest: mockDigest,
@@ -12,10 +12,10 @@ Object.defineProperty(global, 'crypto', {
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+globalThis.fetch = mockFetch as any;
 
 // Mock navigator
-Object.defineProperty(global, 'navigator', {
+Object.defineProperty(globalThis, 'navigator', {
   value: {
     userAgent: 'test-agent',
   },

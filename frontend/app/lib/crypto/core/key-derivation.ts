@@ -12,15 +12,13 @@ import {
   uint8ToHex,
   concatUint8Arrays,
 } from '../utils/binary';
-import { rawPrivateKeyToPkcs8, pkcs8ToRawPrivateKey } from '../utils/serialization';
+import { rawPrivateKeyToPkcs8 } from '../utils/serialization';
 import type { KeyPair, EncryptedSeedData, Argon2Params } from '../types';
 
 // Configure @noble/ed25519
-// @ts-ignore
+// eslint-disable-next-line no-import-assign
 if (!ed.hashes) ed.hashes = {};
-// @ts-ignore
 ed.hashes.sha512 = sha512;
-// @ts-ignore
 ed.hashes.sha512Async = async (m: Uint8Array) => sha512(m);
 
 /**
@@ -161,8 +159,7 @@ async function deriveKeyArgon2id(
  */
 export async function encryptSeedForCloud(
   seedWords: string[],
-  password: string,
-  userId: string
+  password: string
 ): Promise<EncryptedSeedData> {
   // Validate seed first
   const validation = validateSeedPhrase(seedWords);

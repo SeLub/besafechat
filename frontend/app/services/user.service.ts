@@ -17,13 +17,27 @@ export class UserService {
 
     // Transform the response to match ProfileResponse interface
     return {
-      userId: result.identity.id,
-      publicKey: result.identity.publicKey,
-      displayName: result.profile.displayName,
-      username: result.handle.value,
-      createdAt: result.identity.createdAt,
-      isSearchable: result.handle.isSearchable,
-      avatarUrl: result.profile.avatarUrl,
+      identity: {
+        id: result.identity.id,
+        publicKey: result.identity.publicKey,
+        createdAt: result.identity.createdAt,
+      },
+      handle: {
+        id: result.handle.id,
+        value: result.handle.value,
+        alias: result.handle.alias || null,
+        isSearchable: result.handle.isSearchable,
+        isPrimary: result.handle.isPrimary,
+        createdAt: result.handle.createdAt,
+      },
+      profile: {
+        displayName: result.profile.displayName,
+        firstName: result.profile.firstName || null,
+        lastName: result.profile.lastName || null,
+        avatarUrl: result.profile.avatarUrl || null,
+        bio: result.profile.bio || null,
+        settings: result.profile.settings || {},
+      },
     };
   }
 
@@ -127,13 +141,27 @@ export class UserService {
 
       // Return the user data based on handle information
       return {
-        userId: handle.ownerIdentityId,
-        publicKey: '', // Public key not returned in search
-        displayName: handle.value, // Use handle value as display name if no profile
-        username: handle.value,
-        createdAt: handle.createdAt,
-        isSearchable: handle.isSearchable,
-        avatarUrl: null, // No avatar in search result
+        identity: {
+          id: handle.ownerIdentityId,
+          publicKey: '', // Public key not returned in search, so empty string or default
+          createdAt: handle.createdAt,
+        },
+        handle: {
+          id: handle.id,
+          value: handle.value,
+          alias: handle.alias || null,
+          isSearchable: handle.isSearchable,
+          isPrimary: handle.isPrimary || false, // Assuming isPrimary property exists on handle, default to false
+          createdAt: handle.createdAt,
+        },
+        profile: {
+          displayName: handle.value, // Use handle value as display name if no profile
+          firstName: null,
+          lastName: null,
+          avatarUrl: null, // No avatar in search result
+          bio: null,
+          settings: {},
+        },
       };
     } catch {
       return null;

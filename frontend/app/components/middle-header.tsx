@@ -10,7 +10,6 @@ interface MiddleHeaderProps {
 
 export function MiddleHeader({
   selectedChat,
-  rightPanelOpen,
   onToggleRightPanel,
 }: MiddleHeaderProps) {
   const getInitials = (name: string) => {

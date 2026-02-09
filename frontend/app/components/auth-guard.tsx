@@ -1,4 +1,4 @@
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '~/hooks/use-auth-context';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 

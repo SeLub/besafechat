@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotifications } from '~/hooks/use-notifications-context';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -55,6 +55,9 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
     // Clear notifications when contacts page is opened
     clearNotifications();
   }, []);

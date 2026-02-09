@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
-import { useAuth } from './use-auth';
-import { useNotifications } from './use-notifications';
+import { useAuth } from './use-auth-context';
+import { useNotifications } from './use-notifications-context';
 
 interface ContactRequestData {
   requestId: string;
@@ -52,6 +52,10 @@ export function useWebSocketNotifications(
 
     const socket: Socket = io('http://localhost:4000/messages', {
       withCredentials: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
     });
 
     // Store socket globally for message sending
@@ -167,6 +171,15 @@ export function useWebSocketNotifications(
       // Optionally notify the UI that connection was lost
     });
 
+    // Listen for reconnection
+    socket.on('connect', () => {
+      console.log('✅ WebSocket reconnected');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+    });
+
     return () => {
       clearInterval(heartbeatInterval);
       socket.off('contact_request_received');
@@ -175,8 +188,11 @@ export function useWebSocketNotifications(
       socket.off('message:new');
       socket.off('user_online');
       socket.off('user_offline');
+      socket.off('disconnect');
+      socket.off('connect');
+      socket.off('connect_error');
       socket.disconnect();
       window.socketInstance = null;
     };
-  }, [user]);
+  }, [user, incrementAccepted, incrementRequests]);
 }

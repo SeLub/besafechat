@@ -203,7 +203,7 @@ export class CloudBackupService {
    * Restore seed by password and decrypt it
    * Used for account recovery flow
    */
-  static async restoreAndDecryptSeedByPassword(password: string): Promise<string[] | null> {
+  static async restoreAndDecryptSeedByPassword(password: string, handleId: string): Promise<string[] | null> {
     // 1. Download encrypted seed by password
     const encryptedSeed = await CloudBackupService.restoreSeedByPassword(password);
 
@@ -213,7 +213,7 @@ export class CloudBackupService {
 
     // 2. Decrypt the seed using the password and userId
     try {
-      const seed = await decryptSeedFromCloud(encryptedSeed, password);
+      const seed = await decryptSeedFromCloud(encryptedSeed, password, handleId);
       return seed;
     } catch (error) {
       console.error('Decryption failed:', error);

@@ -17,7 +17,7 @@ vi.mock('../../app/services/storage.service', () => ({
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+globalThis.fetch = mockFetch as any;
 
 describe('AuthGuard Minimal Tests', () => {
   beforeEach(() => {

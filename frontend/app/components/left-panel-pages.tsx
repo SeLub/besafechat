@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '~/hooks/use-auth-context';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
 import { MediaService } from '@/services/media.service';
 import {
@@ -31,6 +31,7 @@ import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { UserService } from '~/services';
+import { useAvatarUpdate } from '~/hooks/avatar-update-context'; // Import useAvatarUpdate
 
 interface LeftPanelPageProps {
   page: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
@@ -63,7 +64,9 @@ interface LeftPanelPageProps {
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
   const { user, logout, checkAuth, refreshUser } = useAuth();
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotificationHistory();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } =
+    useNotificationHistory();
+  const { lastAvatarUpdateTimestamp, triggerAvatarUpdate } = useAvatarUpdate();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -108,12 +111,12 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
       }
 
       // Use the MediaService uploadAvatar method which properly handles the upload
-      const result = await MediaService.uploadAvatar(file);
-      const avatarUrl = result.url;
-
+      await MediaService.uploadAvatar(file);
       toast.success('Avatar updated');
-      // Force reload with cache bust
-      setTimeout(() => checkAuth(), 500);
+      // Refresh the user profile to get the potentially updated avatar URL (though it's static)
+      // And then trigger an avatar update in the context to force image reload
+      await refreshUser();
+      triggerAvatarUpdate();
     } catch (error) {
       console.error('Failed to upload avatar:', error);
       toast.error('Failed to upload avatar');
@@ -159,7 +162,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 </AvatarFallback>
                 {userProfile?.profile?.avatarUrl && (
                   <AvatarImage
-                    src={userProfile.profile.avatarUrl + '?' + Math.random().toString(36)}
+                    src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
                   />
                 )}
               </Avatar>
@@ -334,12 +337,16 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 <SettingsItem
                   icon={<Globe className="h-5 w-5" />}
                   label="Language"
-                  onClick={() => {}}
+                  onClick={() => {
+                    console.log('Mock Language functionality.');
+                  }}
                 />
                 <SettingsItem
                   icon={<HelpCircle className="h-5 w-5" />}
                   label="Help & Support"
-                  onClick={() => {}}
+                  onClick={() => {
+                    console.log('Help & Support clicked.');
+                  }}
                 />
               </SettingsSection>
 

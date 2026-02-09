@@ -4,12 +4,13 @@ import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
 import { NewChatModal } from '@/components/new-chat-modal';
 import { RightPanel } from '@/components/right-panel';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth-context';
 import { useChats } from '@/hooks/use-chats';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
 import { StorageService } from '@/services/storage.service';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -17,9 +18,9 @@ function ChatRouteContent() {
   >([]);
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [leftPanelPage, setLeftPanelPage] = useState<'profile' | 'settings' | 'contacts' | 'notifications' | null>(
-    null
-  );
+  const [leftPanelPage, setLeftPanelPage] = useState<
+    'profile' | 'settings' | 'contacts' | 'notifications' | null
+  >(null);
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const [contactRequestModal, setContactRequestModal] = useState<{
     isOpen: boolean;
@@ -27,6 +28,7 @@ function ChatRouteContent() {
   }>({ isOpen: false, request: null });
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const lastLoadedChatRef = useRef<string | undefined>(undefined);
   const { user } = useAuth();
   const {
     chats,
@@ -38,7 +40,16 @@ function ChatRouteContent() {
   } = useChats();
 
   const handleSendMessage = async (message: string) => {
-    if (!socketRef.current || !selectedChatId || !user) return;
+    const socket = socketRef.current || window.socketInstance;
+    if (!socket || !socket.connected || !selectedChatId || !user) {
+      console.error('❌ Cannot send message: socket not connected or missing data', {
+        hasSocket: !!socket,
+        isConnected: socket?.connected,
+        hasChatId: !!selectedChatId,
+        hasUser: !!user,
+      });
+      return;
+    }
 
     const selectedChat = getChatById(selectedChatId);
     const recipientHandleId = selectedChat?.handleId; // This should be the handleId of the recipient for sending
@@ -62,7 +73,7 @@ function ChatRouteContent() {
 
     const timestamp = new Date().toISOString();
 
-    socketRef.current.emit('message', {
+    socket.emit('message', {
       to: recipientHandleId,
       type: 'text',
       encryptedContent: base64Message,
@@ -106,31 +117,36 @@ function ChatRouteContent() {
     updateChatLastMessage(selectedChatId, `You: ${message}`);
   };
 
-  const handleChatSelect = async (chatId: string) => {
-    setSelectedChatId(chatId);
-    setRightPanelOpen(false);
+  const handleChatSelect = useCallback(
+    async (chatId: string) => {
+      if (lastLoadedChatRef.current === chatId) return; // Prevent reload of same chat
+      lastLoadedChatRef.current = chatId;
+      setSelectedChatId(chatId);
+      setRightPanelOpen(false);
 
-    // Save to localStorage for persistence
-    localStorage.setItem('selectedChatId', chatId);
+      // Save to localStorage for persistence
+      localStorage.setItem('selectedChatId', chatId);
 
-    // Get chat to find userId
-    const chat = getChatById(chatId);
-    // Use chat ID as the key for loading messages (not userId)
-    const loadKey = chat?.id || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
+      // Get chat to find userId
+      const chat = getChatById(chatId);
+      // Use chat ID as the key for loading messages (not userId)
+      const loadKey = chat?.id || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
 
-    console.log('📚 Loading messages for chatId:', loadKey);
-    if (!loadKey) {
-      console.error('❌ Cannot load messages: no chat ID available');
-      setMessages([]);
-      return;
-    }
-    // Load messages from IndexedDB
-    const loadedMessages = user
-      ? await StorageService.loadDecryptedMessages(loadKey, user.handle.id)
-      : [];
-    console.log('📚 Loaded', loadedMessages.length, 'messages');
-    setMessages(loadedMessages);
-  };
+      console.log('📚 Loading messages for chatId:', loadKey);
+      if (!loadKey) {
+        console.error('❌ Cannot load messages: no chat ID available');
+        setMessages([]);
+        return;
+      }
+      // Load messages from IndexedDB
+      const loadedMessages = user
+        ? await StorageService.loadDecryptedMessages(loadKey, user.handle.id)
+        : [];
+      console.log('📚 Loaded', loadedMessages.length, 'messages');
+      setMessages(loadedMessages);
+    },
+    [setSelectedChatId, setRightPanelOpen, getChatById, setMessages, user]
+  );
 
   const handleNewChat = () => {
     setNewChatModalOpen(true);
@@ -252,7 +268,7 @@ function ChatRouteContent() {
   const handleContactRequest = useCallback((request: any) => {
     console.log('handleContactRequest called with:', request);
     console.log('request.fromHandle:', request.fromHandle);
-    
+
     // Transform data to match modal expectations
     const transformedRequest = {
       id: request.requestId,
@@ -268,7 +284,7 @@ function ChatRouteContent() {
       },
       message: request.message,
     };
-    
+
     console.log('Transformed request:', transformedRequest);
     setContactRequestModal({ isOpen: true, request: transformedRequest });
   }, []);
@@ -322,12 +338,7 @@ function ChatRouteContent() {
     handleContactRequest
   );
 
-  // Get socket reference for sending messages
-  useEffect(() => {
-    if (user && window.socketInstance) {
-      socketRef.current = window.socketInstance;
-    }
-  }, [user]);
+
 
   // Cleanup old messages on app start
   useEffect(() => {
@@ -349,7 +360,7 @@ function ChatRouteContent() {
         handleChatSelect(savedChatId);
       }
     }
-  }, [chats.length]);
+  }, [chats.length, chats, handleChatSelect]);
 
   const handleProfileClick = () => {
     setLeftPanelPage('profile');

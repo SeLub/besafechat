@@ -35,8 +35,8 @@ export function MessageList({ messages, selectedChat }: MessageListProps) {
         ) : (
           messages.map(msg => {
             const accentColor =
-              !msg.isOwn && selectedChat?.userId
-                ? getUserAccentColor(selectedChat.userId)
+              !msg.isOwn && selectedChat?.publicKey
+                ? getUserAccentColor(selectedChat.publicKey)
                 : undefined;
 
             const accentStyle = accentColor

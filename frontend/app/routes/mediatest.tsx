@@ -87,8 +87,8 @@ export default function MediaTestRoute() {
         await MediaService.deleteAvatar();
         setUploadedUrl(null);
         toast.success('Avatar deleted successfully');
-      } catch (error) {
-        toast.error('Failed to delete avatar');
+      } catch {
+        toast.error('Failed to delete avatar ');
       }
     }
   };
@@ -132,8 +132,11 @@ export default function MediaTestRoute() {
 
       {/* Media Type Selection */}
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">Media Type</label>
+        <label htmlFor="mediaTypeSelect" className="block text-sm font-medium mb-2">
+          Media Type
+        </label>
         <select
+          id="mediaTypeSelect"
           value={mediaType}
           onChange={e => setMediaType(e.target.value as MediaType)}
           className="w-full p-2 border rounded-lg"
@@ -218,6 +221,7 @@ export default function MediaTestRoute() {
               <p className="text-sm text-gray-600 mb-2">Audio Player:</p>
               <audio controls className="w-full">
                 <source src={uploadedUrl} type="audio/mpeg" />
+                <track kind="captions" srcLang="en" label="English captions" />
                 Your browser does not support the audio element.
               </audio>
             </div>

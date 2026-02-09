@@ -50,7 +50,7 @@ export class AuthService {
       throw new Error(challengeData.error || 'Failed to get challenge');
     }
 
-    const { challengeId, challenge } = challengeData.data!;
+    const { challengeId, challenge } = challengeData.data;
 
     // Get the private key to sign the challenge
     // The private key parameter is now passed to login() method directly
@@ -85,11 +85,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<LoginResponse> = await authRes.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Login failed');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Login failed');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -216,11 +218,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<RefreshTokenResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Token refresh failed');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Token refresh failed');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -238,11 +242,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<{ publicKey: string }> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get public key');
-    }
-
-    return data.data!.publicKey;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get public key');
+        }
+        if (!data.data || !data.data.publicKey) {
+          throw new Error('Missing public key in successful response');
+        }
+        return data.data.publicKey;
   }
 
   // ==================== Profile Endpoints ====================
@@ -262,11 +268,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<ProfileResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get profile');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get profile');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -316,11 +324,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<OnlineStatusResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get online status');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get online status');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**

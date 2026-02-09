@@ -2,20 +2,9 @@ import { authenticateUser, clearAuthCookies, handleAuthError } from '@/lib/auth-
 import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { AuthContext } from './auth-context';
 import type { FullProfile } from '~/types/profile';
-
-interface AuthContextType {
-  user: FullProfile | null;
-  loading: boolean;
-  register: (deviceId: string) => Promise<void>;
-  login: (publicKey: string, deviceId: string) => Promise<void>;
-  logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FullProfile | null>(null);
@@ -91,6 +80,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Initialize and cleanup StorageService based on user identity
+  useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+    const initStorage = async () => {
+      if (user?.identity?.id && isMounted) {
+        try {
+          await StorageService.initialize(user.identity.id);
+        } catch (error) {
+          console.error('Failed to initialize StorageService on user change:', error);
+          // Handle error, e.g., show a toast, redirect to login
+        }
+      }
+    };
+
+    initStorage();
+
+    return () => {
+      isMounted = false; // Set flag to false when component unmounts or user changes
+      // StorageService.cleanup() is already called in logout, no need to duplicate here
+      // Unless we want to explicitly close on component unmount even if not logged out
+      // For now, avoid duplicate cleanup if logout already handles it
+      // If `user` becomes null (logout), then cleanup is handled by logout itself
+    };
+  }, [user?.identity?.id]); // Re-run effect when user's identity ID changes
+
   // Обновление данных пользователя без перезагрузки страницы
   const refreshUser = async () => {
     try {
@@ -114,12 +128,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

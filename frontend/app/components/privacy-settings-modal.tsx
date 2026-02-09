@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { X, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '~/hooks/use-auth-context';
 
 interface PrivacySettingsModalProps {
   isOpen: boolean;
@@ -16,13 +16,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   const [initialLoading, setInitialLoading] = useState(true);
   const { user, refreshUser } = useAuth();
 
-  useEffect(() => {
-    if (isOpen && user) {
-      loadCurrentSettings();
-    }
-  }, [isOpen, user]);
-
-  const loadCurrentSettings = async () => {
+  const loadCurrentSettings = useCallback(async () => {
     setInitialLoading(true);
     try {
       // Load current searchable status from user profile
@@ -37,7 +31,13 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [user, setIsSearchable, setInitialLoading]);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      loadCurrentSettings();
+    }
+  }, [isOpen, user, loadCurrentSettings]);
 
   const handleSave = async () => {
     setLoading(true);

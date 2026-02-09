@@ -1,17 +1,21 @@
 /**
  * Phase 5: Encryption & Database Isolation - Automated Test Suite
- * 
+ *
  * Tests hash-based encryption implementation and per-account database isolation.
  * Run with: npm run test -- phase5-encryption-validation.spec.ts
- * 
+ *
  * NOTE: Tests that require IndexedDB (database isolation tests) are designed to
  * fail gracefully in Node.js test environment. These should be run in browser
  * or with a proper jsdom/browser environment. See PHASE_5_TESTING_EXECUTION.md
  * for manual testing procedures.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setSessionPrivateKeyHash, getSessionPrivateKeyHash, clearSessionPrivateKeyHash } from '@/services/account.service';
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  setSessionPrivateKeyHash,
+  getSessionPrivateKeyHash,
+  clearSessionPrivateKeyHash,
+} from '@/services/account.service';
 import { deriveKeyPairFromSeed, generateSeedPhrase, hashPrivateKey } from '@/lib/crypto';
 import { pkcs8ToRawPrivateKey } from '@/lib/crypto';
 
@@ -20,7 +24,6 @@ import { pkcs8ToRawPrivateKey } from '@/lib/crypto';
 // ============================================================================
 
 describe('Phase 5: Hash-Based Encryption - Unit Tests', () => {
-  
   describe('hashPrivateKey()', () => {
     it('should produce a valid SHA-256 hash from private key', async () => {
       // Generate a seed and derive keypair
@@ -122,7 +125,6 @@ describe('Phase 5: Hash-Based Encryption - Unit Tests', () => {
 // ============================================================================
 
 describe('Phase 5: Key Derivation & Security - Integration Tests', () => {
-  
   afterEach(() => {
     clearSessionPrivateKeyHash();
   });
@@ -130,10 +132,10 @@ describe('Phase 5: Key Derivation & Security - Integration Tests', () => {
   describe('Keypair Derivation from Seed', () => {
     it('should derive consistent keypairs from same seed', async () => {
       const seed = await generateSeedPhrase();
-      
+
       const keyPair1 = await deriveKeyPairFromSeed(seed);
       const keyPair2 = await deriveKeyPairFromSeed(seed);
-      
+
       // Same seed should produce same public key
       expect(keyPair1.publicKeyBase64).toBe(keyPair2.publicKeyBase64);
     });
@@ -141,17 +143,17 @@ describe('Phase 5: Key Derivation & Security - Integration Tests', () => {
     it('should produce different keypairs from different seeds', async () => {
       const seed1 = await generateSeedPhrase();
       const seed2 = await generateSeedPhrase();
-      
+
       const keyPair1 = await deriveKeyPairFromSeed(seed1);
       const keyPair2 = await deriveKeyPairFromSeed(seed2);
-      
+
       // Different seeds should produce different public keys
       expect(keyPair1.publicKeyBase64).not.toBe(keyPair2.publicKeyBase64);
     });
 
     it('should validate seed phrase before deriving keys', async () => {
       const invalidSeed = ['invalid', 'seed', 'words'];
-      
+
       await expect(deriveKeyPairFromSeed(invalidSeed)).rejects.toThrow('Invalid seed phrase');
     });
   });
@@ -186,9 +188,9 @@ describe('Phase 5: Key Derivation & Security - Integration Tests', () => {
 
       // Hash should not equal raw private key
       expect(sessionHash).not.toEqual(rawPrivateKey);
-      
+
       // Hash should be 32 bytes (SHA-256)
-      expect(sessionHash!.length).toBe(32);
+      expect(sessionHash?.length).toBe(32);
     });
   });
 });
@@ -198,7 +200,6 @@ describe('Phase 5: Key Derivation & Security - Integration Tests', () => {
 // ============================================================================
 
 describe('Phase 5: Multi-User Hash Isolation - Integration Tests', () => {
-  
   afterEach(() => {
     clearSessionPrivateKeyHash();
   });
@@ -242,7 +243,7 @@ describe('Phase 5: Multi-User Hash Isolation - Integration Tests', () => {
       const keyPair2 = await deriveKeyPairFromSeed(seed2);
       const rawKey2 = pkcs8ToRawPrivateKey(keyPair2.privateKey);
       const hash2 = await hashPrivateKey(rawKey2);
-      
+
       setSessionPrivateKeyHash(hash2);
       const sessionHash2 = getSessionPrivateKeyHash();
       expect(sessionHash2).toEqual(hash2);
@@ -278,12 +279,12 @@ describe('Phase 5: Multi-User Hash Isolation - Integration Tests', () => {
       const seed = await generateSeedPhrase();
       const keyPair = await deriveKeyPairFromSeed(seed);
       const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
-      
+
       const hash = await hashPrivateKey(rawPrivateKey);
 
       // Hash should be different from original
       expect(hash).not.toEqual(rawPrivateKey);
-      
+
       // Hashing the hash should produce different result (one-way)
       const hashOfHash = await hashPrivateKey(hash);
       expect(hashOfHash).not.toEqual(hash);
@@ -310,7 +311,6 @@ describe('Phase 5: Multi-User Hash Isolation - Integration Tests', () => {
 // ============================================================================
 
 describe('Phase 5: Security Behavior - Tests', () => {
-  
   afterEach(() => {
     clearSessionPrivateKeyHash();
   });
@@ -346,10 +346,10 @@ describe('Phase 5: Security Behavior - Tests', () => {
     expect(originalHash).toEqual(hash);
 
     clearSessionPrivateKeyHash();
-    
+
     // After clear, should be null
     expect(getSessionPrivateKeyHash()).toBeNull();
-    
+
     // Original hash reference should be garbage collectable
     expect(originalHash).toBeDefined(); // Still exists in this scope
   });
@@ -360,7 +360,6 @@ describe('Phase 5: Security Behavior - Tests', () => {
 // ============================================================================
 
 describe('Phase 5: Performance Benchmarks', () => {
-  
   afterEach(() => {
     clearSessionPrivateKeyHash();
   });
@@ -406,7 +405,7 @@ describe('Phase 5: Performance Benchmarks', () => {
 
     const startTime = performance.now();
     const hashes = await Promise.all(
-      seeds.map(async (seed) => {
+      seeds.map(async seed => {
         const keyPair = await deriveKeyPairFromSeed(seed);
         const rawKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
         return hashPrivateKey(rawKey);
@@ -416,7 +415,7 @@ describe('Phase 5: Performance Benchmarks', () => {
 
     expect(elapsed).toBeLessThan(500); // 10 operations in under 500ms
     expect(hashes).toHaveLength(10);
-    expect(hashes.every((h) => h.length === 32)).toBe(true);
+    expect(hashes.every(h => h.length === 32)).toBe(true);
   });
 
   it('hash consistency across multiple calls', async () => {
@@ -433,7 +432,7 @@ describe('Phase 5: Performance Benchmarks', () => {
     // All 3 hashes should be identical
     expect(hash1).toEqual(hash2);
     expect(hash2).toEqual(hash3);
-    
+
     // And should be fast
     expect(elapsed).toBeLessThan(50);
   });

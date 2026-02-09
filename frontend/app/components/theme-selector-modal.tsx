@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '~/hooks/use-theme-context';
 import { Check } from 'lucide-react';
 
 interface ThemeSelectorModalProps {

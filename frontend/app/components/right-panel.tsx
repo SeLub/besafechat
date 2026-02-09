@@ -1,19 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import {
-  X,
-  Phone,
-  Video,
-  Search,
-  Bell,
-  BellOff,
-  Shield,
-  Trash2,
-  Archive,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { X, Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -71,9 +59,7 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
           <AvatarFallback className="bg-primary text-primary-foreground text-xl">
             {getInitials(chatInfo.name)}
           </AvatarFallback>
-          {chatInfo.avatarUrl && (
-            <AvatarImage src={chatInfo.avatarUrl} />
-          )}
+          {chatInfo.avatarUrl && <AvatarImage src={chatInfo.avatarUrl} />}
         </Avatar>
         <h2 className="text-xl font-semibold mb-1">{getDisplayName()}</h2>
         <p className="text-sm text-muted-foreground">

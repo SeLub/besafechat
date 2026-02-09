@@ -237,10 +237,10 @@ export class StorageService {
             context
           );
 
-          const { encrypted, iv } = await encryptWithKey(textBytes, encryptionKey);
+          const { encrypted: enc, iv } = await encryptWithKey(textBytes, encryptionKey);
 
           return {
-            encrypted,
+            encrypted: enc,
             salt: new Uint8Array(0), // Not used with hash-based approach
             iv,
             version: 2, // Version 2 = hash-based
@@ -256,14 +256,17 @@ export class StorageService {
       }
 
       // Fallback to old method (passphrase-based) for backward compatibility
-      const encrypted = await encryptWithPassphrase(
+      const { encrypted: encBytes, salt, iv, version } = await encryptWithPassphrase(
         textBytes,
         handleId,
         this.DEFAULT_KDF_ITERATIONS
       );
 
       return {
-        ...encrypted,
+        encrypted: encBytes,
+        salt,
+        iv,
+        version,
         context,
         timestamp: Date.now(),
       };
@@ -503,7 +506,7 @@ export class StorageService {
         contentType: 'text',
         encryptedContent,
         salt,
-        iv,
+        iv: toArrayBuffer(iv),
         timestamp: Date.now(),
         isOwn,
         status: 'sent',
