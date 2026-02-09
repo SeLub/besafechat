@@ -23,14 +23,28 @@ ed.hashes.sha512Async = async (m: Uint8Array) => sha512(m);
 
 /**
  * Generate simple checksum for seed validation
+ * Uses Web Crypto API if available, falls back to sha512 from @noble/hashes
  */
 async function generateSeedChecksum(seedString: string): Promise<string> {
   const encoder = new TextEncoder();
   const seedBytes = encoder.encode(seedString);
 
-  // Асинхронный хэш
-  const hashBuffer = await crypto.subtle.digest('SHA-256', seedBytes);
-  const hashArray = new Uint8Array(hashBuffer);
+  let hashArray: Uint8Array;
+
+  try {
+    // Try Web Crypto API (available on HTTPS and localhost)
+    if (crypto.subtle) {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', seedBytes);
+      hashArray = new Uint8Array(hashBuffer);
+    } else {
+      throw new Error('crypto.subtle not available');
+    }
+  } catch (error) {
+    // Fallback: use sha512 from @noble/hashes (already imported)
+    console.warn('Web Crypto API not available for seed checksum, using fallback:', error);
+    const hash = sha512(seedBytes);
+    hashArray = hash.slice(0, 32); // Use first 32 bytes (SHA-256 equivalent length)
+  }
 
   // Берем первые 4 байта хэша (8 hex символов)
   return uint8ToHex(hashArray.slice(0, 4));
@@ -98,6 +112,7 @@ export async function generateSeedPhrase(): Promise<string[]> {
 
 /**
  * Derive Ed25519 keypair from seed phrase
+ * Handles both secure (Web Crypto) and fallback (noble/hashes) contexts
  */
 export async function deriveKeyPairFromSeed(seedWords: string[]): Promise<KeyPair> {
   const validation = validateSeedPhrase(seedWords);
@@ -107,7 +122,19 @@ export async function deriveKeyPairFromSeed(seedWords: string[]): Promise<KeyPai
 
   const normalizedWords = normalizeSeedPhrase(seedWords);
   const mnemonic = normalizedWords.join(' ');
-  const seedBytes = await mnemonicToSeed(mnemonic);
+  
+  let seedBytes: Uint8Array;
+  try {
+    seedBytes = await mnemonicToSeed(mnemonic);
+  } catch (error) {
+    // If mnemonicToSeed fails due to missing crypto.subtle, provide helpful error
+    if (error instanceof Error && error.message.includes('digest')) {
+      throw new Error(
+        'Cryptographic functions unavailable. Please ensure you are accessing via HTTPS or localhost.'
+      );
+    }
+    throw error;
+  }
 
   // Use first 32 bytes of BIP39 seed as private key
   const rawPrivateKey = seedBytes.slice(0, 32);

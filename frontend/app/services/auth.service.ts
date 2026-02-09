@@ -8,12 +8,13 @@ import type {
 } from '@/types/account';
 import type { FullProfile } from '~/types/profile';
 import { UserService } from './user.service';
+import { API_CONFIG } from './api-config';
 
 /**
  * Базовые операции с бэкендом для аутентификации
  */
 export class AuthService {
-  private static readonly API_BASE = 'http://localhost:4000';
+  private static readonly API_BASE = API_CONFIG.BASE_URL;
 
   /**
    * Логин на бэкенде

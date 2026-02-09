@@ -9,6 +9,7 @@ import { useChats } from '@/hooks/use-chats';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 import { StorageService } from '@/services/storage.service';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { toast } from 'sonner';
@@ -159,7 +160,7 @@ function ChatRouteContent() {
     async (chatId: string) => {
       try {
         // Load chat info from backend
-        const res = await fetch(`http://localhost:4000/chats/${chatId}`, {
+        const res = await fetch(API_ENDPOINTS.CHATS.GET_ONE(chatId), {
           credentials: 'include',
         });
 
@@ -308,7 +309,7 @@ function ChatRouteContent() {
   const handleAcceptRequest = async (requestId: string) => {
     setRequestActionLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/accept`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -328,7 +329,7 @@ function ChatRouteContent() {
   const handleRejectRequest = async (requestId: string) => {
     setRequestActionLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/reject`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
         method: 'POST',
         credentials: 'include',
       });

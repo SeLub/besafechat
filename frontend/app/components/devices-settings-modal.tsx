@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QrCode, Smartphone, Monitor, Tablet, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface Session {
   id: string;
@@ -34,7 +35,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
 
   const fetchSessions = async () => {
     try {
-      const response = await fetch('http://localhost:4000/auth/sessions', {
+      const response = await fetch(API_ENDPOINTS.AUTH.SESSIONS, {
         credentials: 'include',
       });
       if (response.ok) {
@@ -48,7 +49,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
 
   const handleRevokeSession = async (sessionId: string) => {
     try {
-      const response = await fetch(`http://localhost:4000/auth/sessions/revoke/${sessionId}`, {
+      const response = await fetch(API_ENDPOINTS.AUTH.SESSIONS_REVOKE(sessionId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -64,7 +65,7 @@ export function DevicesSettingsModal({ isOpen, onClose }: DevicesSettingsModalPr
   const handleCloseAllOtherSessions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:4000/auth/sessions/revoke-all', {
+      const response = await fetch(API_ENDPOINTS.AUTH.SESSIONS_REVOKE_ALL, {
         method: 'POST',
         credentials: 'include',
       });

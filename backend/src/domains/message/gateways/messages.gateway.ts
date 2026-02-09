@@ -13,13 +13,11 @@ import { NotificationService } from '../../notification/services/notification.se
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
+import { getCorsConfig } from '../../../common/config/cors-origins';
 
 @WebSocketGateway({
   namespace: '/messages',
-  cors: {
-    origin: ['http://localhost:3000', 'http://localhost:5173'],
-    credentials: true,
-  },
+  cors: getCorsConfig(),
 })
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

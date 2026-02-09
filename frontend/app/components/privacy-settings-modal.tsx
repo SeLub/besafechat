@@ -4,6 +4,7 @@ import { Switch } from '@/components/ui/switch';
 import { X, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '~/hooks/use-auth-context';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface PrivacySettingsModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
         throw new Error('Handle not found');
       }
 
-      const res = await fetch(`http://localhost:4000/handles/${handleId}/searchable`, {
+      const res = await fetch(API_ENDPOINTS.HANDLES.SEARCHABLE(handleId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

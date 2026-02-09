@@ -32,18 +32,51 @@ export function getDb(): BeSafeDB {
 }
 
 /**
+ * Simple fallback hash function for environments without Web Crypto API
+ * Used only for database naming (not encryption), so cryptographic strength not required
+ * 
+ * IMPORTANT: This is a graceful fallback for:
+ * - Development on HTTP (non-localhost)
+ * - Edge cases where crypto.subtle is unavailable
+ * - Older browsers or restricted environments
+ * 
+ * In production (HTTPS), Web Crypto API should always be available.
+ * This fallback ensures the app never crashes due to missing crypto.
+ */
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(16);
+}
+
+/**
  * Generate a deterministic database name from identityId
- * Uses SHA-256 hash to create a consistent, short database identifier
+ * Uses SHA-256 hash (Web Crypto API) if available, falls back to simpleHash
  * 
  * @param identityId User's unique identity ID from server
  * @returns Promise resolving to database name (e.g., "BeSafeDB_a3f5c7e2b1d4...")
  */
 async function generateDatabaseName(identityId: string): Promise<string> {
   try {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identityId));
-    const hashArray = Array.from(new Uint8Array(hash));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return `BeSafeDB_${hashHex.substring(0, 16)}`;
+    // Try Web Crypto API (available on HTTPS and localhost)
+    if (crypto.subtle) {
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identityId));
+      const hashArray = Array.from(new Uint8Array(hash));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return `BeSafeDB_${hashHex.substring(0, 16)}`;
+    }
+  } catch (error) {
+    console.warn('Web Crypto API not available, using fallback hash:', error);
+  }
+
+  // Fallback for insecure contexts (HTTP on non-localhost IPs)
+  try {
+    const fallbackHash = simpleHash(identityId);
+    return `BeSafeDB_${fallbackHash.substring(0, 16)}`;
   } catch (error) {
     console.error('Error generating database name:', error);
     throw new Error(

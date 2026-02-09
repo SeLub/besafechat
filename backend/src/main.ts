@@ -34,8 +34,7 @@ async function bootstrap() {
   app.useLogger(new PinoLogger());
 
   // CORS из конфига
-  const configService = app.get(ConfigService);
-  app.enableCors(AppModule.configureCors(configService));
+  app.enableCors(AppModule.configureCors());
 
   // Прочее
   app.use(cookieParser());
@@ -44,6 +43,7 @@ async function bootstrap() {
   // Swagger
   await registerSwagger(app);
 
+  const configService = app.get(ConfigService);
   const port = configService.get('PORT', 4000);
 
   // Graceful shutdown handling to prevent port conflicts during restarts

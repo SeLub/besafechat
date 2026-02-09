@@ -74,8 +74,10 @@ export function useAuthFlow() {
     setLoading(true);
     try {
       await AccountService.createAccountWithCloud(password);
+      setStep('complete');
       toast.success('Account created successfully!');
-      setTimeout(() => (window.location.href = '/'), 1500);
+      // Give browser time to process cookies before redirect
+      setTimeout(() => (window.location.href = '/'), 1000);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -87,8 +89,10 @@ export function useAuthFlow() {
     setLoading(true);
     try {
       await AccountService.createAccountWithSelfCustody();
+      setStep('complete');
       toast.success('Account created successfully!');
-      setTimeout(() => (window.location.href = '/'), 1500);
+      // Give browser time to process cookies before redirect
+      setTimeout(() => (window.location.href = '/'), 1000);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {

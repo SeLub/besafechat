@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check, Clock, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 interface ContactRequest {
   id: string;
   from: {
@@ -41,10 +42,10 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
     setLoading(true);
     try {
       const [incomingRes, outgoingRes] = await Promise.all([
-        fetch('http://localhost:4000/contacts/requests/incoming', {
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, {
           credentials: 'include',
         }),
-        fetch('http://localhost:4000/contacts/requests/outgoing', {
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, {
           credentials: 'include',
         }),
       ]);
@@ -68,7 +69,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/accept`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -90,7 +91,7 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
   const handleReject = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/reject`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
         method: 'POST',
         credentials: 'include',
       });

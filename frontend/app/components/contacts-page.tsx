@@ -5,6 +5,7 @@ import { useOnlineStatusContext } from '~/hooks/use-online-status-context';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface Contact {
   id: string;
@@ -67,9 +68,9 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
     setLoading(true);
     try {
       const [contactsRes, incomingRes, outgoingRes] = await Promise.all([
-        fetch('http://localhost:4000/contacts', { credentials: 'include' }),
-        fetch('http://localhost:4000/contacts/requests/incoming', { credentials: 'include' }),
-        fetch('http://localhost:4000/contacts/requests/outgoing', { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.GET_ALL, { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, { credentials: 'include' }),
       ]);
 
       if (contactsRes.ok) {
@@ -96,7 +97,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/accept`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -119,7 +120,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
   const handleReject = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/reject`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -140,7 +141,7 @@ export function ContactsPage({ onBack }: ContactsPageProps) {
   const handleContactClick = async (userId: string) => {
     try {
       // Find or create chat with this contact
-      await fetch('http://localhost:4000/chats/find-or-create', {
+      await fetch(API_ENDPOINTS.CHATS.FIND_OR_CREATE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

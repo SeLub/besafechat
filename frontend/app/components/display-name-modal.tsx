@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface DisplayNameModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export function DisplayNameModal({
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/profile/display-name', {
+      const res = await fetch(API_ENDPOINTS.PROFILE.DISPLAY_NAME, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

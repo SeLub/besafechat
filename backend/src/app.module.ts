@@ -15,6 +15,7 @@ import { ProfileModule } from './domains/profile/profile.module';
 import { SessionModule } from './domains/session/session.module';
 import { TeamModule } from './domains/team/team.module';
 import { RedisModule } from './domains/redis/redis.module';
+import { getCorsConfig } from './common/config/cors-origins';
 
 @Module({
   imports: [
@@ -36,11 +37,7 @@ import { RedisModule } from './domains/redis/redis.module';
   ],
 })
 export class AppModule {
-  static configureCors(configService: ConfigService) {
-    const origins = configService.get<string>('CORS_ORIGINS');
-    return {
-      origin: origins ? origins.split(',') : ['http://localhost:3000', 'http://localhost:5173'],
-      credentials: true,
-    };
+  static configureCors() {
+    return getCorsConfig();
   }
 }

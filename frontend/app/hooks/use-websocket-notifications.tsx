@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth-context';
 import { useNotifications } from './use-notifications-context';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface ContactRequestData {
   requestId: string;
@@ -53,7 +54,7 @@ export function useWebSocketNotifications(
   useEffect(() => {
     if (!user) return;
 
-    const socket: Socket = io('http://localhost:4000/messages', {
+    const socket: Socket = io(API_ENDPOINTS.WEBSOCKET.MESSAGES, {
       withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
