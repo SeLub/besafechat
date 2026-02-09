@@ -1,9 +1,9 @@
+import { authenticateUser, clearAuthCookies, handleAuthError } from '@/lib/auth-utils';
 import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { FullProfile } from '~/types/profile';
-import type { ApiResponse } from '../types/api';
 
 interface AuthContextType {
   user: FullProfile | null;
@@ -24,60 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Проверка аутентификации при старте
   const checkAuth = async () => {
     try {
-      const res = await fetch('http://localhost:4000/auth/profile', {
-        credentials: 'include',
-      });
-
-      if (res.ok) {
-        const response: ApiResponse<FullProfile> = await res.json();
-        if (response.success && response.data) {
-          setUser(response.data);
-        } else {
-          setUser(null);
-        }
-      } else if (res.status === 401) {
-        // Try to refresh the tokens first
-        try {
-          const refreshResponse = await fetch('http://localhost:4000/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-          });
-
-          if (refreshResponse.ok) {
-            // Retry fetching profile after refresh
-            const retryRes = await fetch('http://localhost:4000/auth/profile', {
-              credentials: 'include',
-            });
-
-            if (retryRes.ok) {
-              const retryResponse: ApiResponse<FullProfile> = await retryRes.json();
-              if (retryResponse.success && retryResponse.data) {
-                setUser(retryResponse.data);
-                return;
-              }
-            }
-          }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-        }
-
-        // If refresh failed, clear auth
-        clearAuthCookies();
-        setUser(null);
-      } else {
-        setUser(null);
-      }
+      const user = await authenticateUser();
+      setUser(user);
     } catch (error) {
-      console.error('Auth check error:', error);
+      handleAuthError(error, false);
       setUser(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  const clearAuthCookies = () => {
-    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   };
 
   // Регистрация — генерация ключей и сохранение публичного ключа в IndexedDB
@@ -122,13 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       // Clear all authentication data
       clearAuthCookies();
-      
+
       // Close the current database connection (per-user database remains in IndexedDB)
       await StorageService.cleanup(); // Close and cleanup database (Phase 4)
-      
+
       // Clear sensitive data from memory
       AccountService.clearTemporarySeed(); // Clears seed and private key hash from memory
-      
+
       setUser(null);
     }
   };
@@ -140,54 +94,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Обновление данных пользователя без перезагрузки страницы
   const refreshUser = async () => {
     try {
-      const res = await fetch('http://localhost:4000/auth/profile', {
-        credentials: 'include',
-      });
+      const user = await authenticateUser();
+      setUser(user);
 
-      if (res.ok) {
-        const response: ApiResponse<FullProfile> = await res.json();
-        if (response.success && response.data) {
-          setUser(response.data);
-          console.log('User profile refreshed successfully', response.data);
-        } else {
-          console.error('Failed to refresh user profile: invalid response data');
-        }
-      } else if (res.status === 401) {
-        // Try to refresh the tokens first
-        try {
-          const refreshResponse = await fetch('http://localhost:4000/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-          });
-
-          if (refreshResponse.ok) {
-            // Retry fetching profile after refresh
-            const retryRes = await fetch('http://localhost:4000/auth/profile', {
-              credentials: 'include',
-            });
-
-            if (retryRes.ok) {
-              const retryResponse: ApiResponse<FullProfile> = await retryRes.json();
-              if (retryResponse.success && retryResponse.data) {
-                setUser(retryResponse.data);
-                console.log('User profile refreshed after token refresh', retryResponse.data);
-                return;
-              }
-            }
-          }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-        }
-
-        // If refresh failed, clear auth
-        clearAuthCookies();
-        setUser(null);
-        console.log('User session expired, cleared auth');
+      if (user) {
+        console.log('User profile refreshed successfully', user);
       } else {
-        console.error('Failed to refresh user profile:', res.status);
+        console.log('User session expired, cleared auth');
       }
     } catch (error) {
-      console.error('User refresh error:', error);
+      handleAuthError(error, false);
     }
   };
 

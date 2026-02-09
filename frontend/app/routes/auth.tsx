@@ -5,6 +5,7 @@ import { SeedDisplay } from '@/components/auth/seed-display';
 import { SeedVerification } from '@/components/auth/seed-verification';
 import { UsernameSelection } from '@/components/auth/username-selection';
 import { Button } from '@/components/ui/button';
+import { silentAuthCheck } from '@/lib/auth-utils';
 import { generateSeedPhrase } from '@/lib/crypto';
 import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
@@ -36,17 +37,15 @@ export default function AuthRoute() {
     const attemptAutoLogin = async () => {
       // First check if user is already authenticated with valid tokens
       try {
-        const profileResponse = await fetch('http://localhost:4000/auth/profile', {
-          credentials: 'include',
-        });
+        const user = await silentAuthCheck(true); // Use silent check to avoid console errors
 
-        if (profileResponse.ok) {
+        if (user) {
           // User is already authenticated, redirect to main app
           window.location.href = '/';
           return;
         }
       } catch (error) {
-        console.log('User not authenticated with existing tokens, proceeding normally');
+        console.log('User not authenticated with existing tokens, proceeding normally ', error);
       }
 
       // If not authenticated, check if we have a stored public key
@@ -203,18 +202,20 @@ export default function AuthRoute() {
       const loginResult = await loginOnly(publicKeyBase64, privateKey);
       // Initialize database after login with identityId
       await StorageService.initialize(loginResult.identityId);
-      
+
       // Verify that derived public key matches stored key
       const storedKey = await StorageService.getPublicKey();
       if (storedKey && storedKey !== publicKeyBase64) {
-        throw new Error('Seed verification failed: Public key mismatch. This password does not match your account.');
+        throw new Error(
+          'Seed verification failed: Public key mismatch. This password does not match your account.'
+        );
       }
-      
+
       // Store public key if not already stored
       if (!storedKey) {
         await StorageService.storePublicKey(publicKeyBase64);
       }
-      
+
       toast.success('Account recovered!');
       window.location.href = '/';
     } catch (error: any) {
@@ -225,37 +226,39 @@ export default function AuthRoute() {
   };
 
   const handleSeedRecovery = async (recoveredSeed: string[]) => {
-   setLoading(true);
-   try {
-     const { publicKeyBase64, privateKey } = await AccountService.recoverWithSeed(recoveredSeed);
-     const { deviceId, deviceName } = AccountService.getDeviceInfo();
-     const loginResult = await AuthService.login({
-       publicKey: publicKeyBase64,
-       privateKey,
-       deviceId,
-       deviceName,
-     });
-     // Initialize database after login with identityId (Phase 4)
-     await StorageService.initialize(loginResult.identityId);
-     
-     // Verify that derived public key matches stored key
-     const storedKey = await StorageService.getPublicKey();
-     if (storedKey && storedKey !== publicKeyBase64) {
-       throw new Error('Seed verification failed: Public key mismatch. This seed does not match your account.');
-     }
-     
-     // Store public key if not already stored
-     if (!storedKey) {
-       await StorageService.storePublicKey(publicKeyBase64);
-     }
-     
-     toast.success('Account recovered!');
-     window.location.href = '/';
-   } catch (error: any) {
-     throw new Error(error.message || 'Recovery failed');
-   } finally {
-     setLoading(false);
-   }
+    setLoading(true);
+    try {
+      const { publicKeyBase64, privateKey } = await AccountService.recoverWithSeed(recoveredSeed);
+      const { deviceId, deviceName } = AccountService.getDeviceInfo();
+      const loginResult = await AuthService.login({
+        publicKey: publicKeyBase64,
+        privateKey,
+        deviceId,
+        deviceName,
+      });
+      // Initialize database after login with identityId (Phase 4)
+      await StorageService.initialize(loginResult.identityId);
+
+      // Verify that derived public key matches stored key
+      const storedKey = await StorageService.getPublicKey();
+      if (storedKey && storedKey !== publicKeyBase64) {
+        throw new Error(
+          'Seed verification failed: Public key mismatch. This seed does not match your account.'
+        );
+      }
+
+      // Store public key if not already stored
+      if (!storedKey) {
+        await StorageService.storePublicKey(publicKeyBase64);
+      }
+
+      toast.success('Account recovered!');
+      window.location.href = '/';
+    } catch (error: any) {
+      throw new Error(error.message || 'Recovery failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (step === 'username-selection') {
