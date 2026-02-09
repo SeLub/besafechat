@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Info, Phone, Video } from 'lucide-react';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 
 interface MiddleHeaderProps {
   selectedChat: any;
@@ -12,6 +13,8 @@ export function MiddleHeader({
   selectedChat,
   onToggleRightPanel,
 }: MiddleHeaderProps) {
+  const { getOnlineStatus } = useOnlineStatusContext();
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -44,8 +47,10 @@ export function MiddleHeader({
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>
             <div className="text-sm text-muted-foreground flex items-center">
-              {selectedChat.isOnline && <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />}
-              {selectedChat.isOnline ? 'Online' : 'Last seen recently'}
+              {getOnlineStatus(selectedChat.handleId) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+              )}
+              {getOnlineStatus(selectedChat.handleId) ? 'Online' : 'Last seen recently'}
             </div>
           </div>
         </div>

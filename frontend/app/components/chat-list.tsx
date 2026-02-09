@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getInitials } from '@/lib/utils';
 import { Plus, Search } from 'lucide-react';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 
 interface Chat {
   id: string;
@@ -12,6 +13,7 @@ interface Chat {
   isOnline?: boolean;
   userId?: string;
   avatarUrl?: string;
+  handleId?: string;
 }
 
 interface ChatListProps {
@@ -22,6 +24,8 @@ interface ChatListProps {
 }
 
 export function ChatList({ chats, selectedChatId, onChatSelect, onNewChat }: ChatListProps) {
+  const { getOnlineStatus } = useOnlineStatusContext();
+
   return (
     <div className="flex flex-col h-full">
       {/* Search Bar */}
@@ -59,6 +63,7 @@ export function ChatList({ chats, selectedChatId, onChatSelect, onNewChat }: Cha
               key={chat.id}
               chat={chat}
               isSelected={chat.id === selectedChatId}
+              isOnline={getOnlineStatus(chat.handleId)}
               onClick={() => onChatSelect(chat.id)}
             />
           ))
@@ -71,10 +76,11 @@ export function ChatList({ chats, selectedChatId, onChatSelect, onNewChat }: Cha
 interface ChatItemProps {
   chat: Chat;
   isSelected: boolean;
+  isOnline: boolean;
   onClick: () => void;
 }
 
-function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
+function ChatItem({ chat, isSelected, isOnline, onClick }: ChatItemProps) {
   return (
     <div
       onClick={onClick}
@@ -106,7 +112,7 @@ function ChatItem({ chat, isSelected, onClick }: ChatItemProps) {
             <AvatarImage src="" style={{ display: 'none' }} />
           )}
         </Avatar>
-        {chat.isOnline && (
+        {isOnline && (
           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
         )}
       </div>

@@ -7,6 +7,7 @@ import { RightPanel } from '@/components/right-panel';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useChats } from '@/hooks/use-chats';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 import { StorageService } from '@/services/storage.service';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
@@ -38,6 +39,8 @@ function ChatRouteContent() {
     getChatById,
     loadOnlineStatuses,
   } = useChats();
+  const { updateOnlineStatus: updateContextOnlineStatus, loadInitialStatuses } =
+    useOnlineStatusContext();
 
   const handleSendMessage = async (message: string) => {
     const socket = socketRef.current || window.socketInstance;
@@ -199,6 +202,15 @@ function ChatRouteContent() {
     chatsRef.current = chats;
   }, [chats]);
 
+  // Load initial online statuses to context when chats are loaded
+  useEffect(() => {
+    const handleIds = chats.map(chat => chat.handleId).filter(Boolean) as string[];
+    if (handleIds.length > 0) {
+      loadInitialStatuses(handleIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats.length, loadInitialStatuses]);
+
   const handleMessageReceived = useCallback(
     async (message: any) => {
       // Skip processing if this is our own message (sender should not receive their own messages)
@@ -251,19 +263,15 @@ function ChatRouteContent() {
     [selectedChatId, user]
   );
 
-  const handleUserOnline = useCallback(
-    (handleId: string) => {
-      updateChatOnlineStatus(handleId, true);
-    },
-    [updateChatOnlineStatus]
-  );
+  // Deprecated: Use handleOnlineStatusChange instead
+  const handleUserOnline = useCallback(() => {
+    // No-op: replaced by handleOnlineStatusChange
+  }, []);
 
-  const handleUserOffline = useCallback(
-    (handleId: string) => {
-      updateChatOnlineStatus(handleId, false);
-    },
-    [updateChatOnlineStatus]
-  );
+  // Deprecated: Use handleOnlineStatusChange instead
+  const handleUserOffline = useCallback(() => {
+    // No-op: replaced by handleOnlineStatusChange
+  }, []);
 
   const handleContactRequest = useCallback((request: any) => {
     console.log('handleContactRequest called with:', request);
@@ -288,6 +296,14 @@ function ChatRouteContent() {
     console.log('Transformed request:', transformedRequest);
     setContactRequestModal({ isOpen: true, request: transformedRequest });
   }, []);
+
+  const handleOnlineStatusChange = useCallback(
+    (handleId: string, isOnline: boolean) => {
+      updateChatOnlineStatus(handleId, isOnline);
+      updateContextOnlineStatus(handleId, isOnline);
+    },
+    [updateChatOnlineStatus, updateContextOnlineStatus]
+  );
 
   const handleAcceptRequest = async (requestId: string) => {
     setRequestActionLoading(true);
@@ -335,10 +351,9 @@ function ChatRouteContent() {
     handleMessageReceived,
     handleUserOnline,
     handleUserOffline,
-    handleContactRequest
+    handleContactRequest,
+    handleOnlineStatusChange
   );
-
-
 
   // Cleanup old messages on app start
   useEffect(() => {

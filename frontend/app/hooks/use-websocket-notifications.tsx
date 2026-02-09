@@ -24,7 +24,8 @@ export function useWebSocketNotifications(
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
-  onContactRequest?: (request: ContactRequestData) => void
+  onContactRequest?: (request: ContactRequestData) => void,
+  onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void
 ) {
   const { user } = useAuth();
   const { incrementRequests, incrementAccepted } = useNotifications();
@@ -35,6 +36,7 @@ export function useWebSocketNotifications(
     onUserOnline,
     onUserOffline,
     onContactRequest,
+    onOnlineStatusChange,
   });
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function useWebSocketNotifications(
       onUserOnline,
       onUserOffline,
       onContactRequest,
+      onOnlineStatusChange,
     };
   });
 
@@ -152,10 +155,12 @@ export function useWebSocketNotifications(
     // Online status events
     socket.on('user_online', (data: { handleId: string }) => {
       callbacksRef.current.onUserOnline?.(data.handleId);
+      callbacksRef.current.onOnlineStatusChange?.(data.handleId, true);
     });
 
     socket.on('user_offline', (data: { handleId: string }) => {
       callbacksRef.current.onUserOffline?.(data.handleId);
+      callbacksRef.current.onOnlineStatusChange?.(data.handleId, false);
     });
 
     // Heartbeat to maintain online status

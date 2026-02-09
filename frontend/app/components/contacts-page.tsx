@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '~/hooks/use-notifications-context';
+import { useOnlineStatusContext } from '~/hooks/use-online-status-context';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';

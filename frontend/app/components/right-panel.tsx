@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { X, Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface RightPanelProps {
     lastSeen?: string;
     phone?: string;
     username?: string;
+    handleId?: string;
     avatarUrl?: string;
     bio?: string;
     firstName?: string;
@@ -22,6 +24,8 @@ interface RightPanelProps {
 }
 
 export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
+  const { getOnlineStatus } = useOnlineStatusContext();
+
   if (!isOpen || !chatInfo) return null;
 
   const getInitials = (name: string) => {
@@ -66,7 +70,7 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
           @{chatInfo.alias || chatInfo.username || chatInfo.name}
         </p>
         <p className="text-sm text-muted-foreground mb-4">
-          {chatInfo.isOnline ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
+          {getOnlineStatus(chatInfo.handleId) ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
         </p>
 
         {/* Action Buttons */}

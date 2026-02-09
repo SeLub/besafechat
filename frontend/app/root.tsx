@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from 'react-router';
 import { AvatarUpdateProvider } from '@/hooks/avatar-update-context'; // Import AvatarUpdateProvider
+import { OnlineStatusProvider } from '@/hooks/use-online-status-context';
 
 import type { Route } from './+types/root';
 import './app.css';
@@ -31,8 +32,10 @@ export function Layout({ children }: { children: ReactNode }) {
           <AuthProvider>
             <NotificationProvider>
               <AvatarUpdateProvider>
-                {children}
-                <Toaster />
+                <OnlineStatusProvider>
+                  {children}
+                  <Toaster />
+                </OnlineStatusProvider>
               </AvatarUpdateProvider>
             </NotificationProvider>
           </AuthProvider>

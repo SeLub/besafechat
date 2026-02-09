@@ -100,21 +100,14 @@ export function useChats() {
     } catch (error) {
       console.error('Failed to load online statuses:', error);
     }
-  }, [chats]); // Add chats as dependency for useCallback
+  }, []);
 
-  // Load online statuses after chats are loaded
+  // Load online statuses once when chats are loaded (initial sync)
   useEffect(() => {
     if (chats.length > 0) {
       loadOnlineStatuses();
-
-      // Set up periodic refresh of online statuses every 30 seconds
-      const interval = setInterval(() => {
-        loadOnlineStatuses();
-      }, 30000);
-
-      return () => clearInterval(interval);
     }
-  }, [chats.length, loadOnlineStatuses]);
+  }, [chats.length]);
 
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {
@@ -163,9 +156,12 @@ export function useChats() {
     setChats(prev => prev.map(chat => (chat.handleId === handleId ? { ...chat, isOnline } : chat)));
   };
 
-  const getChatById = useCallback((chatId: string) => {
-    return chats.find(chat => chat.id === chatId);
-  }, [chats]);
+  const getChatById = useCallback(
+    (chatId: string) => {
+      return chats.find(chat => chat.id === chatId);
+    },
+    [chats]
+  );
 
   return {
     chats,
