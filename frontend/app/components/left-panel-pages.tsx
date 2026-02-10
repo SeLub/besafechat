@@ -1,48 +1,72 @@
-import { useState, useRef } from 'react';
-import type { ReactNode } from 'react';
+import { ContactsPage } from '@/components/contacts-page';
+import { NotificationList } from '@/components/notification-list';
+import { DevicesSettingsModal } from '@/components/devices-settings-modal';
+import { DisplayNameModal } from '@/components/display-name-modal';
+import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
+import { StorageSettingsModal } from '@/components/storage-settings-modal';
+import { ThemeSelectorModal } from '@/components/theme-selector-modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
-import { DisplayNameModal } from '@/components/display-name-modal';
-import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
-import { ThemeSelectorModal } from '@/components/theme-selector-modal';
-import { StorageSettingsModal } from '@/components/storage-settings-modal';
-import { DevicesSettingsModal } from '@/components/devices-settings-modal';
-import { ContactsPage } from '@/components/contacts-page';
-import { useAuth } from '@/hooks/use-auth';
-import { S3Service } from '@/services/s3-service';
-import { toast } from 'sonner';
+import { useAuth } from '~/hooks/use-auth-context';
+import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { MediaService } from '@/services/media.service';
 import {
   ArrowLeft,
-  Edit3,
-  Camera,
-  User,
   AtSign,
   Bell,
-  Shield,
-  Palette,
+  Camera,
   Database,
+  Edit3,
   Globe,
   HelpCircle,
-  LogOut,
   Key,
+  LogOut,
+  Palette,
+  Shield,
+  User,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { UserService } from '~/services';
+import { useAvatarUpdate } from '~/hooks/avatar-update-context'; // Import useAvatarUpdate
 
 interface LeftPanelPageProps {
-  page: 'profile' | 'settings' | 'contacts' | null;
+  page: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
   onBack: () => void;
   userProfile?: {
-    displayName?: string;
-    publicKey: string;
-    username?: string;
-    avatarUrl?: string;
+    identity: {
+      id: string;
+      publicKey: string;
+      createdAt: string;
+    };
+    handle: {
+      id: string;
+      value: string;
+      alias: string | null;
+      isSearchable: boolean;
+      isPrimary: boolean;
+      createdAt: string;
+    };
+    profile: {
+      displayName: string;
+      firstName: string | null;
+      lastName: string | null;
+      avatarUrl: string | null;
+      bio: string | null;
+      settings: Record<string, any>;
+    };
   };
   onChatCreated?: (chatId: string) => void;
 }
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
-  const { logout, checkAuth, user } = useAuth();
+  const { user, logout, checkAuth, refreshUser } = useAuth();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } =
+    useNotificationHistory();
+  const { lastAvatarUpdateTimestamp, triggerAvatarUpdate } = useAvatarUpdate();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -55,7 +79,10 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   if (!page) return null;
 
   const getInitials = (name?: string) => {
-    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || 'U';
+    if (!name) {
+      const publicKey = userProfile?.identity?.publicKey;
+      return publicKey ? publicKey.slice(0, 2).toUpperCase() : 'U';
+    }
     return name
       .split(' ')
       .map(n => n[0])
@@ -78,22 +105,39 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
     setUploading(true);
     try {
       // Use the authenticated user's ID from the auth context
-      const userId = user?.id;
+      const userId = user?.identity?.id;
       if (!userId) {
         throw new Error('User not authenticated');
       }
 
-      // Use the S3Service uploadAvatar method which properly handles the upload
-      const avatarUrl = await S3Service.uploadAvatar(userId, file);
-
+      // Use the MediaService uploadAvatar method which properly handles the upload
+      await MediaService.uploadAvatar(file);
       toast.success('Avatar updated');
-      // Force reload with cache bust
-      setTimeout(() => checkAuth(), 500);
+      // Refresh the user profile to get the potentially updated avatar URL (though it's static)
+      // And then trigger an avatar update in the context to force image reload
+      await refreshUser();
+      triggerAvatarUpdate();
     } catch (error) {
       console.error('Failed to upload avatar:', error);
       toast.error('Failed to upload avatar');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSaveUsername = async (username: string, isSearchable: boolean) => {
+    try {
+      // Обновляем username на сервере с isSearchable
+      await UserService.setUsername(username, userProfile?.profile?.displayName, isSearchable);
+
+      // Обновляем данные пользователя без перезагрузки страницы
+      await refreshUser();
+
+      toast.success('Settings updated successfully');
+      setUsernameModalOpen(false);
+    } catch (error) {
+      console.error('Failed to update username:', error);
+      toast.error('Failed to update username');
     }
   };
 
@@ -114,9 +158,13 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
             <div className="relative inline-block">
               <Avatar className="h-24 w-24 mx-auto">
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                  {getInitials(userProfile?.displayName)}
+                  {getInitials(userProfile?.profile?.displayName)}
                 </AvatarFallback>
-                {userProfile?.avatarUrl && <AvatarImage src={userProfile.avatarUrl} />}
+                {userProfile?.profile?.avatarUrl && (
+                  <AvatarImage
+                    src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
+                  />
+                )}
               </Avatar>
               <input
                 ref={fileInputRef}
@@ -142,16 +190,30 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
               <ProfileField
                 icon={<User className="h-5 w-5" />}
                 label="Display Name"
-                value={userProfile?.displayName || 'Not set'}
+                value={userProfile?.profile?.displayName || 'Not set'}
                 onEdit={() => setDisplayNameModalOpen(true)}
               />
 
               <ProfileField
                 icon={<AtSign className="h-5 w-5" />}
                 label="Username"
-                value={userProfile?.username ? `@${userProfile.username}` : 'Not set'}
+                value={userProfile?.handle?.value ? `@${userProfile.handle.value}` : 'Not set'}
                 onEdit={() => setUsernameModalOpen(true)}
               />
+
+              {userProfile?.handle?.alias && (
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="text-sm text-muted-foreground mb-1">Alias</div>
+                  <div className="font-medium">@{userProfile.handle.alias}</div>
+                </div>
+              )}
+
+              {userProfile?.profile?.bio && (
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="text-sm text-muted-foreground mb-1">Bio</div>
+                  <div>{userProfile.profile.bio}</div>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-2">
@@ -161,7 +223,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                   </div>
                 </div>
                 <div className="text-xs font-mono bg-muted p-3 rounded-lg break-all">
-                  {userProfile?.publicKey}
+                  {userProfile?.identity?.publicKey || 'Public Key Not Available'}
                 </div>
               </div>
             </div>
@@ -172,14 +234,15 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
         <UsernameSetupModal
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
-          currentUsername={userProfile?.username}
+          currentUsername={userProfile?.handle?.value}
+          onSave={handleSaveUsername}
         />
 
         {/* Display Name Modal */}
         <DisplayNameModal
           isOpen={displayNameModalOpen}
           onClose={() => setDisplayNameModalOpen(false)}
-          currentDisplayName={userProfile?.displayName}
+          currentDisplayName={userProfile?.profile?.displayName}
           onUpdate={checkAuth}
         />
       </>
@@ -194,10 +257,19 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           onChatCreated?.(userId);
           onBack();
         }}
-        onChatCreated={chatId => {
-          onChatCreated?.(chatId);
-          onBack();
-        }}
+      />
+    );
+  }
+
+  if (page === 'notifications') {
+    return (
+      <NotificationList
+        notifications={notifications}
+        unreadCount={unreadCount}
+        loading={loading}
+        onBack={onBack}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
       />
     );
   }
@@ -265,12 +337,16 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 <SettingsItem
                   icon={<Globe className="h-5 w-5" />}
                   label="Language"
-                  onClick={() => {}}
+                  onClick={() => {
+                    console.log('Mock Language functionality.');
+                  }}
                 />
                 <SettingsItem
                   icon={<HelpCircle className="h-5 w-5" />}
                   label="Help & Support"
-                  onClick={() => {}}
+                  onClick={() => {
+                    console.log('Help & Support clicked.');
+                  }}
                 />
               </SettingsSection>
 
@@ -366,6 +442,13 @@ function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: Setti
     <div
       className="flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer"
       onClick={!hasSwitch ? onClick : undefined}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (!hasSwitch && onClick) onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
       <div className="flex items-center space-x-3">
         <div className="text-muted-foreground">{icon}</div>

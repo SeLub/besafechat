@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface SeedDisplayProps {
   seed: string[];
@@ -8,10 +9,27 @@ interface SeedDisplayProps {
 export function SeedDisplay({ seed, onConfirm }: SeedDisplayProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(seed.join(' '));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(seed.join(' '));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        // Fallback for environments without clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = seed.join(' ');
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error('Failed to copy seed phrase');
+    }
   };
 
   const handleDownload = () => {

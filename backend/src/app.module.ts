@@ -1,33 +1,43 @@
+///home/selub/Documents/progs/besafechat/backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './db/database.module';
-import { UserModule } from './domains/user/user.module';
-import { UsernameModule } from './domains/username/username.module';
-import { MessageModule } from './domains/message/message.module';
-import { ContactModule } from './domains/contact/contact.module';
+import { AuthModule } from './domains/auth/auth.module';
 import { ChatModule } from './domains/chat/chat.module';
-import { S3Module } from './domains/s3/s3.module';
+import { ContactModule } from './domains/contact/contact.module';
+import { HandleModule } from './domains/handle/handle.module';
+import { IdentityModule } from './domains/identity/identity.module';
+import { MediaModule } from './domains/media/media.module';
+import { MessageModule } from './domains/message/message.module';
+import { NotificationModule } from './domains/notification/notification.module';
+import { ProfileModule } from './domains/profile/profile.module';
+import { SessionModule } from './domains/session/session.module';
+import { TeamModule } from './domains/team/team.module';
+import { RedisModule } from './domains/redis/redis.module';
+import { getCorsConfig } from './common/config/cors-origins';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     DatabaseModule,
-    UserModule,
-    UsernameModule,
+    RedisModule,
+    AuthModule,
+    HandleModule,
+    IdentityModule,
+    ProfileModule,
+    TeamModule,
+    SessionModule,
     MessageModule,
+    NotificationModule,
     ContactModule,
     ChatModule,
-    S3Module,
+    MediaModule,
   ],
 })
 export class AppModule {
-  static configureCors(configService: ConfigService) {
-    const origins = configService.get<string>('CORS_ORIGINS');
-    return {
-      origin: origins ? origins.split(',') : ['http://localhost:3000', 'http://localhost:5173'],
-      credentials: true,
-    };
+  static configureCors() {
+    return getCorsConfig();
   }
 }

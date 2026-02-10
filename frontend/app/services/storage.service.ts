@@ -2,13 +2,17 @@ import {
   base64ToUint8,
   decryptWithPassphrase,
   encryptWithPassphrase,
+  encryptWithKey,
+  decryptWithKey,
   generateSalt,
   randomBytes,
   testKeyImport,
   toArrayBuffer,
   uint8ToBase64,
+  deriveEncryptionKeyFromHash,
 } from '@/lib/crypto';
-import { db } from '@/lib/db/db';
+import { getSessionPrivateKeyHash } from './account.service';
+import { getDb, initializeDb, closeDb } from '@/lib/db/db';
 import type { Contact, Message, MessageRetentionPeriod, PublicKey } from '@/lib/db/schema';
 // Conversion utilities for IndexedDB storage
 const convertUint8ToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
@@ -100,6 +104,41 @@ export class StorageService {
   private static readonly AES_KEY_LENGTH = 256;
 
   // ==========================================================================
+  // Database Initialization & Cleanup (Phase 4)
+  // ==========================================================================
+
+  /**
+   * Initialize database for a specific user account
+   * Must be called after successful login, before any storage operations
+   * 
+   * @param identityId User's identity from server (from login response)
+   * @throws Error if database initialization fails
+   */
+  static async initialize(identityId: string): Promise<void> {
+    try {
+      await initializeDb(identityId);
+      console.log(`StorageService initialized for identity: ${identityId}`);
+    } catch (error) {
+      console.error('Failed to initialize StorageService:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Close and cleanup the current database
+   * Should be called on logout or account switch
+   */
+  static async cleanup(): Promise<void> {
+    try {
+      await closeDb();
+      console.log('StorageService cleaned up');
+    } catch (error) {
+      console.error('Failed to cleanup StorageService:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================================================
   // Key Management
   // ==========================================================================
 
@@ -108,7 +147,7 @@ export class StorageService {
    */
   static async hasStoredPublicKey(): Promise<boolean> {
     try {
-      const count = await db.publicKey.count();
+      const count = await getDb().publicKey.count();
       return count > 0;
     } catch (error) {
       console.error('Error checking for stored key:', error);
@@ -127,7 +166,7 @@ export class StorageService {
         createdAt: Date.now(),
       };
 
-      await db.publicKey.put(record);
+      await getDb().publicKey.put(record);
       console.log('Public key stored successfully');
     } catch (error) {
       console.error('Error storing public key:', error);
@@ -142,7 +181,7 @@ export class StorageService {
    */
   static async clearStoredKey(): Promise<void> {
     try {
-      await db.publicKey.clear();
+      await getDb().publicKey.clear();
       console.log('Key cleared');
     } catch (error) {
       console.error('Error clearing key:', error);
@@ -157,7 +196,7 @@ export class StorageService {
    */
   static async getKeyRecord(): Promise<PublicKey | null> {
     try {
-      const record = await db.publicKey.get('current');
+      const record = await getDb().publicKey.get('current');
       return record || null;
     } catch (error) {
       console.error('Error getting key record:', error);
@@ -182,16 +221,52 @@ export class StorageService {
    */
   static async encryptTextData(
     text: string,
-    userId: string,
+    handleId: string,
     context: 'message' | 'contact' | 'metadata'
   ): Promise<EncryptedStorage> {
     try {
       const textBytes = new TextEncoder().encode(text);
 
-      const encrypted = await encryptWithPassphrase(textBytes, userId, this.DEFAULT_KDF_ITERATIONS);
+      // Try new method first (hash-based encryption)
+      const privateKeyHash = getSessionPrivateKeyHash();
+      if (privateKeyHash) {
+        try {
+          const encryptionKey = await deriveEncryptionKeyFromHash(
+            privateKeyHash,
+            handleId,
+            context
+          );
+
+          const { encrypted: enc, iv } = await encryptWithKey(textBytes, encryptionKey);
+
+          return {
+            encrypted: enc,
+            salt: new Uint8Array(0), // Not used with hash-based approach
+            iv,
+            version: 2, // Version 2 = hash-based
+            context,
+            timestamp: Date.now(),
+          };
+        } catch (newMethodError) {
+          console.warn(
+            `Hash-based encryption failed for ${context}, falling back to legacy method:`,
+            newMethodError
+          );
+        }
+      }
+
+      // Fallback to old method (passphrase-based) for backward compatibility
+      const { encrypted: encBytes, salt, iv, version } = await encryptWithPassphrase(
+        textBytes,
+        handleId,
+        this.DEFAULT_KDF_ITERATIONS
+      );
 
       return {
-        ...encrypted,
+        encrypted: encBytes,
+        salt,
+        iv,
+        version,
         context,
         timestamp: Date.now(),
       };
@@ -208,12 +283,12 @@ export class StorageService {
    */
   static async encryptBinaryData(
     data: Uint8Array,
-    userId: string,
+    handleId: string,
     context: 'file'
   ): Promise<EncryptedStorage> {
     try {
-      const salt = await this.generateFileSalt(userId);
-      const key = await this.deriveFileKey(userId, salt);
+      const salt = await this.generateFileSalt(handleId);
+      const key = await this.deriveFileKey(handleId, salt);
       const iv = randomBytes(12);
 
       const encrypted = await crypto.subtle.encrypt(
@@ -248,7 +323,7 @@ export class StorageService {
    */
   static async decryptData(
     encryptedStorage: EncryptedStorage,
-    userId: string
+    handleId: string
   ): Promise<Uint8Array> {
     try {
       if (encryptedStorage.version === 1) {
@@ -259,26 +334,60 @@ export class StorageService {
             iv: encryptedStorage.iv,
             version: 1,
           },
-          userId,
+          handleId,
           this.DEFAULT_KDF_ITERATIONS
         );
       }
 
-      if (encryptedStorage.version === 2 && encryptedStorage.authTag) {
-        const key = await this.deriveFileKey(userId, encryptedStorage.salt);
+      // Version 2 can be either:
+      // - Hash-based encryption (new method, no salt needed, salt.length === 0)
+      // - File-based with auth tag (old method)
 
-        const combined = new Uint8Array([
-          ...encryptedStorage.encrypted,
-          ...encryptedStorage.authTag,
-        ]);
+      if (encryptedStorage.version === 2) {
+        // Try hash-based decryption first (new method)
+        if (encryptedStorage.salt.length === 0) {
+          try {
+            const privateKeyHash = getSessionPrivateKeyHash();
+            if (privateKeyHash) {
+              const encryptionKey = await deriveEncryptionKeyFromHash(
+                privateKeyHash,
+                handleId,
+                encryptedStorage.context
+              );
 
-        const decrypted = await crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: toArrayBuffer(encryptedStorage.iv) },
-          key,
-          toArrayBuffer(combined)
-        );
+              const decrypted = await decryptWithKey(
+                encryptedStorage.encrypted,
+                encryptionKey,
+                encryptedStorage.iv
+              );
 
-        return new Uint8Array(decrypted);
+              return new Uint8Array(decrypted);
+            }
+          } catch (hashMethodError) {
+            console.warn(
+              'Hash-based decryption failed, trying file-based method:',
+              hashMethodError
+            );
+          }
+        }
+
+        // Fall back to file-based decryption (old method)
+        if (encryptedStorage.authTag) {
+          const key = await this.deriveFileKey(handleId, encryptedStorage.salt);
+
+          const combined = new Uint8Array([
+            ...encryptedStorage.encrypted,
+            ...encryptedStorage.authTag,
+          ]);
+
+          const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: toArrayBuffer(encryptedStorage.iv) },
+            key,
+            toArrayBuffer(combined)
+          );
+
+          return new Uint8Array(decrypted);
+        }
       }
 
       throw new Error(`Unsupported encryption version: ${encryptedStorage.version}`);
@@ -295,9 +404,9 @@ export class StorageService {
    */
   static async decryptTextData(
     encryptedStorage: EncryptedStorage,
-    userId: string
+    handleId: string
   ): Promise<string> {
-    const decryptedBytes = await this.decryptData(encryptedStorage, userId);
+    const decryptedBytes = await this.decryptData(encryptedStorage, handleId);
     return new TextDecoder().decode(decryptedBytes);
   }
 
@@ -315,39 +424,96 @@ export class StorageService {
     chatId: string,
     senderId: string,
     content: string,
-    userId: string,
+    handleId: string,
     isOwn: boolean = false,
     messageId?: string
   ): Promise<string> {
     try {
-      const textBytes = new TextEncoder().encode(content);
-
-      const encrypted = await encryptWithPassphrase(textBytes, userId, this.DEFAULT_KDF_ITERATIONS);
-
-      // Для AES-GCM, auth tag (16 байт) находится в конце зашифрованных данных
-      // Вам нужно отделить ciphertext от auth tag
-      const encryptedArray = new Uint8Array(encrypted.encrypted);
-      const ciphertext = encryptedArray.slice(0, -16); // Все кроме последних 16 байт
-      const authTag = encryptedArray.slice(-16); // Последние 16 байт - auth tag
-
       const id =
         messageId || `${senderId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Check if message already exists to prevent duplicates
+      const existingMessage = await getDb().messages.get(id);
+      if (existingMessage) {
+        console.log(`⚠️ Message ${id} already exists, skipping save`);
+        return id;
+      }
+
+      const textBytes = new TextEncoder().encode(content);
+
+      let encryptedContent: ArrayBuffer;
+      let salt: ArrayBuffer;
+      let iv: Uint8Array;
+      let authTag: ArrayBuffer | undefined;
+
+      // Try hash-based encryption first
+      const privateKeyHash = getSessionPrivateKeyHash();
+      if (privateKeyHash) {
+        try {
+          const encryptionKey = await deriveEncryptionKeyFromHash(
+            privateKeyHash,
+            handleId,
+            'message'
+          );
+
+          const { encrypted: enc, iv: newIv } = await encryptWithKey(textBytes, encryptionKey);
+
+          encryptedContent = convertUint8ToArrayBuffer(enc);
+          salt = convertUint8ToArrayBuffer(new Uint8Array(0)); // No salt needed
+          iv = newIv;
+          // authTag is undefined (not used in hash-based)
+        } catch (hashError) {
+          console.warn('Hash-based message encryption failed, using legacy method:', hashError);
+
+          // Fall back to passphrase-based
+          const encrypted = await encryptWithPassphrase(
+            textBytes,
+            handleId,
+            this.DEFAULT_KDF_ITERATIONS
+          );
+
+          const encryptedArray = new Uint8Array(encrypted.encrypted);
+          const ciphertext = encryptedArray.slice(0, -16);
+          const tag = encryptedArray.slice(-16);
+
+          encryptedContent = convertUint8ToArrayBuffer(ciphertext);
+          salt = convertUint8ToArrayBuffer(encrypted.salt);
+          iv = encrypted.iv;
+          authTag = convertUint8ToArrayBuffer(tag);
+        }
+      } else {
+        // No hash available, use legacy method
+        const encrypted = await encryptWithPassphrase(
+          textBytes,
+          handleId,
+          this.DEFAULT_KDF_ITERATIONS
+        );
+
+        const encryptedArray = new Uint8Array(encrypted.encrypted);
+        const ciphertext = encryptedArray.slice(0, -16);
+        const tag = encryptedArray.slice(-16);
+
+        encryptedContent = convertUint8ToArrayBuffer(ciphertext);
+        salt = convertUint8ToArrayBuffer(encrypted.salt);
+        iv = encrypted.iv;
+        authTag = convertUint8ToArrayBuffer(tag);
+      }
 
       const message: Message = {
         id,
         chatId,
         senderId,
         contentType: 'text',
-        encryptedContent: convertUint8ToArrayBuffer(ciphertext), // ciphertext без auth tag
-        salt: convertUint8ToArrayBuffer(encrypted.salt),
-        iv: convertUint8ToArrayBuffer(encrypted.iv),
+        encryptedContent,
+        salt,
+        iv: toArrayBuffer(iv),
         timestamp: Date.now(),
         isOwn,
         status: 'sent',
-        authTag: convertUint8ToArrayBuffer(authTag), // Сохраняем auth tag отдельно
+        authTag,
       };
 
-      await db.messages.put(message);
+      await getDb().messages.put(message);
 
       return id;
     } catch (error) {
@@ -363,7 +529,7 @@ export class StorageService {
    */
   static async loadDecryptedMessages(
     chatId: string,
-    userId: string
+    handleId: string
   ): Promise<
     Array<{
       id: string;
@@ -374,7 +540,7 @@ export class StorageService {
     }>
   > {
     try {
-      const messages = await db.messages.where('chatId').equals(chatId).sortBy('timestamp');
+      const messages = await getDb().messages.where('chatId').equals(chatId).sortBy('timestamp');
 
       const decryptedMessages = [];
 
@@ -393,7 +559,7 @@ export class StorageService {
               authTag,
               version: 1,
             },
-            userId,
+            handleId,
             this.DEFAULT_KDF_ITERATIONS
           );
 
@@ -432,10 +598,10 @@ export class StorageService {
    */
   static async encryptPrivateKeyForSession(
     privateKey: Uint8Array,
-    publicKeyBase64: string
+    handleId: string
   ): Promise<EncryptedStorage> {
     try {
-      return await this.encryptTextData(uint8ToBase64(privateKey), publicKeyBase64, 'metadata');
+      return await this.encryptTextData(uint8ToBase64(privateKey), handleId, 'metadata');
     } catch (error) {
       console.error('Error encrypting private key for session:', error);
       throw new Error(
@@ -449,10 +615,10 @@ export class StorageService {
    */
   static async decryptPrivateKeyFromSession(
     encryptedStorage: EncryptedStorage,
-    publicKeyBase64: string
+    handleId: string
   ): Promise<Uint8Array> {
     try {
-      const base64Key = await this.decryptTextData(encryptedStorage, publicKeyBase64);
+      const base64Key = await this.decryptTextData(encryptedStorage, handleId);
       return base64ToUint8(base64Key);
     } catch (error) {
       console.error('Error decrypting private key from session:', error);
@@ -483,7 +649,7 @@ export class StorageService {
       }
 
       const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-      const deleted = await db.messages.where('timestamp').below(cutoffTime).delete();
+      const deleted = await getDb().messages.where('timestamp').below(cutoffTime).delete();
 
       console.log(`Cleaned up ${deleted} old messages`);
       return deleted;
@@ -528,7 +694,7 @@ export class StorageService {
    */
   static async getTotalMessageCount(): Promise<number> {
     try {
-      return await db.messages.count();
+      return await getDb().messages.count();
     } catch (error) {
       console.error('Error getting total message count:', error);
       return 0;
@@ -540,8 +706,8 @@ export class StorageService {
    */
   static async clearAllMessages(): Promise<void> {
     try {
-      const count = await db.messages.count();
-      await db.messages.clear();
+      const count = await getDb().messages.count();
+      await getDb().messages.clear();
       console.log(`Cleared all ${count} messages`);
     } catch (error) {
       console.error('Error clearing all messages:', error);
@@ -556,15 +722,19 @@ export class StorageService {
   /**
    * Сохранение контакта
    */
-  static async saveContact(contactId: string, userId: string, displayName?: string): Promise<void> {
+  static async saveContact(
+    contactId: string,
+    handleId: string,
+    displayName?: string
+  ): Promise<void> {
     try {
       const contact: Contact = {
         contactId,
-        userId,
+        handleId,
         displayName: displayName || '',
       };
 
-      await db.contacts.put(contact);
+      await getDb().contacts.put(contact);
     } catch (error) {
       console.error('Error saving contact:', error);
       throw error;
@@ -574,9 +744,9 @@ export class StorageService {
   /**
    * Удаление контакта
    */
-  static async removeContact(contactId: string, userId: string): Promise<void> {
+  static async removeContact(contactId: string, handleId: string): Promise<void> {
     try {
-      await db.contacts.where('userId').equals(userId).delete();
+      await getDb().contacts.where('handleId').equals(handleId).delete();
     } catch (error) {
       console.error('Error removing contact:', error);
       throw error;
@@ -588,7 +758,7 @@ export class StorageService {
    */
   static async getAllContacts(): Promise<Contact[]> {
     try {
-      return await db.contacts.toArray();
+      return await getDb().contacts.toArray();
     } catch (error) {
       console.error('Error getting all contacts:', error);
       throw error;
@@ -600,7 +770,7 @@ export class StorageService {
    */
   static async contactExists(id: string): Promise<boolean> {
     try {
-      const count = await db.contacts.where('id').equals(id).count();
+      const count = await getDb().contacts.where('id').equals(id).count();
       return count > 0;
     } catch (error) {
       console.error(`Error checking if contact exists ${id}:`, error);
@@ -613,7 +783,7 @@ export class StorageService {
    */
   static async getContactCount(): Promise<number> {
     try {
-      return await db.contacts.count();
+      return await getDb().contacts.count();
     } catch (error) {
       console.error('Error getting contact count:', error);
       return 0;
@@ -625,8 +795,8 @@ export class StorageService {
    */
   static async clearAllContacts(): Promise<void> {
     try {
-      const count = await db.contacts.count();
-      await db.contacts.clear();
+      const count = await getDb().contacts.count();
+      await getDb().contacts.clear();
       console.log(`Cleared ${count} contacts`);
     } catch (error) {
       console.error('Error clearing all contacts:', error);
@@ -643,7 +813,7 @@ export class StorageService {
    */
   static async isAvailable(): Promise<boolean> {
     try {
-      await db.open();
+      await getDb().open();
       return true;
     } catch (error) {
       console.error('IndexedDB is not available:', error);
@@ -656,10 +826,10 @@ export class StorageService {
    */
   static async getStorageInfo(): Promise<StorageInfo> {
     try {
-      const messagesCount = await db.messages.count();
-      const contactsCount = await db.contacts.count();
+      const messagesCount = await getDb().messages.count();
+      const contactsCount = await getDb().contacts.count();
       const hasKey = await StorageService.hasStoredPublicKey();
-      const keyRecord = await db.publicKey.get('current');
+      const keyRecord = await getDb().publicKey.get('current');
 
       const estimatedMessageSize = messagesCount * 500;
       const estimatedContactSize = contactsCount * 200;
@@ -669,9 +839,9 @@ export class StorageService {
 
       const quota = await this.getQuotaUsage();
 
-      const messages = await db.messages.orderBy('timestamp').limit(1).toArray();
+      const messages = await getDb().messages.orderBy('timestamp').limit(1).toArray();
 
-      const newestMessages = await db.messages.orderBy('timestamp').reverse().limit(1).toArray();
+      const newestMessages = await getDb().messages.orderBy('timestamp').reverse().limit(1).toArray();
 
       return {
         totalSize,
@@ -739,13 +909,13 @@ export class StorageService {
   /**
    * Проверка целостности зашифрованных данных
    */
-  static async verifyEncryptionIntegrity(userId: string): Promise<{
+  static async verifyEncryptionIntegrity(handleId: string): Promise<{
     messages: { total: number; successful: number; failed: number };
     contacts: { total: number; successful: number; failed: number };
   }> {
     try {
-      const messages = await db.messages.toArray();
-      const contacts = await db.contacts.toArray();
+      const messages = await getDb().messages.toArray();
+      const contacts = await getDb().contacts.toArray();
 
       let successfulMessages = 0;
       let failedMessages = 0;
@@ -762,7 +932,7 @@ export class StorageService {
             timestamp: msg.timestamp,
           };
 
-          await this.decryptTextData(encryptedStorage, userId);
+          await this.decryptTextData(encryptedStorage, handleId);
           successfulMessages++;
         } catch {
           failedMessages++;
@@ -798,9 +968,9 @@ export class StorageService {
    */
   static async clearAllData(): Promise<void> {
     try {
-      await db.messages.clear();
-      await db.contacts.clear();
-      await db.publicKey.clear();
+      await getDb().messages.clear();
+      await getDb().contacts.clear();
+      await getDb().publicKey.clear();
       localStorage.removeItem(StorageService.RETENTION_KEY);
       console.log('All storage data cleared');
     } catch (error) {
@@ -818,13 +988,13 @@ export class StorageService {
   /**
    * Генерация соли для файлов
    */
-  private static async generateFileSalt(userId: string): Promise<Uint8Array> {
-    const userIdBytes = base64ToUint8(userId);
+  private static async generateFileSalt(handleId: string): Promise<Uint8Array> {
+    const handleIdBytes = base64ToUint8(handleId);
     const timestampBytes = new TextEncoder().encode(Date.now().toString());
 
-    const combined = new Uint8Array(userIdBytes.length + timestampBytes.length);
-    combined.set(userIdBytes);
-    combined.set(timestampBytes, userIdBytes.length);
+    const combined = new Uint8Array(handleIdBytes.length + timestampBytes.length);
+    combined.set(handleIdBytes);
+    combined.set(timestampBytes, handleIdBytes.length);
 
     const hash = await crypto.subtle.digest('SHA-256', combined);
     return new Uint8Array(hash);
@@ -833,12 +1003,12 @@ export class StorageService {
   /**
    * Деривация ключа для файлов
    */
-  private static async deriveFileKey(userId: string, salt: Uint8Array): Promise<CryptoKey> {
-    const userIdBytes = base64ToUint8(userId);
+  private static async deriveFileKey(handleId: string, salt: Uint8Array): Promise<CryptoKey> {
+    const handleIdBytes = base64ToUint8(handleId);
 
     const baseKey = await crypto.subtle.importKey(
       'raw',
-      toArrayBuffer(userIdBytes),
+      toArrayBuffer(handleIdBytes),
       'PBKDF2',
       false,
       ['deriveKey']
@@ -860,7 +1030,7 @@ export class StorageService {
 
   private static async enforceMessageLimit(chatId: string, limit: number): Promise<void> {
     try {
-      const messages = await db.messages
+      const messages = await getDb().messages
         .where('chatId')
         .equals(chatId)
         .reverse()
@@ -868,7 +1038,7 @@ export class StorageService {
 
       if (messages.length > limit) {
         const toDelete = messages.slice(limit).map(m => m.id);
-        await db.messages.bulkDelete(toDelete);
+        await getDb().messages.bulkDelete(toDelete);
         console.log(`Enforced limit: deleted ${toDelete.length} messages from chat ${chatId}`);
       }
     } catch (error) {

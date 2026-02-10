@@ -1,20 +1,41 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { useNotifications } from '@/hooks/use-notifications';
-import { Menu, User, Users, Settings, Moon, Sun, X } from 'lucide-react';
+import { useNotifications } from '~/hooks/use-notifications-context';
+import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { Menu, Moon, Settings, Sun, User, Users, Bell, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { useAvatarUpdate } from '~/hooks/avatar-update-context';
 
 interface HamburgerMenuProps {
   userProfile?: {
-    displayName?: string;
-    publicKey: string;
-    avatarUrl?: string;
+    identity: {
+      id: string;
+      publicKey: string;
+      createdAt: string;
+    };
+    handle: {
+      id: string;
+      value: string;
+      alias: string | null;
+      isSearchable: boolean;
+      isPrimary: boolean;
+      createdAt: string;
+    };
+    profile: {
+      displayName: string;
+      firstName: string | null;
+      lastName: string | null;
+      avatarUrl: string | null;
+      bio: string | null;
+      settings: Record<string, any>;
+    };
   };
   onProfileClick?: () => void;
   onContactsClick?: () => void;
   onSettingsClick?: () => void;
+  onNotificationsClick?: () => void;
 }
 
 export function HamburgerMenu({
@@ -22,10 +43,13 @@ export function HamburgerMenu({
   onProfileClick,
   onContactsClick,
   onSettingsClick,
+  onNotificationsClick,
 }: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { counts, clearNotifications } = useNotifications();
+  const { unreadCount } = useNotificationHistory();
+  const { lastAvatarUpdateTimestamp } = useAvatarUpdate();
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
@@ -35,7 +59,10 @@ export function HamburgerMenu({
   };
 
   const getInitials = (name?: string) => {
-    if (!name) return userProfile?.publicKey.slice(0, 2).toUpperCase() || 'U';
+    if (!name) {
+      const publicKey = userProfile?.identity?.publicKey;
+      return publicKey ? publicKey.slice(0, 2).toUpperCase() : 'U';
+    }
     return name
       .split(' ')
       .map(n => n[0])
@@ -52,7 +79,16 @@ export function HamburgerMenu({
 
       {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsOpen(false)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setIsOpen(false);
+          }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close menu"
+        />
       )}
 
       {/* Sidebar */}
@@ -72,22 +108,37 @@ export function HamburgerMenu({
 
           {/* User Profile Section */}
           <div className="p-4 border-b border-border">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 mb-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {getInitials(userProfile?.displayName)}
+                  {getInitials(userProfile?.profile?.displayName)}
                 </AvatarFallback>
-                {userProfile?.avatarUrl && <AvatarImage src={userProfile.avatarUrl} />}
+                {userProfile?.profile?.avatarUrl ? (
+                  <AvatarImage
+                    src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
+                    onError={e => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <AvatarImage src="" style={{ display: 'none' }} />
+                )}
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">
-                  {userProfile?.displayName || 'Anonymous User'}
+                  {userProfile?.profile?.displayName || 'Anonymous User'}
                 </div>
                 <div className="text-sm text-muted-foreground truncate">
-                  {userProfile?.publicKey.slice(0, 16)}...
+                  @{userProfile?.handle?.alias || userProfile?.handle?.value || 'unknown'}
                 </div>
               </div>
             </div>
+            {userProfile?.profile?.bio && (
+              <div className="text-sm text-muted-foreground">
+                {userProfile.profile.bio}
+              </div>
+            )}
           </div>
 
           {/* Menu Items */}
@@ -100,6 +151,21 @@ export function HamburgerMenu({
                 onProfileClick?.();
               }}
             />
+            <div className="relative">
+              <MenuItem
+                icon={<Bell className="h-5 w-5" />}
+                label="Notifications"
+                onClick={() => {
+                  setIsOpen(false);
+                  onNotificationsClick?.();
+                }}
+              />
+              {unreadCount > 0 && (
+                <div className="absolute top-2 right-4 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
             <div className="relative">
               <MenuItem
                 icon={<Users className="h-5 w-5" />}

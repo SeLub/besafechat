@@ -1,52 +1,98 @@
-import type {
-  LoginCredentials,
-  ApiResponse,
-  LoginResponse,
-  ProfileResponse,
-  UsernameCheckResponse,
-} from '@/types';
+import type { ApiResponse, LoginCredentials, LoginResponse, ProfileResponse } from '@/types';
 
 import type {
-  OnlineStatusResponse,
   BulkOnlineStatusResponse,
-  Session,
+  OnlineStatusResponse,
   RefreshTokenResponse,
-  PublicKeyResponse,
+  Session,
 } from '@/types/account';
+import type { FullProfile } from '~/types/profile';
+import { UserService } from './user.service';
+import { API_CONFIG } from './api-config';
 
 /**
  * Базовые операции с бэкендом для аутентификации
  */
 export class AuthService {
-  private static readonly API_BASE = 'http://localhost:4000';
+  private static readonly API_BASE = API_CONFIG.BASE_URL;
 
   /**
    * Логин на бэкенде
    */
   static async login(credentials: LoginCredentials): Promise<LoginResponse> {
     const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
+    // Generate deviceName from available browser info if not provided
+    const deviceName =
+      credentials.deviceName ||
+      (typeof navigator !== 'undefined' ? `${navigator.platform || 'Web'} Device` : 'Web Device');
 
-    const res = await fetch(`${this.API_BASE}/auth/login`, {
+    // First, request a challenge from the server
+    const challengeRes = await fetch(`${this.API_BASE}/auth/login/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         publicKey: credentials.publicKey,
-        deviceId: finalDeviceId,
+        action: 'login',
       }),
     });
 
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      throw new Error(`Backend login failed: ${error}`);
+    if (!challengeRes.ok) {
+      const error = await challengeRes.text().catch(() => 'Unknown error');
+      throw new Error(`Challenge request failed: ${error}`);
     }
 
-    const data: ApiResponse<LoginResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Login failed');
+    const challengeData: ApiResponse<{
+      challengeId: string;
+      challenge: string;
+      expiresAt: number;
+    }> = await challengeRes.json();
+    if (!challengeData.success || !challengeData.data) {
+      throw new Error(challengeData.error || 'Failed to get challenge');
     }
 
-    return data.data!;
+    const { challengeId, challenge } = challengeData.data;
+
+    // Get the private key to sign the challenge
+    // The private key parameter is now passed to login() method directly
+    // This should be called during account creation/recovery before the private key is destroyed
+    const { signMessageToBase64 } = await import('../lib/crypto/core/signatures');
+    
+    // Note: The privateKey parameter should be provided by the caller
+    // If not available, it means we're trying to login without a proper key derivation
+    if (!credentials.privateKey) {
+      throw new Error('Private key not available. Please complete account creation or recovery first.');
+    }
+    
+    const signature = await signMessageToBase64(credentials.privateKey, challenge);
+
+    // Send the signature back to the server to complete authentication
+    const authRes = await fetch(`${this.API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        challengeId,
+        publicKey: credentials.publicKey,
+        signature,
+        deviceName, // Required by backend DTO
+        deviceId: finalDeviceId, // Still send deviceId for reference
+      }),
+    });
+
+    if (!authRes.ok) {
+      const error = await authRes.text().catch(() => 'Unknown error');
+      throw new Error(`Backend authentication failed: ${error}`);
+    }
+
+    const data: ApiResponse<LoginResponse> = await authRes.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Login failed');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -66,15 +112,15 @@ export class AuthService {
   /**
    * Получение информации о текущем пользователе
    */
-  static async getCurrentUser(): Promise<ProfileResponse | null> {
+  static async getCurrentUser(): Promise<FullProfile | null> {
     try {
-      const res = await fetch(`${this.API_BASE}/auth/me`, {
+      const res = await fetch(`${this.API_BASE}/auth/profile`, {
         credentials: 'include',
       });
 
       if (res.ok) {
-        const data: ApiResponse<ProfileResponse> = await res.json();
-        return data.data || null;
+        const response: ApiResponse<FullProfile> = await res.json();
+        return response.success && response.data ? response.data : null;
       }
       return null;
     } catch {
@@ -95,33 +141,6 @@ export class AuthService {
   }
 
   // ==================== Auth Endpoints ====================
-
-  /**
-   * Регистрация нового пользователя
-   */
-  static async register(credentials: { publicKey: string; deviceId?: string }): Promise<void> {
-    const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
-
-    const res = await fetch(`${this.API_BASE}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        publicKey: credentials.publicKey,
-        deviceId: finalDeviceId,
-      }),
-    });
-
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      throw new Error(`Registration failed: ${error}`);
-    }
-
-    const data: ApiResponse = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Registration failed');
-    }
-  }
 
   /**
    * Получение списка активных сессий
@@ -200,11 +219,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<RefreshTokenResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Token refresh failed');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Token refresh failed');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -222,11 +243,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<{ publicKey: string }> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get public key');
-    }
-
-    return data.data!.publicKey;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get public key');
+        }
+        if (!data.data || !data.data.publicKey) {
+          throw new Error('Missing public key in successful response');
+        }
+        return data.data.publicKey;
   }
 
   // ==================== Profile Endpoints ====================
@@ -235,7 +258,7 @@ export class AuthService {
    * Получение профиля текущего пользователя
    */
   static async getProfile(): Promise<ProfileResponse> {
-    const res = await fetch(`${this.API_BASE}/profile`, {
+    const res = await fetch(`${this.API_BASE}/auth/profile`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -246,11 +269,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<ProfileResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get profile');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get profile');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**
@@ -276,48 +301,11 @@ export class AuthService {
   }
 
   /**
-   * Установка username
+   * Update username (now calls separate endpoints)
    */
-  static async setUsername(username: string): Promise<void> {
-    const res = await fetch(`${this.API_BASE}/profile/username`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        username,
-        isSearchable: 'yes',
-      }),
-    });
-
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      throw new Error(`Failed to set username: ${error}`);
-    }
-
-    const data: ApiResponse = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to set username');
-    }
-  }
-
-  /**
-   * Проверка доступности username
-   */
-  static async checkUsernameAvailable(username: string): Promise<boolean> {
-    try {
-      const res = await fetch(
-        `${this.API_BASE}/profile/username/search/${encodeURIComponent(username)}`,
-        { credentials: 'include' }
-      );
-
-      if (res.ok) {
-        const data: ApiResponse<UsernameCheckResponse> = await res.json();
-        return data.success && data.data?.available === true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
+  static async setUsername(username: string, displayName?: string): Promise<void> {
+    // Call UserService to update the username properly via the handles endpoint
+    await UserService.setUsername(username, displayName);
   }
 
   // ==================== Online Status Endpoints ====================
@@ -337,11 +325,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<OnlineStatusResponse> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get online status');
-    }
-
-    return data.data!;
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get online status');
+        }
+        if (!data.data) {
+          throw new Error('Missing data in successful response');
+        }
+        return data.data;
   }
 
   /**

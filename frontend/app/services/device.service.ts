@@ -2,6 +2,9 @@
  * Device identification service for anonymous E2EE messenger
  * Provides non-identifying device metadata to prevent spam while preserving privacy
  */
+
+// Примечание: В бизнес-логике нужно будет обновить создание сессии, чтобы использовать DeviceService.getDeviceName() и DeviceService.getDeviceType() вместо текущего подхода с deviceId.
+
 export class DeviceService {
   private static iosDeviceMapping = new Map([
     ['320x480', 'iPhone 4S/4/3GS'],
@@ -79,5 +82,14 @@ export class DeviceService {
   private static getDesktopDeviceName(): string {
     const platform = navigator.platform || 'Unknown';
     return this.desktopDeviceMapping.get(platform) || platform;
+  }
+
+  static getDeviceType(): 'mobile' | 'desktop' | 'web' {
+    if (typeof window === 'undefined') return 'web';
+
+    const ua = navigator.userAgent.toLowerCase();
+    if (/mobi|android|iphone|ipad|ipod/.test(ua)) return 'mobile';
+    if (/windows|linux|macintosh/.test(ua)) return 'desktop';
+    return 'web';
   }
 }

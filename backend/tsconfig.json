@@ -8,13 +8,18 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2021",
     "sourceMap": true,
-    "rootDir": "./src",
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true, // ← временно скрывает ошибки в node_modules
     "strict": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"],
+    "lib": ["ES2021"],
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "useDefineForClassFields": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

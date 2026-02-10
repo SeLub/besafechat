@@ -1,21 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { useAuth } from './use-auth';
-import { toast } from 'sonner';
-
-interface NotificationCounts {
-  newRequests: number;
-  newAccepted: number;
-}
-
-interface NotificationContextType {
-  counts: NotificationCounts;
-  clearNotifications: () => void;
-  incrementRequests: () => void;
-  incrementAccepted: () => void;
-}
-
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+import { useAuth } from './use-auth-context';
+import { NotificationContext, type NotificationCounts } from './notification-context';
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<NotificationCounts>({
@@ -27,7 +13,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Load persisted counts on mount
   useEffect(() => {
     if (user) {
-      const stored = localStorage.getItem(`notifications_${user.id}`);
+      const stored = localStorage.getItem(`notifications_${user.identity.id}`);
       if (stored) {
         try {
           setCounts(JSON.parse(stored));
@@ -41,7 +27,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Persist counts to localStorage
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`notifications_${user.id}`, JSON.stringify(counts));
+      localStorage.setItem(`notifications_${user.identity.id}`, JSON.stringify(counts));
     }
   }, [counts, user]);
 
@@ -69,12 +55,4 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       {children}
     </NotificationContext.Provider>
   );
-}
-
-export function useNotifications() {
-  const context = useContext(NotificationContext);
-  if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
-  }
-  return context;
 }

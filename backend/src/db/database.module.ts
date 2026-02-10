@@ -15,12 +15,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         username: configService.get('DB_USERNAME', 'user'),
         password: configService.get('DB_PASSWORD', 'secure_password'),
         database: configService.get('DB_DATABASE', 'messenger'),
-        // Explicitly specify entity paths
-        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+        // Explicitly specify entity paths to avoid loading compiled files
+        entities: [__dirname + '/../domains/**/*.entity{.ts,.js}'],
         // Use migrations instead of synchronize for production
         migrations: [__dirname + '/../migrations/*{.ts,.js}'],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only use sync in non-production
-        logging: configService.get('NODE_ENV') === 'development', // Enable logging in development
+        logging: false, // configService.get('NODE_ENV') === 'development', // Enable logging in development
       }),
       inject: [ConfigService],
     }),

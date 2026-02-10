@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { X, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '~/hooks/use-auth-context';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface PrivacySettingsModalProps {
   isOpen: boolean;
@@ -14,49 +15,60 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   const [isSearchable, setIsSearchable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  const loadCurrentSettings = useCallback(async () => {
+    setInitialLoading(true);
+    try {
+      // Load current searchable status from user profile
+      if (user?.handle) {
+        setIsSearchable(user.handle.isSearchable);
+      } else {
+        // Default to true if not set
+        setIsSearchable(true);
+      }
+    } catch {
+      console.error('Failed to load privacy settings');
+    } finally {
+      setInitialLoading(false);
+    }
+  }, [user, setIsSearchable, setInitialLoading]);
 
   useEffect(() => {
     if (isOpen && user) {
       loadCurrentSettings();
     }
-  }, [isOpen, user]);
-
-  const loadCurrentSettings = async () => {
-    setInitialLoading(true);
-    try {
-      // TODO: Add API endpoint to get user privacy settings
-      // For now, assume user is searchable by default
-      setIsSearchable(true);
-    } catch (error) {
-      console.error('Failed to load privacy settings');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
+  }, [isOpen, user, loadCurrentSettings]);
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Update searchability through username endpoint
-      // This assumes user already has a username set
-      const res = await fetch('http://localhost:4000/username/set', {
+      // Update searchability through handles endpoint
+      // Use the handle ID to update searchable status
+      const handleId = user?.handle?.id;
+      if (!handleId) {
+        throw new Error('Handle not found');
+      }
+
+      const res = await fetch(API_ENDPOINTS.HANDLES.SEARCHABLE(handleId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          username: user?.username || 'temp_username',
-          isSearchable: isSearchable ? 'yes' : 'no',
+          isSearchable: isSearchable,
         }),
       });
 
       if (res.ok) {
         toast.success('Privacy settings updated');
+        // Refresh the user profile data after successful update
+        await refreshUser();
         onClose();
       } else {
-        toast.error('Failed to update settings');
+        const errorText = await res.text();
+        toast.error(`Failed to update settings: ${errorText}`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update settings');
     } finally {
       setLoading(false);
@@ -68,7 +80,16 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose();
+        }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close modal"
+      />
 
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">

@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarUrl } from '@/lib/avatar-utils';
-import { Phone, Video, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Info, Phone, Video } from 'lucide-react';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 
 interface MiddleHeaderProps {
   selectedChat: any;
@@ -11,9 +11,10 @@ interface MiddleHeaderProps {
 
 export function MiddleHeader({
   selectedChat,
-  rightPanelOpen,
   onToggleRightPanel,
 }: MiddleHeaderProps) {
+  const { getOnlineStatus } = useOnlineStatusContext();
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -31,13 +32,25 @@ export function MiddleHeader({
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(selectedChat.name)}
             </AvatarFallback>
-            {selectedChat.userId && <AvatarImage src={getAvatarUrl(selectedChat.userId)} />}
+            {selectedChat.avatarUrl ? (
+              <AvatarImage
+                src={selectedChat.avatarUrl}
+                onError={e => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
+            ) : (
+              <AvatarImage src="" style={{ display: 'none' }} />
+            )}
           </Avatar>
           <div className="ml-3">
             <div className="font-medium">{selectedChat.name}</div>
             <div className="text-sm text-muted-foreground flex items-center">
-              {selectedChat.isOnline && <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />}
-              {selectedChat.isOnline ? 'Online' : 'Last seen recently'}
+              {getOnlineStatus(selectedChat.handleId) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+              )}
+              {getOnlineStatus(selectedChat.handleId) ? 'Online' : 'Last seen recently'}
             </div>
           </div>
         </div>

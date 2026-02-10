@@ -1,19 +1,25 @@
-// src/domains/message/message.module.ts
+// /home/selub/Documents/progs/besafechat/backend/src/domains/message/message.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MessagesGateway } from './gateways/messages.gateway';
-import { MessageMetadataService } from './services/message-metadata.service';
-import { ChatRoomService } from './services/chat-room.service';
-import { MessageMetadata } from './message-metadata.entity';
-import { Chat } from '../chat/chat.entity';
+import { RedisService } from '../../domains/redis/redis.service';
 import { ChatMember } from '../chat/chat-member.entity';
-import { User } from '../user/user.entity';
-import { Session } from '../user/session.entity';
-import { SessionService } from '../user/services/session.service';
-import { RedisService } from '../../common/redis.service';
+import { Chat } from '../chat/chat.entity';
+import { HandleModule } from '../handle/handle.module'; // ДОБАВИТЬ
+import { NotificationModule } from '../notification/notification.module';
+import { Identity } from '../identity/identity.entity';
+import { SessionService } from '../session/services/session.service';
+import { Session } from '../session/session.entity';
+import { MessagesGateway } from './gateways/messages.gateway';
+import { MessageMetadata } from './message-metadata.entity';
+import { ChatRoomService } from './services/chat-room.service';
+import { MessageMetadataService } from './services/message-metadata.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MessageMetadata, Chat, ChatMember, User, Session])],
+  imports: [
+    TypeOrmModule.forFeature([MessageMetadata, Chat, ChatMember, Identity, Session]),
+    HandleModule, // ДОБАВИТЬ: для SessionService
+    NotificationModule,
+  ],
   providers: [
     MessagesGateway,
     MessageMetadataService,
@@ -21,6 +27,6 @@ import { RedisService } from '../../common/redis.service';
     SessionService,
     RedisService,
   ],
-  exports: [ChatRoomService],
+  exports: [ChatRoomService, RedisService, MessagesGateway],
 })
 export class MessageModule {}

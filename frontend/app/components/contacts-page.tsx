@@ -1,32 +1,39 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarUrl } from '@/lib/avatar-utils';
-import { ArrowLeft, ChevronDown, ChevronRight, MessageCircle, Check, X, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNotifications } from '~/hooks/use-notifications-context';
+import { useOnlineStatusContext } from '~/hooks/use-online-status-context';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { useNotifications } from '@/hooks/use-notifications';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface Contact {
   id: string;
   user: {
     id: string;
     displayName?: string;
-    username?: string;
+    handle?: string;
+    avatarUrl?: string;
+    firstName?: string;
+    lastName?: string;
+    bio?: string;
   };
   acceptedAt: string;
 }
 
 interface ContactRequest {
   id: string;
-  fromUser?: {
-    id: string;
-    displayName?: string;
-    username?: string;
+  from: {
+    handleId: string;
+    value: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
   };
-  toUser?: {
-    id: string;
-    displayName?: string;
-    username?: string;
+  to: {
+    handleId: string;
   };
   message?: string;
   status?: string;
@@ -36,10 +43,9 @@ interface ContactRequest {
 interface ContactsPageProps {
   onBack: () => void;
   onChatSelect: (userId: string) => void;
-  onChatCreated?: (chatId: string) => void;
 }
 
-export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPageProps) {
+export function ContactsPage({ onBack }: ContactsPageProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
@@ -51,6 +57,9 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
     // Clear notifications when contacts page is opened
     clearNotifications();
   }, []);
@@ -59,9 +68,9 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
     setLoading(true);
     try {
       const [contactsRes, incomingRes, outgoingRes] = await Promise.all([
-        fetch('http://localhost:4000/contacts', { credentials: 'include' }),
-        fetch('http://localhost:4000/contacts/requests/incoming', { credentials: 'include' }),
-        fetch('http://localhost:4000/contacts/requests/outgoing', { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.GET_ALL, { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, { credentials: 'include' }),
       ]);
 
       if (contactsRes.ok) {
@@ -78,7 +87,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
         const outgoingData = await outgoingRes.json();
         setOutgoingRequests(outgoingData.requests || []);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
@@ -88,24 +97,20 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/accept`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
 
       if (res.ok) {
-        const data = await res.json();
         toast.success('Request accepted');
         loadData();
 
         // Handle chat creation
-        if (data.chatId && onChatCreated) {
-          onChatCreated(data.chatId);
-        }
       } else {
         toast.error('Failed to accept request');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -115,7 +120,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
   const handleReject = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const res = await fetch(`http://localhost:4000/contacts/requests/${requestId}/reject`, {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
         method: 'POST',
         credentials: 'include',
       });
@@ -126,7 +131,7 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
       } else {
         toast.error('Failed to reject request');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
@@ -136,27 +141,18 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
   const handleContactClick = async (userId: string) => {
     try {
       // Find or create chat with this contact
-      const res = await fetch('http://localhost:4000/chats/find-or-create', {
+      await fetch(API_ENDPOINTS.CHATS.FIND_OR_CREATE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ otherUserId: userId }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (onChatCreated) {
-          onChatCreated(data.chatId);
-        }
-      } else {
-        toast.error('Failed to open chat');
-      }
-    } catch (error) {
+    } catch {
       toast.error('Failed to open chat');
     }
   };
 
-  const getInitials = (user: { displayName?: string; username?: string }) => {
+  const getInitials = (user: { displayName?: string; value?: string }) => {
     if (user.displayName) {
       return user.displayName
         .split(' ')
@@ -165,8 +161,8 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
         .toUpperCase()
         .slice(0, 2);
     }
-    if (user.username) {
-      return user.username.slice(0, 2).toUpperCase();
+    if (user.value) {
+      return user.value.slice(0, 2).toUpperCase();
     }
     return 'U';
   };
@@ -233,23 +229,40 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                   key={contact.id}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-accent cursor-pointer"
                   onClick={() => handleContactClick(contact.user.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      handleContactClick(contact.user.id);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
                 >
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(contact.user)}
                       </AvatarFallback>
-                      <AvatarImage src={getAvatarUrl(contact.user.id)} />
+                      {contact.user.avatarUrl ? (
+                        <AvatarImage
+                          src={contact.user.avatarUrl}
+                          onError={e => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <AvatarImage src="" style={{ display: 'none' }} />
+                      )}
                     </Avatar>
                     <div>
                       <div className="font-medium">
                         {contact.user.displayName ||
-                          `@${contact.user.username}` ||
+                          `@${contact.user.handle}` ||
                           'Anonymous User'}
                       </div>
-                      {contact.user.username && (
+                      {contact.user.handle && (
                         <div className="text-sm text-muted-foreground">
-                          @{contact.user.username}
+                          @{contact.user.handle}
                         </div>
                       )}
                     </div>
@@ -297,17 +310,25 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getInitials(request.fromUser || {})}
+                            {getInitials(request.from || {})}
                           </AvatarFallback>
-                          {request.fromUser?.id && (
-                            <AvatarImage src={getAvatarUrl(request.fromUser.id)} />
+                          {request.from?.avatarUrl ? (
+                            <AvatarImage
+                              src={request.from.avatarUrl}
+                              onError={e => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <AvatarImage src="" style={{ display: 'none' }} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.fromUser?.displayName ||
-                                `@${request.fromUser?.username}` ||
+                              {request.from?.displayName ||
+                                `@${request.from?.value}` ||
                                 'Anonymous User'}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -377,17 +398,25 @@ export function ContactsPage({ onBack, onChatSelect, onChatCreated }: ContactsPa
                       <div className="flex items-start space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getInitials(request.toUser || {})}
+                            {getInitials(request.from || {})}
                           </AvatarFallback>
-                          {request.toUser?.id && (
-                            <AvatarImage src={getAvatarUrl(request.toUser.id)} />
+                          {request.from?.avatarUrl ? (
+                            <AvatarImage
+                              src={request.from.avatarUrl}
+                              onError={e => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <AvatarImage src="" style={{ display: 'none' }} />
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-sm">
-                              {request.toUser?.displayName ||
-                                `@${request.toUser?.username}` ||
+                              {request.from?.displayName ||
+                                `@${request.from?.value}` ||
                                 'Anonymous User'}
                             </div>
                             <div className="flex items-center space-x-2">

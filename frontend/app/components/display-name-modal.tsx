@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface DisplayNameModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export function DisplayNameModal({
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/profile/display-name', {
+      const res = await fetch(API_ENDPOINTS.PROFILE.DISPLAY_NAME, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -45,7 +46,7 @@ export function DisplayNameModal({
       toast.success('Display name updated');
       onUpdate();
       onClose();
-    } catch (error) {
+    } catch {
       toast.error('Failed to update display name');
     } finally {
       setLoading(false);
@@ -61,10 +62,14 @@ export function DisplayNameModal({
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">
+            <label
+              htmlFor="display-name-input"
+              className="text-sm text-muted-foreground mb-2 block"
+            >
               Display Name (1-24 characters, emoji allowed)
             </label>
             <input
+              id="display-name-input"
               type="text"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}

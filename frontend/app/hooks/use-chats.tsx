@@ -1,6 +1,6 @@
-import { StorageService } from '@/services/storage.service';
-import { useEffect, useState } from 'react';
-import { useAuth } from './use-auth';
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from './use-auth-context';
+import { API_CONFIG } from '../services/api-config';
 
 interface Chat {
   id: string;
@@ -12,7 +12,12 @@ interface Chat {
   phone?: string;
   username?: string;
   publicKey?: string;
-  userId?: string;
+  handleId?: string;
+  avatarUrl?: string;
+  bio?: string;
+  firstName?: string;
+  lastName?: string;
+  alias?: string;
 }
 
 export function useChats() {
@@ -20,69 +25,84 @@ export function useChats() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Mock data for now - will be replaced with real API calls
-  const mockChats: Chat[] = [
-    // {
-    //   id: "6d36bdb6-8651-4d72-94f4-3c9aa13f489d",
-    //   name: "John Doe",
-    //   lastMessage: "Hello there!",
-    //   timestamp: "12:30",
-    //   unreadCount: 3,
-    //   isOnline: true,
-    //   phone: "+1 234 567 8900",
-    //   username: "johndoe",
-    //   publicKey: "fxhKP0trJd8XJR3IPTVOmA+BFXpFgWtJDRLC8LOZnMI=",
-    // },
-    // {
-    //   id: "saved-messages",
-    //   name: "Saved Messages",
-    //   lastMessage: "You: Test message",
-    //   timestamp: "11:45",
-    //   isOnline: false,
-    // },
-  ];
+  const loadChatsFromBackend = useCallback(async () => {
+    try {
+      // Load actual chats from the chats API
+      const chatsRes = await fetch(`${API_CONFIG.BASE_URL}/chats`, {
+        credentials: 'include',
+      });
+
+      let chatData = [];
+      if (chatsRes.ok) {
+        const chatsJson = await chatsRes.json();
+        chatData = chatsJson.chats || chatsJson; // Handle different response formats
+
+        // Transform chat data to our Chat interface
+        const actualChats = chatData.map((chat: any) => {
+          // Get the first other member (in private chats there's typically one other person)
+          const otherMember = chat.otherMembers?.[0];
+
+          return {
+            id: chat.id,
+            name:
+              otherMember?.user?.displayName || `@${otherMember?.user?.handle}` || 'Unknown User',
+            handleId: otherMember?.handleId,
+            publicKey: otherMember?.user?.publicKey,
+            avatarUrl: otherMember?.user?.avatarUrl || undefined,
+            bio: otherMember?.user?.bio || undefined,
+            firstName: otherMember?.user?.firstName || undefined,
+            lastName: otherMember?.user?.lastName || undefined,
+            username: otherMember?.user?.handle || undefined,
+            alias: otherMember?.user?.alias || undefined,
+            isOnline: false,
+          };
+        });
+        setChats(actualChats);
+      } else {
+        // Fallback to empty array if no chats or API fails
+        setChats([]);
+      }
+    } catch (error) {
+      console.error('Error loading chats:', error);
+      setChats([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Removed user from dependency array
 
   useEffect(() => {
     if (user) {
       loadChatsFromBackend();
     }
-  }, [user]);
+  }, [user, loadChatsFromBackend]);
 
-  const loadChatsFromBackend = async () => {
+  const loadOnlineStatuses = useCallback(async () => {
+    const handleIds = chats.map(chat => chat.handleId).filter(Boolean);
+    if (handleIds.length === 0) return;
+
     try {
-      const res = await fetch('http://localhost:4000/contacts', {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ userIds: handleIds }),
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const chats = data.contacts.map((contact: any) => ({
-          id: `chat_${contact.user.id}`,
-          name: contact.user.displayName || `@${contact.user.username}` || 'Unknown User',
-          userId: contact.user.id,
-          publicKey: contact.user.publicKey,
-          isOnline: false,
-        }));
-
-        // Save contacts to IndexedDB
-        if (user) {
-          for (const chat of chats) {
-            await StorageService.saveContact(chat.userId, user.id, chat.name);
-          }
-        }
-
-        setChats([...mockChats, ...chats]);
-      } else {
-        setChats(mockChats);
+        const { statuses } = await res.json();
+        setChats(prev =>
+          prev.map(chat => ({
+            ...chat,
+            isOnline: chat.handleId ? statuses[chat.handleId] || false : false,
+          }))
+        );
       }
     } catch (error) {
-      setChats(mockChats);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load online statuses:', error);
     }
-  };
+  }, []);
 
-  // Load online statuses after chats are loaded
+  // Load online statuses once when chats are loaded (initial sync)
   useEffect(() => {
     if (chats.length > 0) {
       loadOnlineStatuses();
@@ -101,10 +121,11 @@ export function useChats() {
     };
 
     setChats(prev => {
-      // Check if chat already exists by userId or publicKey
+      // Check if chat already exists by handleId or publicKey
       const exists = prev.find(
         c =>
-          (c.userId && c.userId === chat.userId) || (c.publicKey && c.publicKey === chat.publicKey)
+          (c.handleId && c.handleId === chat.handleId) ||
+          (c.publicKey && c.publicKey === chat.publicKey)
       );
       if (exists) return prev;
 
@@ -131,39 +152,16 @@ export function useChats() {
     );
   };
 
-  const updateChatOnlineStatus = (userId: string, isOnline: boolean) => {
-    setChats(prev => prev.map(chat => (chat.userId === userId ? { ...chat, isOnline } : chat)));
+  const updateChatOnlineStatus = (handleId: string, isOnline: boolean) => {
+    setChats(prev => prev.map(chat => (chat.handleId === handleId ? { ...chat, isOnline } : chat)));
   };
 
-  const loadOnlineStatuses = async () => {
-    const userIds = chats.map(chat => chat.userId).filter(Boolean);
-    if (userIds.length === 0) return;
-
-    try {
-      const res = await fetch('http://localhost:4000/users/bulk-online-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userIds }),
-      });
-
-      if (res.ok) {
-        const { statuses } = await res.json();
-        setChats(prev =>
-          prev.map(chat => ({
-            ...chat,
-            isOnline: chat.userId ? statuses[chat.userId] || false : false,
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Failed to load online statuses:', error);
-    }
-  };
-
-  const getChatById = (chatId: string) => {
-    return chats.find(chat => chat.id === chatId);
-  };
+  const getChatById = useCallback(
+    (chatId: string) => {
+      return chats.find(chat => chat.id === chatId);
+    },
+    [chats]
+  );
 
   return {
     chats,

@@ -6,7 +6,8 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router';
-import type { ReactNode } from 'react';
+import { AvatarUpdateProvider } from '@/hooks/avatar-update-context'; // Import AvatarUpdateProvider
+import { OnlineStatusProvider } from '@/hooks/use-online-status-context';
 
 import type { Route } from './+types/root';
 import './app.css';
@@ -15,19 +16,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/hooks/use-auth';
 import { NotificationProvider } from '@/hooks/use-notifications';
 import { ThemeProvider } from '@/hooks/use-theme';
-
-export const links: Route.LinksFunction = () => [
-  { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-  {
-    rel: 'preconnect',
-    href: 'https://fonts.gstatic.com',
-    crossOrigin: 'anonymous',
-  },
-  {
-    rel: 'stylesheet',
-    href: 'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap',
-  },
-];
+import type { ReactNode } from 'react';
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -42,8 +31,12 @@ export function Layout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <AuthProvider>
             <NotificationProvider>
-              {children}
-              <Toaster />
+              <AvatarUpdateProvider>
+                <OnlineStatusProvider>
+                  {children}
+                  <Toaster />
+                </OnlineStatusProvider>
+              </AvatarUpdateProvider>
             </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>

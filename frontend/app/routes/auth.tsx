@@ -1,192 +1,35 @@
+import { Button } from '@/components/ui/button';
+import { useAuthFlow } from '~/hooks/use-auth-flow';
+
+// Auth component imports (needed for rendering in JSX)
 import { MethodSelection } from '@/components/auth/method-selection';
 import { PasswordCreation } from '@/components/auth/password-creation';
 import { RecoveryOptions } from '@/components/auth/recovery-options';
 import { SeedDisplay } from '@/components/auth/seed-display';
 import { SeedVerification } from '@/components/auth/seed-verification';
-import { UsernameSelection } from '@/components/auth/username-selection';
-import { Button } from '@/components/ui/button';
-import { generateSeedPhrase } from '@/lib/crypto';
-import { AccountService } from '@/services/account.service';
-import { AuthService } from '@/services/auth.service';
-import { StorageService } from '@/services/storage.service';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
-type AuthStep =
-  | 'main'
-  | 'username-selection'
-  | 'method-selection'
-  | 'seed-display'
-  | 'seed-verify'
-  | 'password'
-  | 'recovery'
-  | 'complete';
-type AuthMethod = 'cloud' | 'self-custody' | null;
 
 export default function AuthRoute() {
-  const [loading, setLoading] = useState(false);
-  const [hasKey, setHasKey] = useState(false);
-  const [step, setStep] = useState<AuthStep>('main');
-  const [method, setMethod] = useState<AuthMethod>(null);
-  const [username, setUsername] = useState('');
-  const [seed, setSeed] = useState<string[]>([]);
+  const {
+    loading,
+    hasKey,
+    step,
+    seed,
+    handleCreateAccount,
+    handleMethodSelect,
+    handleSeedConfirmed,
+    handleSeedVerified,
+    handlePasswordCreated,
+    handleClearKey,
+    handleRecovery,
+    handlePasswordRecovery,
+    handleSeedRecovery,
+  } = useAuthFlow();
 
-  useEffect(() => {
-    const checkKey = async () => {
-      const hasKey = await StorageService.hasStoredPublicKey();
-      setHasKey(hasKey);
-    };
-    checkKey();
-  }, []);
-
-  const handleCreateAccount = () => {
-    setStep('username-selection');
-  };
-
-  const handleUsernameSelected = (selectedUsername: string) => {
-    setUsername(selectedUsername);
-    setStep('method-selection');
-  };
-
-  const handleMethodSelect = async (selectedMethod: 'cloud' | 'self-custody') => {
-    setMethod(selectedMethod);
-    const newSeed = await generateSeedPhrase();
-    setSeed(newSeed);
-
-    if (selectedMethod === 'cloud') {
-      // Skip seed display for cloud - go directly to password
-      setStep('password');
-    } else {
-      // Self-custody shows seed
-      setStep('seed-display');
-    }
-  };
-
-  const handleSeedConfirmed = () => {
-    setStep('seed-verify');
-  };
-
-  const handleSeedVerified = () => {
-    if (method === 'cloud') {
-      setStep('password');
-    } else {
-      finalizeSelfCustody();
-    }
-  };
-
-  const handlePasswordCreated = async (password: string) => {
-    setLoading(true);
-    try {
-      // 1. Derive keys and save to IndexedDB
-      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
-
-      // 2. Login to backend
-      await loginToBackend(publicKeyBase64);
-
-      // 3. Set username
-      await setUsernameOnBackend(username);
-
-      // 4. Upload encrypted seed to S3
-      await AccountService.createAccountWithCloud(password);
-
-      setStep('complete');
-      toast.success('Account created with cloud backup!');
-      setTimeout(() => (window.location.href = '/'), 1500);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create account');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const finalizeSelfCustody = async () => {
-    setLoading(true);
-    try {
-      const { publicKeyBase64 } = await AccountService.createAccountWithSeed(seed);
-      await loginToBackend(publicKeyBase64);
-      await setUsernameOnBackend(username);
-      setStep('complete');
-      toast.success('Account created!');
-      setTimeout(() => (window.location.href = '/'), 1500);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create account');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setUsernameOnBackend = async (usernameValue: string) => {
-    await AuthService.setUsername(usernameValue);
-  };
-
-  const loginToBackend = async (publicKeyBase64: string) => {
-    const { deviceId } = AccountService.getDeviceInfo();
-    await AuthService.login({
-      publicKey: publicKeyBase64,
-      deviceId,
-    });
-  };
-
-  const handleLogin = async () => {
-    setLoading(true);
-    try {
-      const publicKey = await StorageService.getPublicKey();
-      if (!publicKey) {
-        toast.error('No stored key found');
-        return;
-      }
-      await loginToBackend(publicKey);
-      window.location.href = '/';
-    } catch (error: any) {
-      toast.error(error.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClearKey = async () => {
-    await StorageService.clearStoredKey();
-    AccountService.clearTemporarySeed(); // Also clear temporary seed storage
-    setHasKey(false);
-    toast.success('Key cleared');
-  };
-
-  const handleRecovery = () => {
-    setStep('recovery');
-  };
-
-  const handlePasswordRecovery = async (username: string, password: string) => {
-    setLoading(true);
-    try {
-      const { publicKeyBase64 } = await AccountService.recoverWithPassword(username, password);
-      await loginToBackend(publicKeyBase64);
-      toast.success('Account recovered!');
-      window.location.href = '/';
-    } catch (error: any) {
-      throw new Error(error.message || 'Recovery failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSeedRecovery = async (recoveredSeed: string[]) => {
-    setLoading(true);
-    try {
-      const { publicKeyBase64 } = await AccountService.recoverWithSeed(recoveredSeed);
-      await loginToBackend(publicKeyBase64);
-      toast.success('Account recovered!');
-      window.location.href = '/';
-    } catch (error: any) {
-      throw new Error(error.message || 'Recovery failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (step === 'username-selection') {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <UsernameSelection onUsernameSelected={handleUsernameSelected} />
+        <div className="text-center text-lg">Loading...</div>
       </div>
     );
   }
@@ -259,15 +102,22 @@ export default function AuthRoute() {
 
         {hasKey ? (
           <div className="space-y-3">
-            <Button onClick={handleLogin} disabled={loading} className="w-full py-6 text-lg">
-              {loading ? 'Logging in...' : 'Continue as User'}
+            <div className="text-center py-6 text-lg">
+              <div className="mb-2">Stored account detected</div>
+              <div className="text-sm text-muted-foreground">Automatically authenticating...</div>
+            </div>
+            <Button onClick={handleRecovery} variant="outline" className="w-full py-6 text-lg">
+              Restore Access
+            </Button>
+            <Button onClick={handleCreateAccount} className="w-full py-6 text-lg">
+              Create New Account
             </Button>
             <div className="text-center">
               <button
                 onClick={handleClearKey}
                 className="text-sm text-muted-foreground hover:text-foreground underline"
               >
-                Use different account
+                Clear Stored Account
               </button>
             </div>
           </div>

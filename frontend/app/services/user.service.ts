@@ -2,19 +2,43 @@
 import type { ProfileResponse } from '@/types/api';
 import type { UpdateDisplayNameRequest } from '~/types/account';
 import { API_CONFIG } from './api-config';
-import { handleApiResponse } from './api-utils';
+import { handleApiResponse, apiRequest } from './api-utils';
 
 export class UserService {
   static async getProfile(): Promise<ProfileResponse> {
     console.log('UserService.getProfile: Calling API...');
-    const res = await fetch(`${API_CONFIG.BASE_URL}/profile`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/auth/profile`, {
       credentials: 'include',
     });
     console.log('UserService.getProfile: Response received', { status: res.status, ok: res.ok });
 
-    const result = await handleApiResponse<ProfileResponse>(res);
-    console.log('UserService.getProfile: Profile data received', result);
-    return result;
+    const result = await handleApiResponse<any>(res); // Get the raw response structure
+    console.log('UserService.getProfile: Raw profile data received', result);
+
+    // Transform the response to match ProfileResponse interface
+    return {
+      identity: {
+        id: result.identity.id,
+        publicKey: result.identity.publicKey,
+        createdAt: result.identity.createdAt,
+      },
+      handle: {
+        id: result.handle.id,
+        value: result.handle.value,
+        alias: result.handle.alias || null,
+        isSearchable: result.handle.isSearchable,
+        isPrimary: result.handle.isPrimary,
+        createdAt: result.handle.createdAt,
+      },
+      profile: {
+        displayName: result.profile.displayName,
+        firstName: result.profile.firstName || null,
+        lastName: result.profile.lastName || null,
+        avatarUrl: result.profile.avatarUrl || null,
+        bio: result.profile.bio || null,
+        settings: result.profile.settings || {},
+      },
+    };
   }
 
   static async updateDisplayName(displayName: string): Promise<void> {
@@ -27,46 +51,70 @@ export class UserService {
     return handleApiResponse(res);
   }
 
-  static async setUsername(username: string, isSearchable: boolean = true): Promise<void> {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/profile/username`, {
+  static async setUsername(
+    username: string,
+    displayName?: string,
+    isSearchable: boolean = true
+  ): Promise<void> {
+    // Get profile to access the public key
+    const profileRes = await fetch(`${API_CONFIG.BASE_URL}/auth/profile`, {
+      credentials: 'include',
+    });
+
+    if (!profileRes.ok) {
+      const error = await profileRes.text().catch(() => 'Unknown error');
+      throw new Error(`Failed to get profile: ${error}`);
+    }
+
+    const profileData = await profileRes.json();
+    if (!profileData.success || !profileData.data) {
+      throw new Error('Could not retrieve profile data');
+    }
+
+    // Get device info
+    const deviceName =
+      typeof navigator !== 'undefined' ? `${navigator.platform || 'Web'} Device` : 'Web Device';
+    const deviceId = `web-device-${Date.now()}`;
+
+    // Call the complete registration endpoint to update the handle
+    const res = await fetch(`${API_CONFIG.BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        username,
+        publicKey: profileData.data.publicKey,
+        handle: username,
+        displayName: displayName || profileData.data.displayName || 'Anonym User',
+        deviceName,
         isSearchable: isSearchable ? 'yes' : 'no',
+        deviceId,
       }),
     });
+
     return handleApiResponse(res);
   }
 
   /**
-   * Проверить доступность username
-   * Сервер возвращает:
-   * - 200 с данными пользователя если username занят
-   * - 404 если username свободен
+   * Check if username is available
+   * Server returns:
+   * - 200 with { available: true } if username is available
+   * - 200 with { available: false, user: userInfo } if username exists
    */
   static async checkUsernameAvailable(username: string): Promise<boolean> {
     try {
-      const res = await fetch(
-        `${API_CONFIG.BASE_URL}/profile/username/search/${encodeURIComponent(username)}`,
-        { credentials: 'include' }
+      // First try to find if the handle already exists
+      const searchResult = await apiRequest<{ handles: any[] }>(
+        `/handles/search?q=${encodeURIComponent(username)}`,
+        {
+          method: 'GET',
+        }
       );
 
-      // Если статус 404 - username свободен
-      if (res.status === 404) {
-        return true;
-      }
-
-      // Если статус 200 - username занят
-      if (res.status === 200) {
-        return false;
-      }
-
-      // Для других статусов считаем что не доступен
-      return false;
-    } catch {
-      // При ошибке сети считаем что не доступен
+      // If any handles are returned, the username is not available
+      return searchResult.handles.length === 0;
+    } catch (error) {
+      // On network error, consider as not available
+      console.error('Error checking username availability:', error);
       return false;
     }
   }
@@ -77,21 +125,44 @@ export class UserService {
    */
   static async getUserByUsername(username: string): Promise<ProfileResponse | null> {
     try {
-      const res = await fetch(
-        `${API_CONFIG.BASE_URL}/profile/username/search/${encodeURIComponent(username)}`,
-        { credentials: 'include' }
+      const result = await apiRequest<{ handles: any[] }>(
+        `/handles/search?q=${encodeURIComponent(username)}`,
+        {
+          method: 'GET',
+        }
       );
 
-      if (res.status === 404) {
+      if (!result.handles || result.handles.length === 0) {
         return null;
       }
 
-      if (res.status === 200) {
-        const data = await res.json();
-        return data.data;
-      }
+      // Get the first matching handle
+      const handle = result.handles[0];
 
-      return null;
+      // Return the user data based on handle information
+      return {
+        identity: {
+          id: handle.ownerIdentityId,
+          publicKey: '', // Public key not returned in search, so empty string or default
+          createdAt: handle.createdAt,
+        },
+        handle: {
+          id: handle.id,
+          value: handle.value,
+          alias: handle.alias || null,
+          isSearchable: handle.isSearchable,
+          isPrimary: handle.isPrimary || false, // Assuming isPrimary property exists on handle, default to false
+          createdAt: handle.createdAt,
+        },
+        profile: {
+          displayName: handle.value, // Use handle value as display name if no profile
+          firstName: null,
+          lastName: null,
+          avatarUrl: null, // No avatar in search result
+          bio: null,
+          settings: {},
+        },
+      };
     } catch {
       return null;
     }

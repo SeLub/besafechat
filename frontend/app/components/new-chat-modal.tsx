@@ -1,151 +1,234 @@
-import { useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { X, Search, User } from 'lucide-react';
+import { useAuth } from '~/hooks/use-auth-context';
+import { apiRequest } from '@/services/api-utils';
+import { Search, User, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/use-auth';
 
 interface NewChatModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onChatCreated: (chatId: string) => void;
+  onChatCreated: (chatId: string) => Promise<void>;
 }
 
-interface SearchResult {
-  publicKey: string;
-  username?: string;
-  displayName?: string;
-  userId?: string;
-  requestStatus?: string;
+interface ContactProfile {
+  handle: {
+    id: string;
+    value: string;
+    alias: string | null;
+    matchedBy: 'value' | 'alias';
+  };
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  requestStatus: string;
+  isCurrentUser: boolean;
+  ownerIdentityId: string;
 }
 
-export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalProps) {
+export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [contact, setContact] = useState<ContactProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const { checkAuth } = useAuth();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { user, checkAuth } = useAuth();
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   if (!isOpen) return null;
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  const debouncedSearch = async (value: string) => {
+    if (!value.trim()) return;
 
-    // Remove @ if user typed it
-    const cleanQuery = searchQuery.replace('@', '');
+    const cleanQuery = value.replace('@', '');
 
     setLoading(true);
     setSearchError(null);
-    setSearchResults([]); // Clear previous results
+    setContact(null);
 
     try {
-      const res = await fetch(`http://localhost:4000/username/search/${cleanQuery}`, {
-        credentials: 'include',
-      });
+      const result = await apiRequest<{ handles: any[] }>(
+        `/handles/search?q=${encodeURIComponent(cleanQuery)}`,
+        { method: 'GET' }
+      );
 
-      if (res.ok) {
-        const data = await res.json();
-        // Only add to results if we have valid data
-        if (data && data.publicKey) {
-          // Check request status
-          const statusRes = await fetch(`http://localhost:4000/contacts/check/${data.id}`, {
-            credentials: 'include',
-          });
+      if (!result.handles || result.handles.length === 0) {
+        setSearchError('User not found');
+        return;
+      }
 
-          let requestStatus = 'none';
-          if (statusRes.ok) {
-            const statusData = await statusRes.json();
+      const handle = result.handles[0];
+      const isCurrentUser = user?.identity.id === handle.ownerIdentityId;
+
+      let requestStatus = 'none';
+      if (!isCurrentUser) {
+        try {
+          const statusData = await apiRequest<{ status: string }>(
+            `/contacts/check/${handle.id}`,
+            { method: 'GET' }
+          );
+          if (statusData?.status) {
             requestStatus = statusData.status;
           }
-
-          setSearchResults([
-            {
-              publicKey: data.publicKey,
-              username: cleanQuery,
-              displayName: data.displayName,
-              userId: data.id,
-              requestStatus,
-            },
-          ]);
-          setSearchError(null);
-        } else {
-          setSearchResults([]);
-          setSearchError('User not found');
+        } catch {
+          // ignore status check errors
         }
-      } else {
-        setSearchResults([]);
-        setSearchError('User not found');
       }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchResults([]);
+
+      try {
+        const profileData = await apiRequest<{ profile: any }>(
+          `/profiles/public/${handle.value}`,
+          { method: 'GET' }
+        );
+
+        const profile = profileData.profile;
+        setContact({
+          handle: {
+            id: profile.handle.id,
+            value: profile.handle.value,
+            alias: profile.handle.alias,
+            matchedBy: profile.handle.matchedBy,
+          },
+          displayName: profile.displayName,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          avatarUrl: profile.avatarUrl,
+          bio: profile.bio,
+          requestStatus,
+          isCurrentUser,
+          ownerIdentityId: handle.ownerIdentityId,
+        });
+      } catch {
+        setContact({
+          handle: {
+            id: handle.id,
+            value: handle.value,
+            alias: handle.alias || null,
+            matchedBy: 'value',
+          },
+          displayName: handle.value,
+          firstName: null,
+          lastName: null,
+          avatarUrl: null,
+          bio: null,
+          requestStatus,
+          isCurrentUser,
+          ownerIdentityId: handle.ownerIdentityId,
+        });
+      }
+    } catch {
       setSearchError('Search failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSendRequest = async (userId: string, username: string) => {
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    await debouncedSearch(searchQuery);
+  };
+
+  const handleInputChange = (value: string) => {
+    setSearchQuery(value);
+
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    if (value.trim()) {
+      debounceTimer.current = setTimeout(() => {
+        debouncedSearch(value);
+      }, 500);
+    } else {
+      setContact(null);
+      setSearchError(null);
+    }
+  };
+
+  const handleSendRequest = async () => {
+    if (!contact) return;
     setCreating(true);
     try {
-      const res = await fetch('http://localhost:4000/contacts/request', {
+      await apiRequest('/contacts/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
-          toUserId: userId,
+          toHandleId: contact.handle.id,
           message: message.trim() || undefined,
         }),
       });
 
-      if (res.status === 401) {
+      const displayHandle = contact.handle.matchedBy === 'alias' && contact.handle.alias
+        ? contact.handle.alias
+        : contact.handle.value;
+      toast.success(`Request sent to @${displayHandle}`);
+      onClose();
+      setMessage('');
+      setSearchQuery('');
+      setContact(null);
+    } catch (error: any) {
+      if (error.status === 401) {
         await checkAuth();
         toast.error('Session expired. Please try again.');
-        return;
-      }
-
-      if (res.ok) {
-        toast.success(`Request sent to @${username}`);
-        onClose();
-        setMessage('');
-        setSearchQuery('');
-        setSearchResults([]);
+      } else if (error.status === 409) {
+        toast.info('Request already sent to this user');
       } else {
-        const errorData = await res.json();
-        toast.error(errorData.message || 'Failed to send request');
+        toast.error(error.message || 'Failed to send request');
       }
-    } catch (error) {
-      toast.error('Failed to send request');
     } finally {
       setCreating(false);
     }
   };
 
-  const getInitials = (result: SearchResult) => {
-    if (result.displayName) {
-      return result.displayName
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+  const getDisplayHandle = (c: ContactProfile) => {
+    return c.handle.matchedBy === 'alias' && c.handle.alias
+      ? c.handle.alias
+      : c.handle.value;
+  };
+
+  const getDisplayName = (c: ContactProfile) => {
+    if (c.firstName || c.lastName) {
+      return [c.firstName, c.lastName].filter(Boolean).join(' ');
     }
-    if (result.username) {
-      return result.username.slice(0, 2).toUpperCase();
-    }
-    return result.publicKey.slice(0, 2).toUpperCase();
+    return c.displayName;
+  };
+
+  const getInitials = (c: ContactProfile) => {
+    const name = getDisplayName(c);
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose();
+        }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close modal"
+      />
 
-      {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
-        {/* Header */}
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[480px] bg-background border border-border rounded-lg shadow-lg z-50">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold">New Chat</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -153,16 +236,15 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
           </Button>
         </div>
 
-        {/* Search */}
         <div className="p-4 border-b border-border">
           <div className="flex space-x-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="@username"
+                placeholder="@username or alias"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => handleInputChange(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
               />
@@ -173,40 +255,45 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
           </div>
         </div>
 
-        {/* Results */}
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-[480px] overflow-y-auto">
           {searchError ? (
             <div className="p-8 text-center text-muted-foreground">
               <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <div className="text-sm text-red-600">{searchError}</div>
             </div>
-          ) : searchResults.length === 0 ? (
+          ) : !contact ? (
             <div className="p-8 text-center text-muted-foreground">
               <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <div className="text-sm">Search for users by username</div>
+              <div className="text-sm">Search for users by username or alias</div>
             </div>
           ) : (
-            <>
-              {searchResults.map(result => (
-                <div key={result.publicKey} className="p-4 border-b border-border">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        {getInitials(result)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">
-                        {result.displayName || `@${result.username}` || 'Anonymous User'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {result.username && `@${result.username}`}
-                      </div>
-                    </div>
-                  </div>
+            <div className="p-4">
+              <div className="flex flex-col items-center mb-4">
+                <Avatar className="h-16 w-16 mb-3">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+                    {getInitials(contact)}
+                  </AvatarFallback>
+                  {contact.avatarUrl && (
+                    <AvatarImage src={contact.avatarUrl} />
+                  )}
+                </Avatar>
+                <div className="text-sm text-muted-foreground">
+                  @{getDisplayHandle(contact)}
+                </div>
+                <div className="text-lg font-semibold mt-1">
+                  {getDisplayName(contact)}
+                </div>
+              </div>
 
-                  {/* Message Input */}
-                  <div className="mb-3">
+              {contact.bio && (
+                <div className="text-sm text-muted-foreground text-center mb-4">
+                  {contact.bio}
+                </div>
+              )}
+
+              <div className="border-t border-border pt-4">
+                {!contact.isCurrentUser && contact.requestStatus !== 'connected' && (
+                  <>
                     <textarea
                       placeholder="Hi! Let's connect (optional)"
                       value={message}
@@ -215,37 +302,39 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
                       rows={2}
                       maxLength={200}
                     />
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-1 mb-3">
                       {message.length}/200 characters
                     </div>
-                  </div>
+                  </>
+                )}
 
-                  {result.requestStatus === 'connected' ? (
-                    <Button className="w-full" disabled>
-                      Already Connected
-                    </Button>
-                  ) : result.requestStatus === 'sent' ? (
-                    <Button className="w-full" disabled>
-                      Request Sent
-                    </Button>
-                  ) : result.requestStatus === 'received' ? (
-                    <Button className="w-full" disabled>
-                      Request Received
-                    </Button>
-                  ) : (
-                    <Button
-                      className="w-full"
-                      disabled={creating}
-                      onClick={() =>
-                        handleSendRequest(result.userId || result.publicKey, result.username || '')
-                      }
-                    >
-                      {creating ? 'Sending...' : 'Send Request'}
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </>
+                {contact.isCurrentUser ? (
+                  <Button className="w-full" disabled>
+                    This is you
+                  </Button>
+                ) : contact.requestStatus === 'connected' ? (
+                  <Button className="w-full" disabled>
+                    Already Connected
+                  </Button>
+                ) : contact.requestStatus === 'sent' ? (
+                  <Button className="w-full" disabled>
+                    Request Sent
+                  </Button>
+                ) : contact.requestStatus === 'received' ? (
+                  <Button className="w-full" disabled>
+                    Request Received
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    disabled={creating}
+                    onClick={handleSendRequest}
+                  >
+                    {creating ? 'Sending...' : 'Send Request'}
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

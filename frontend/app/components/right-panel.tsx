@@ -1,19 +1,8 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import {
-  X,
-  Phone,
-  Video,
-  Search,
-  Bell,
-  BellOff,
-  Shield,
-  Trash2,
-  Archive,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { X, Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
+import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -25,10 +14,18 @@ interface RightPanelProps {
     lastSeen?: string;
     phone?: string;
     username?: string;
+    handleId?: string;
+    avatarUrl?: string;
+    bio?: string;
+    firstName?: string;
+    lastName?: string;
+    alias?: string;
   };
 }
 
 export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
+  const { getOnlineStatus } = useOnlineStatusContext();
+
   if (!isOpen || !chatInfo) return null;
 
   const getInitials = (name: string) => {
@@ -38,6 +35,13 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const getDisplayName = () => {
+    if (chatInfo.firstName || chatInfo.lastName) {
+      return [chatInfo.firstName, chatInfo.lastName].filter(Boolean).join(' ');
+    }
+    return chatInfo.name;
   };
 
   return (
@@ -59,10 +63,14 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
           <AvatarFallback className="bg-primary text-primary-foreground text-xl">
             {getInitials(chatInfo.name)}
           </AvatarFallback>
+          {chatInfo.avatarUrl && <AvatarImage src={chatInfo.avatarUrl} />}
         </Avatar>
-        <h2 className="text-xl font-semibold mb-1">{chatInfo.name}</h2>
+        <h2 className="text-xl font-semibold mb-1">{getDisplayName()}</h2>
+        <p className="text-sm text-muted-foreground">
+          @{chatInfo.alias || chatInfo.username || chatInfo.name}
+        </p>
         <p className="text-sm text-muted-foreground mb-4">
-          {chatInfo.isOnline ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
+          {getOnlineStatus(chatInfo.handleId) ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
         </p>
 
         {/* Action Buttons */}
@@ -85,6 +93,13 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
           <div className="p-4 border-b border-border">
             <div className="text-sm text-muted-foreground mb-1">Phone</div>
             <div className="font-medium">{chatInfo.phone}</div>
+          </div>
+        )}
+
+        {chatInfo.bio && (
+          <div className="p-4 border-b border-border">
+            <div className="text-sm text-muted-foreground mb-1">Bio</div>
+            <div className="text-sm">{chatInfo.bio}</div>
           </div>
         )}
 

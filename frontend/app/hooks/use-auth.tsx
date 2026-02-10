@@ -1,57 +1,26 @@
+import { authenticateUser, clearAuthCookies, handleAuthError } from '@/lib/auth-utils';
+import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-
-interface User {
-  id: string;
-  publicKey: string;
-  displayName?: string;
-  username?: string;
-  // Приватный ключ НЕ хранится в этом объекте — он остаётся в зашифрованной Dexie-БД
-}
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  register: (deviceId: string) => Promise<void>;
-  login: (publicKey: string, deviceId: string) => Promise<void>;
-  logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { useEffect, useState, type ReactNode } from 'react';
+import { AuthContext } from './auth-context';
+import type { FullProfile } from '~/types/profile';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Проверка аутентификации при старте
   const checkAuth = async () => {
     try {
-      const res = await fetch('http://localhost:4000/auth/profile', {
-        credentials: 'include',
-      });
-
-      if (res.ok) {
-        const profile = await res.json();
-        setUser(profile.data);
-      } else if (res.status === 401) {
-        clearAuthCookies();
-        setUser(null);
-      } else {
-        setUser(null);
-      }
+      const user = await authenticateUser();
+      setUser(user);
     } catch (error) {
-      console.error('Auth check error:', error);
+      handleAuthError(error, false);
       setUser(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  const clearAuthCookies = () => {
-    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   };
 
   // Регистрация — генерация ключей и сохранение публичного ключа в IndexedDB
@@ -94,7 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear all authentication data
       clearAuthCookies();
+
+      // Close the current database connection (per-user database remains in IndexedDB)
+      await StorageService.cleanup(); // Close and cleanup database (Phase 4)
+
+      // Clear sensitive data from memory
+      AccountService.clearTemporarySeed(); // Clears seed and private key hash from memory
+
       setUser(null);
     }
   };
@@ -103,17 +80,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Initialize and cleanup StorageService based on user identity
+  useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+    const initStorage = async () => {
+      if (user?.identity?.id && isMounted) {
+        try {
+          await StorageService.initialize(user.identity.id);
+        } catch (error) {
+          console.error('Failed to initialize StorageService on user change:', error);
+          // Handle error, e.g., show a toast, redirect to login
+        }
+      }
+    };
+
+    initStorage();
+
+    return () => {
+      isMounted = false; // Set flag to false when component unmounts or user changes
+      // StorageService.cleanup() is already called in logout, no need to duplicate here
+      // Unless we want to explicitly close on component unmount even if not logged out
+      // For now, avoid duplicate cleanup if logout already handles it
+      // If `user` becomes null (logout), then cleanup is handled by logout itself
+    };
+  }, [user?.identity?.id]); // Re-run effect when user's identity ID changes
+
+  // Обновление данных пользователя без перезагрузки страницы
+  const refreshUser = async () => {
+    try {
+      const user = await authenticateUser();
+      setUser(user);
+
+      if (user) {
+        console.log('User profile refreshed successfully', user);
+      } else {
+        console.log('User session expired, cleared auth');
+      }
+    } catch (error) {
+      handleAuthError(error, false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout, checkAuth }}>
+    <AuthContext.Provider
+      value={{ user, loading, register, login, logout, checkAuth, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

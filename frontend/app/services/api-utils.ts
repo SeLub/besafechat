@@ -87,26 +87,3 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   const res = await fetch(url, mergedOptions);
   return handleApiResponse<T>(res);
 }
-
-// ==========================================================================
-// Get Avatar
-// ==========================================================================
-
-/**
- * Construct avatar URL for any user
- * Avatar is always stored as avatar.png in S3
- * Get avatar URL with cache busting (use after upload)
- */
-export async function getAvatarUrl(userId: string): Promise<string> {
-  return `https://s3.tebi.io/besafe.backet/users/${userId}/avatar.png?v=${Date.now()}`;
-}
-
-// ==========================================================================
-// Path to user`s S3
-// ==========================================================================
-
-/**
- * Construct path URL for user`s S3
- * Avatar is always stored as avatar.png in S3
- * Get avatar URL with cache busting (use after upload)
- */
