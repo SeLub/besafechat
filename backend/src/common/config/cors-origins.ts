@@ -15,12 +15,15 @@ export function getCorsOrigins(): string[] {
   }
 
   // Default origins for development
-  return ['http://localhost:3000', 'http://localhost:5173'];
+  return ['https://localhost:5173', 'https://192.168.100.35:5173'];
 }
 
 export function getCorsConfig() {
   return {
     origin: getCorsOrigins(),
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    optionsSuccessStatus: 200,
   };
 }

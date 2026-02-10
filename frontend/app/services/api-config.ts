@@ -18,11 +18,12 @@ function getApiBaseUrl(): string {
   // If you're at localhost:5173, connect to localhost:4000
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    return `http://${hostname}:${envPort}`;
+    const protocol = window.location.protocol;
+    return `${protocol}//${hostname}:${envPort}`;
   }
 
   // Fallback for SSR or build time
-  return `http://localhost:${envPort}`;
+  return `https://localhost:${envPort}`;
 }
 
 export const API_CONFIG = {

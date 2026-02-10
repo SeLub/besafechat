@@ -65,3 +65,7 @@ mcp*.*
 tests/*
 .kilocode/
 plans/
+cert.crt
+cert.key
+ca.crt
+ca.key

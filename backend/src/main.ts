@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import cookieParser from 'cookie-parser';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { handleShutdownSignals, handleUncaughtErrors } from './common/fatal';
 import { PinoLogger } from './common/pino-logger.service';
@@ -26,7 +28,30 @@ async function bootstrap() {
   handleUncaughtErrors();
   handleShutdownSignals();
 
-  const app = await NestFactory.create(AppModule);
+  const useHttps = process.env.HTTPS === 'true';
+  
+  let httpsOptions: any = undefined;
+  if (useHttps) {
+    const certPath = path.join(process.cwd(), 'cert.crt');
+    const keyPath = path.join(process.cwd(), 'cert.key');
+    if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+      httpsOptions = {
+        cert: fs.readFileSync(certPath),
+        key: fs.readFileSync(keyPath),
+      };
+      console.log('✅ HTTPS enabled with certificates');
+    } else {
+      console.warn('⚠️ HTTPS enabled but certificates not found, falling back to HTTP');
+      console.warn('   To generate certificates, run:');
+      console.warn('   pnpm dlx mkcert create-ca');
+      console.warn('   pnpm dlx mkcert create-cert --domains 192.168.100.35 localhost 127.0.0.1');
+      httpsOptions = undefined;
+    }
+  }
+
+  const app = await NestFactory.create(AppModule, {
+    httpsOptions,
+  });
 
   app.useWebSocketAdapter(new IoAdapter(app));
 
@@ -50,16 +75,16 @@ async function bootstrap() {
   let server: any;
   try {
     server = await app.listen(port, '0.0.0.0');
-    console.log(`🚀 Server running on port ${port}`);
-    console.log(`📘 Swagger UI: http://localhost:${port}/docs`);
+    console.log(`🚀 Server running on https://localhost:${port}`);
+    console.log(`📘 Swagger UI: https://localhost:${port}/docs`);
   } catch (error: any) {
     if (error.code === 'EADDRINUSE') {
       console.log(`⚠️ Port ${port} is busy, waiting before retry...`);
       setTimeout(async () => {
         try {
           server = await app.listen(port, '0.0.0.0');
-          console.log(`🚀 Server running on port ${port}`);
-          console.log(`📘 Swagger UI: http://localhost:${port}/docs`);
+          console.log(`🚀 Server running on https://localhost:${port}`);
+          console.log(`📘 Swagger UI: https://localhost:${port}/docs`);
         } catch (retryError: any) {
           console.error(`❌ Failed to start server after retry:`, retryError.message);
           process.exit(1);

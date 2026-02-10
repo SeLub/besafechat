@@ -323,6 +323,38 @@ npm install
 npm run dev
 ```
 
+### HTTPS Development Setup (Local Network Testing)
+
+For testing on local network devices (Android, other computers), generate HTTPS certificates:
+
+```bash
+# In backend directory
+cd backend
+
+# Create certificate authority
+pnpm dlx mkcert create-ca
+
+# Create certificates for development
+pnpm dlx mkcert create-cert --domains 192.168.100.35 localhost 127.0.0.1
+```
+
+This generates:
+- `ca.crt` - Certificate Authority (add to your OS/browser)
+- `ca.key` - CA private key
+- `cert.crt` - Server certificate
+- `cert.key` - Server private key
+
+**Note**: These files are not committed to Git. Each developer must generate their own certificates.
+
+**Enable HTTPS**: Set `HTTPS=true` in `.env`
+
+**Import CA into browsers** (recommended):
+- **Firefox**: Preferences → Certificates → Import `ca.crt`
+- **Chrome**: Settings → Security → Manage certificates → Import `ca.crt`
+- **Android**: Settings → Security → Install from storage → select `ca.crt`
+
+If certificates are missing, the backend falls back to HTTP with a warning message.
+
 ### Environment Variables
 
 ```env
