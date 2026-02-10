@@ -1,6 +1,3 @@
-// Load crypto polyfill FIRST before any crypto operations
-import '@/lib/crypto/polyfill';
-
 import {
   isRouteErrorResponse,
   Links,
