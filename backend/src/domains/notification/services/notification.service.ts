@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
 import { Notification, NotificationData, NotificationType } from '../notification.types';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class NotificationService {
@@ -16,7 +16,7 @@ export class NotificationService {
   ): Promise<Notification> {
     const redis = this.redisService.getClient();
     const notification: Notification = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       type,
       timestamp: new Date().toISOString(),
       read: false,
