@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { X, Shield } from 'lucide-react';
+import { X, Shield, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '~/hooks/use-auth-context';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { ResponsiveModal } from './ui/responsive-modal';
 
 interface PrivacySettingsModalProps {
   isOpen: boolean;
@@ -20,11 +21,9 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   const loadCurrentSettings = useCallback(async () => {
     setInitialLoading(true);
     try {
-      // Load current searchable status from user profile
       if (user?.handle) {
         setIsSearchable(user.handle.isSearchable);
       } else {
-        // Default to true if not set
         setIsSearchable(true);
       }
     } catch {
@@ -32,7 +31,7 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
     } finally {
       setInitialLoading(false);
     }
-  }, [user, setIsSearchable, setInitialLoading]);
+  }, [user]);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -43,30 +42,23 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Update searchability through handles endpoint
-      // Use the handle ID to update searchable status
       const handleId = user?.handle?.id;
-      if (!handleId) {
-        throw new Error('Handle not found');
-      }
+      if (!handleId) throw new Error('Handle not found');
 
       const res = await fetch(API_ENDPOINTS.HANDLES.SEARCHABLE(handleId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          isSearchable: isSearchable,
-        }),
+        body: JSON.stringify({ isSearchable }),
       });
 
       if (res.ok) {
         toast.success('Privacy settings updated');
-        // Refresh the user profile data after successful update
         await refreshUser();
         onClose();
       } else {
         const errorText = await res.text();
-        toast.error(`Failed to update settings: ${errorText}`);
+        toast.error(`Failed: ${errorText}`);
       }
     } catch {
       toast.error('Failed to update settings');
@@ -78,75 +70,93 @@ export function PrivacySettingsModal({ isOpen, onClose }: PrivacySettingsModalPr
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/50 z-50"
-        onClick={onClose}
-        onKeyDown={e => {
-          if (e.key === 'Escape') onClose();
-        }}
-        role="button"
-        tabIndex={-1}
-        aria-label="Close modal"
-      />
-
-      {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center space-x-2">
-            <Shield className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Privacy Settings</h2>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-6">
-          {initialLoading ? (
-            <div className="text-center py-8">
-              <div className="text-sm text-muted-foreground">Loading settings...</div>
+    <ResponsiveModal isOpen={isOpen} onClose={onClose} title="Privacy">
+      <div className="space-y-6">
+        {initialLoading ? (
+          // Красивое состояние загрузки в стиле Sky
+          <div className="py-10 flex flex-col items-center justify-center space-y-4">
+            <div className="relative">
+              <div className="h-12 w-12 rounded-2xl border-2 border-primary/10 border-t-primary animate-spin" />
+              <Shield className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-primary/40" />
             </div>
-          ) : (
-            <>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2">Discovery</h3>
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div>
-                      <div className="font-medium">Allow others to find me</div>
-                      <div className="text-sm text-muted-foreground">
-                        Let others search for you by username
-                      </div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/30 animate-pulse">
+              Fetching Security Layer
+            </div>
+          </div>
+        ) : (
+          // Основной контент (показывается только когда данные загружены)
+          <>
+            <div className="group">
+              <div className="px-2 mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40">
+                Visibility Mode
+              </div>
+
+              <div className="relative flex items-center justify-between p-6 rounded-[2rem] bg-primary/5 border border-primary/5 hover:border-primary/20 transition-all duration-300">
+                <div className="flex items-start space-x-4">
+                  <div
+                    className={`mt-1 p-2 rounded-xl transition-colors ${
+                      isSearchable
+                        ? 'bg-green-500/10 text-green-500'
+                        : 'bg-orange-500/10 text-orange-500'
+                    }`}
+                  >
+                    {isSearchable ? <Eye size={18} /> : <EyeOff size={18} />}
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">Discoverable</div>
+                    <div className="text-[11px] text-muted-foreground font-medium leading-relaxed max-w-[180px]">
+                      Allow others to find your profile via username search.
                     </div>
-                    <Switch checked={isSearchable} onCheckedChange={setIsSearchable} />
                   </div>
                 </div>
-
-                <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-                  <strong>Note:</strong> When disabled, others won't be able to find you through
-                  username search, but existing contacts can still message you.
-                </div>
+                <Switch
+                  checked={isSearchable}
+                  onCheckedChange={setIsSearchable}
+                  className="data-[state=checked]:bg-primary shadow-lg"
+                />
               </div>
-            </>
-          )}
-        </div>
+            </div>
 
-        {/* Footer */}
-        {!initialLoading && (
-          <div className="flex justify-end space-x-2 p-4 border-t border-border">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
+            <div className="relative overflow-hidden p-5 rounded-[1.5rem] bg-background/50 border border-primary/5 transition-all duration-500">
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-1 transition-colors duration-500 ${
+                  isSearchable ? 'bg-green-500/50' : 'bg-orange-500/50'
+                }`}
+              />
+
+              <p className="text-[11px] font-medium leading-relaxed text-muted-foreground italic">
+                <span className="font-black text-primary uppercase not-italic mr-2">Status:</span>
+                {isSearchable ? (
+                  <span className="text-foreground/80 animate-in fade-in duration-300">
+                    You are visible to the community. New people can find and contact you.
+                  </span>
+                ) : (
+                  <span className="text-foreground/80 animate-in fade-in duration-300">
+                    You are now a ghost. Only your existing contacts can find and message you.
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                className="flex-1 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-primary/5 h-12"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={loading}
+                className="flex-1 rounded-2xl font-bold text-xs uppercase tracking-wider shadow-xl shadow-primary/20 h-12"
+              >
+                {loading ? 'Saving...' : 'Confirm'}
+              </Button>
+            </div>
+          </>
         )}
       </div>
-    </>
+    </ResponsiveModal>
   );
 }

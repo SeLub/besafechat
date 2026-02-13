@@ -25,7 +25,6 @@ interface RightPanelProps {
 
 export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
   const { getOnlineStatus } = useOnlineStatusContext();
-
   if (!isOpen || !chatInfo) return null;
 
   const getInitials = (name: string) => {
@@ -45,106 +44,89 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
   };
 
   return (
-    <div
-      id="RightColumn-wrapper"
-      className={`w-80 border-l border-border bg-background flex flex-col ${isOpen ? 'block' : 'hidden'}`}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h3 className="font-semibold">Profile</h3>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
+    <div className="w-80 border-l border-primary/5 bg-card/50 backdrop-blur-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="flex items-center justify-between p-5">
+        <h3 className="font-black uppercase tracking-widest text-[10px] text-muted-foreground">
+          Identity Profile
+        </h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="rounded-full hover:bg-primary/10"
+        >
+          <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Profile Section */}
-      <div className="p-6 text-center border-b border-border">
-        <Avatar className="h-20 w-20 mx-auto mb-4">
-          <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-            {getInitials(chatInfo.name)}
-          </AvatarFallback>
-          {chatInfo.avatarUrl && <AvatarImage src={chatInfo.avatarUrl} />}
-        </Avatar>
-        <h2 className="text-xl font-semibold mb-1">{getDisplayName()}</h2>
-        <p className="text-sm text-muted-foreground">
-          @{chatInfo.alias || chatInfo.username || chatInfo.name}
-        </p>
-        <p className="text-sm text-muted-foreground mb-4">
-          {getOnlineStatus(chatInfo.handleId) ? 'Online' : chatInfo.lastSeen || 'Last seen recently'}
+      <div className="px-6 py-8 text-center">
+        <div className="relative inline-block mb-4">
+          <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white text-2xl font-black">
+              {getInitials(chatInfo.name)}
+            </AvatarFallback>
+            {chatInfo.avatarUrl && <AvatarImage src={chatInfo.avatarUrl} />}
+          </Avatar>
+          {getOnlineStatus(chatInfo.handleId) && (
+            <span className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-background rounded-full" />
+          )}
+        </div>
+
+        <h2 className="text-xl font-black text-foreground">{getDisplayName()}</h2>
+        <p className="text-sm font-bold text-primary/60 mb-6 italic">
+          @{chatInfo.alias || chatInfo.username || 'identity'}
         </p>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
-          <Button variant="outline" size="icon" className="rounded-full">
-            <Phone className="h-5 w-5" />
-          </Button>
-          <Button variant="outline" size="icon" className="rounded-full">
-            <Video className="h-5 w-5" />
-          </Button>
-          <Button variant="outline" size="icon" className="rounded-full">
-            <Search className="h-5 w-5" />
-          </Button>
+        <div className="grid grid-cols-3 gap-2">
+          <ActionButton icon={<Phone size={18} />} label="Audio" />
+          <ActionButton icon={<Video size={18} />} label="Video" />
+          <ActionButton icon={<Search size={18} />} label="Find" />
         </div>
       </div>
 
-      {/* Info Section */}
-      <div className="flex-1 overflow-y-auto">
-        {chatInfo.phone && (
-          <div className="p-4 border-b border-border">
-            <div className="text-sm text-muted-foreground mb-1">Phone</div>
-            <div className="font-medium">{chatInfo.phone}</div>
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto px-4 space-y-2">
+        {/* Карточки информации вместо просто списка */}
+        <InfoCard label="Bio" value={chatInfo.bio || 'No bio set in the Sky'} />
+        <InfoCard label="Handle ID" value={chatInfo.handleId} isMono />
 
-        {chatInfo.bio && (
-          <div className="p-4 border-b border-border">
-            <div className="text-sm text-muted-foreground mb-1">Bio</div>
-            <div className="text-sm">{chatInfo.bio}</div>
+        <div className="pt-4 px-2 space-y-4">
+          <div className="flex items-center justify-between text-sm font-bold text-foreground/70">
+            <span>Notifications</span>
+            <Switch className="data-[state=checked]:bg-primary" />
           </div>
-        )}
-
-        {chatInfo.username && (
-          <div className="p-4 border-b border-border">
-            <div className="text-sm text-muted-foreground mb-1">Username</div>
-            <div className="font-medium">@{chatInfo.username}</div>
-          </div>
-        )}
-
-        {/* Settings */}
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Bell className="h-5 w-5 text-muted-foreground" />
-              <span>Notifications</span>
-            </div>
-            <Switch defaultChecked />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Volume2 className="h-5 w-5 text-muted-foreground" />
-              <span>Sound</span>
-            </div>
-            <Switch defaultChecked />
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="p-4 space-y-2">
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-            <Archive className="h-5 w-5 mr-3" />
-            Archive Chat
-          </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-            <Shield className="h-5 w-5 mr-3" />
-            Block User
-          </Button>
-          <Button variant="ghost" className="w-full justify-start text-destructive">
-            <Trash2 className="h-5 w-5 mr-3" />
-            Delete Chat
-          </Button>
         </div>
       </div>
     </div>
   );
 }
+
+// Вспомогательные мини-компоненты для чистоты
+const ActionButton = ({ icon, label }: { icon: any; label: string }) => (
+  <button className="flex flex-col items-center gap-1 p-3 rounded-2xl hover:bg-primary/5 transition-colors group">
+    <div className="text-muted-foreground group-hover:text-primary transition-colors">{icon}</div>
+    <span className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/50">
+      {label}
+    </span>
+  </button>
+);
+
+const InfoCard = ({
+  label,
+  value,
+  isMono,
+}: {
+  label: string;
+  value?: string;
+  isMono?: boolean;
+}) => (
+  <div className="p-4 rounded-2xl bg-primary/5 border border-primary/5">
+    <div className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-1">
+      {label}
+    </div>
+    <div
+      className={`text-sm font-medium text-foreground ${isMono ? 'font-mono text-[11px] break-all' : ''}`}
+    >
+      {value}
+    </div>
+  </div>
+);

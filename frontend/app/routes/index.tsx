@@ -13,6 +13,7 @@ import { API_ENDPOINTS } from '@/services/api-gateway';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -401,45 +402,65 @@ function ChatRouteContent() {
   const selectedChat = getChatById(selectedChatId || '');
 
   return (
-    <div id="Main" className="flex h-screen bg-background text-foreground">
-      <LeftColumn
-        leftPanelPage={leftPanelPage}
-        userProfile={user}
-        chats={chats}
-        selectedChatId={selectedChatId}
-        onProfileClick={handleProfileClick}
-        onContactsClick={handleContactsClick}
-        onSettingsClick={handleSettingsClick}
-        onNotificationsClick={handleNotificationsClick}
-        onBackToChats={handleBackToChats}
-        onChatSelect={handleChatSelect}
-        onNewChat={handleNewChat}
-        onChatCreated={handleChatCreated}
-      />
+    <>
+      <motion.div
+        id="Main"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="flex h-screen bg-background text-foreground overflow-hidden"
+      >
+        <LeftColumn
+          leftPanelPage={leftPanelPage}
+          userProfile={user}
+          chats={chats}
+          selectedChatId={selectedChatId}
+          onProfileClick={handleProfileClick}
+          onContactsClick={handleContactsClick}
+          onSettingsClick={handleSettingsClick}
+          onNotificationsClick={handleNotificationsClick}
+          onBackToChats={handleBackToChats}
+          onChatSelect={handleChatSelect}
+          onNewChat={handleNewChat}
+          onChatCreated={handleChatCreated}
+        />
 
-      <MiddleColumn
-        selectedChat={selectedChat}
-        messages={messages}
-        rightPanelOpen={rightPanelOpen}
-        onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
-        onSendMessage={handleSendMessage}
-      />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedChatId || 'empty'}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 flex"
+          >
+            <MiddleColumn
+              selectedChat={selectedChat}
+              messages={messages}
+              rightPanelOpen={rightPanelOpen}
+              onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
+              onSendMessage={handleSendMessage}
+            />
+          </motion.div>
+        </AnimatePresence>
 
-      {/* Right Panel */}
-      <RightPanel
-        isOpen={rightPanelOpen}
-        onClose={() => setRightPanelOpen(false)}
-        chatInfo={selectedChat}
-      />
+        {/* Right Panel */}
+        <RightPanel
+          isOpen={rightPanelOpen}
+          onClose={() => setRightPanelOpen(false)}
+          chatInfo={selectedChat}
+        />
+      </motion.div>
 
-      {/* New Chat Modal */}
+      {/* Модалки выносим за пределы анимированного контейнера Main, 
+        чтобы они не дергались при его появлении */}
+
       <NewChatModal
         isOpen={newChatModalOpen}
         onClose={() => setNewChatModalOpen(false)}
         onChatCreated={handleChatCreated}
       />
 
-      {/* Contact Request Modal */}
       <ContactRequestModal
         isOpen={contactRequestModal.isOpen}
         onClose={() => setContactRequestModal({ isOpen: false, request: null })}
@@ -448,7 +469,7 @@ function ChatRouteContent() {
         onReject={handleRejectRequest}
         loading={requestActionLoading}
       />
-    </div>
+    </>
   );
 }
 

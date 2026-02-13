@@ -2,9 +2,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '~/hooks/use-auth-context';
 import { apiRequest } from '@/services/api-utils';
-import { Search, User, X } from 'lucide-react';
+import { Search, User, X, Sparkles, Send, ShieldAlert, BadgeCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { ResponsiveModal } from './ui/responsive-modal';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ interface ContactProfile {
   ownerIdentityId: string;
 }
 
-export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
+export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [contact, setContact] = useState<ContactProfile | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,24 +40,24 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user, checkAuth } = useAuth();
 
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, []);
+  const handleInputChange = (value: string) => {
+    setSearchQuery(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-  if (!isOpen) return null;
+    if (value.trim()) {
+      debounceTimer.current = setTimeout(() => debouncedSearch(value), 500);
+    } else {
+      setContact(null);
+      setSearchError(null);
+    }
+  };
 
   const debouncedSearch = async (value: string) => {
-    if (!value.trim()) return;
-
-    const cleanQuery = value.replace('@', '');
+    const cleanQuery = value.replace('@', '').trim();
+    if (!cleanQuery) return;
 
     setLoading(true);
     setSearchError(null);
-    setContact(null);
 
     try {
       const result = await apiRequest<{ handles: any[] }>(
@@ -65,7 +66,8 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
       );
 
       if (!result.handles || result.handles.length === 0) {
-        setSearchError('User not found');
+        setSearchError('User not found in Sky network');
+        setContact(null);
         return;
       }
 
@@ -75,85 +77,41 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
       let requestStatus = 'none';
       if (!isCurrentUser) {
         try {
-          const statusData = await apiRequest<{ status: string }>(
-            `/contacts/check/${handle.id}`,
-            { method: 'GET' }
-          );
-          if (statusData?.status) {
-            requestStatus = statusData.status;
-          }
+          const statusData = await apiRequest<{ status: string }>(`/contacts/check/${handle.id}`, {
+            method: 'GET',
+          });
+          requestStatus = statusData?.status || 'none';
         } catch {
-          // ignore status check errors
+          /* ignore */
         }
       }
 
-      try {
-        const profileData = await apiRequest<{ profile: any }>(
-          `/profiles/public/${handle.value}`,
-          { method: 'GET' }
-        );
+      const profileData = await apiRequest<{ profile: any }>(`/profiles/public/${handle.value}`, {
+        method: 'GET',
+      }).catch(() => ({ profile: null }));
 
-        const profile = profileData.profile;
-        setContact({
-          handle: {
-            id: profile.handle.id,
-            value: profile.handle.value,
-            alias: profile.handle.alias,
-            matchedBy: profile.handle.matchedBy,
-          },
-          displayName: profile.displayName,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          avatarUrl: profile.avatarUrl,
-          bio: profile.bio,
-          requestStatus,
-          isCurrentUser,
-          ownerIdentityId: handle.ownerIdentityId,
-        });
-      } catch {
-        setContact({
-          handle: {
-            id: handle.id,
-            value: handle.value,
-            alias: handle.alias || null,
-            matchedBy: 'value',
-          },
-          displayName: handle.value,
-          firstName: null,
-          lastName: null,
-          avatarUrl: null,
-          bio: null,
-          requestStatus,
-          isCurrentUser,
-          ownerIdentityId: handle.ownerIdentityId,
-        });
-      }
+      const profile = profileData.profile;
+
+      setContact({
+        handle: {
+          id: handle.id,
+          value: handle.value,
+          alias: handle.alias || null,
+          matchedBy: profile?.handle.matchedBy || 'value',
+        },
+        displayName: profile?.displayName || handle.value,
+        firstName: profile?.firstName || null,
+        lastName: profile?.lastName || null,
+        avatarUrl: profile?.avatarUrl || null,
+        bio: profile?.bio || null,
+        requestStatus,
+        isCurrentUser,
+        ownerIdentityId: handle.ownerIdentityId,
+      });
     } catch {
-      setSearchError('Search failed');
+      setSearchError('Search failed. Check your connection.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    await debouncedSearch(searchQuery);
-  };
-
-  const handleInputChange = (value: string) => {
-    setSearchQuery(value);
-
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-
-    if (value.trim()) {
-      debounceTimer.current = setTimeout(() => {
-        debouncedSearch(value);
-      }, 500);
-    } else {
-      setContact(null);
-      setSearchError(null);
     }
   };
 
@@ -170,20 +128,13 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
         }),
       });
 
-      const displayHandle = contact.handle.matchedBy === 'alias' && contact.handle.alias
-        ? contact.handle.alias
-        : contact.handle.value;
-      toast.success(`Request sent to @${displayHandle}`);
+      toast.success(`Connection request sent!`);
       onClose();
-      setMessage('');
-      setSearchQuery('');
-      setContact(null);
+      resetState();
     } catch (error: any) {
       if (error.status === 401) {
         await checkAuth();
-        toast.error('Session expired. Please try again.');
-      } else if (error.status === 409) {
-        toast.info('Request already sent to this user');
+        toast.error('Session expired. Retrying...');
       } else {
         toast.error(error.message || 'Failed to send request');
       }
@@ -192,10 +143,11 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
     }
   };
 
-  const getDisplayHandle = (c: ContactProfile) => {
-    return c.handle.matchedBy === 'alias' && c.handle.alias
-      ? c.handle.alias
-      : c.handle.value;
+  const resetState = () => {
+    setSearchQuery('');
+    setContact(null);
+    setMessage('');
+    setSearchError(null);
   };
 
   const getDisplayName = (c: ContactProfile) => {
@@ -205,139 +157,108 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
     return c.displayName;
   };
 
-  const getInitials = (c: ContactProfile) => {
-    const name = getDisplayName(c);
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/50 z-50"
-        onClick={onClose}
-        onKeyDown={e => {
-          if (e.key === 'Escape') onClose();
-        }}
-        role="button"
-        tabIndex={-1}
-        aria-label="Close modal"
-      />
-
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[480px] bg-background border border-border rounded-lg shadow-lg z-50">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">New Chat</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="p-4 border-b border-border">
-          <div className="flex space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="@username or alias"
-                value={searchQuery}
-                onChange={e => handleInputChange(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                className="w-full pl-10 pr-4 py-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <Button onClick={handleSearch} disabled={loading || !searchQuery.trim()}>
-              {loading ? '...' : 'Search'}
-            </Button>
+    <ResponsiveModal isOpen={isOpen} onClose={onClose} title="New Conversation">
+      <div className="space-y-6 pb-2">
+        {/* Search Bar */}
+        <div className="relative group">
+          <div
+            className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-300 ${loading ? 'text-primary animate-pulse' : 'text-muted-foreground group-focus-within:text-primary'}`}
+          >
+            {loading ? <Sparkles size={18} /> : <Search size={18} />}
           </div>
+          <input
+            type="text"
+            placeholder="Search by @username or alias..."
+            value={searchQuery}
+            onChange={e => handleInputChange(e.target.value)}
+            className="w-full pl-12 pr-4 h-14 bg-primary/5 border border-transparent focus:border-primary/20 focus:bg-background rounded-[1.5rem] outline-none transition-all font-medium text-sm"
+          />
         </div>
 
-        <div className="max-h-[480px] overflow-y-auto">
+        <div className="min-h-[280px] flex flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-primary/5 bg-primary/[0.01] px-6 py-8">
           {searchError ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <div className="text-sm text-red-600">{searchError}</div>
+            <div className="text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4 text-destructive">
+                <ShieldAlert size={32} />
+              </div>
+              <p className="text-sm font-bold text-destructive/80 mb-1">User Not Found</p>
+              <p className="text-[11px] text-muted-foreground">{searchError}</p>
             </div>
           ) : !contact ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <div className="text-sm">Search for users by username or alias</div>
+            <div className="text-center opacity-40">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
+                <User size={32} />
+              </div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em]">
+                Enter Sky Identity
+              </p>
             </div>
           ) : (
-            <div className="p-4">
-              <div className="flex flex-col items-center mb-4">
-                <Avatar className="h-16 w-16 mb-3">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                    {getInitials(contact)}
-                  </AvatarFallback>
-                  {contact.avatarUrl && (
-                    <AvatarImage src={contact.avatarUrl} />
-                  )}
-                </Avatar>
-                <div className="text-sm text-muted-foreground">
-                  @{getDisplayHandle(contact)}
+            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Profile Card */}
+              <div className="flex flex-col items-center text-center space-y-3 mb-6">
+                <div className="relative">
+                  <Avatar className="h-24 w-24 border-4 border-background shadow-2xl shadow-primary/20">
+                    <AvatarImage src={contact.avatarUrl || ''} />
+                    <AvatarFallback className="bg-primary text-white text-3xl font-black italic">
+                      {getDisplayName(contact).slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1 bg-background p-1 rounded-full border-2 border-primary/20">
+                    <BadgeCheck size={20} className="text-primary fill-primary/10" />
+                  </div>
                 </div>
-                <div className="text-lg font-semibold mt-1">
-                  {getDisplayName(contact)}
+
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">{getDisplayName(contact)}</h3>
+                  <p className="text-xs font-bold text-primary italic opacity-70">
+                    @{contact.handle.value}
+                  </p>
                 </div>
+
+                {contact.bio && (
+                  <p className="text-[11px] text-muted-foreground font-medium max-w-[240px] leading-relaxed italic">
+                    "{contact.bio}"
+                  </p>
+                )}
               </div>
 
-              {contact.bio && (
-                <div className="text-sm text-muted-foreground text-center mb-4">
-                  {contact.bio}
-                </div>
-              )}
-
-              <div className="border-t border-border pt-4">
-                {!contact.isCurrentUser && contact.requestStatus !== 'connected' && (
-                  <>
-                    <textarea
-                      placeholder="Hi! Let's connect (optional)"
-                      value={message}
-                      onChange={e => setMessage(e.target.value)}
-                      className="w-full p-2 bg-muted rounded-lg outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                      rows={2}
-                      maxLength={200}
-                    />
-                    <div className="text-xs text-muted-foreground mt-1 mb-3">
-                      {message.length}/200 characters
-                    </div>
-                  </>
+              {/* Action Area */}
+              <div className="space-y-3 pt-4 border-t border-primary/5">
+                {!contact.isCurrentUser && contact.requestStatus === 'none' && (
+                  <textarea
+                    placeholder="Add a secure intro message..."
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    className="w-full p-4 bg-background border border-primary/10 rounded-2xl outline-none focus:border-primary/40 transition-all text-xs font-medium resize-none"
+                    rows={2}
+                  />
                 )}
 
-                {contact.isCurrentUser ? (
-                  <Button className="w-full" disabled>
-                    This is you
-                  </Button>
-                ) : contact.requestStatus === 'connected' ? (
-                  <Button className="w-full" disabled>
-                    Already Connected
-                  </Button>
-                ) : contact.requestStatus === 'sent' ? (
-                  <Button className="w-full" disabled>
-                    Request Sent
-                  </Button>
-                ) : contact.requestStatus === 'received' ? (
-                  <Button className="w-full" disabled>
-                    Request Received
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full"
-                    disabled={creating}
-                    onClick={handleSendRequest}
-                  >
-                    {creating ? 'Sending...' : 'Send Request'}
-                  </Button>
-                )}
+                <Button
+                  className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all duration-500 ${contact.isCurrentUser || contact.requestStatus !== 'none' ? 'opacity-50 grayscale' : 'shadow-xl shadow-primary/20'}`}
+                  disabled={creating || contact.isCurrentUser || contact.requestStatus !== 'none'}
+                  onClick={handleSendRequest}
+                >
+                  {creating ? (
+                    <Sparkles size={16} className="animate-spin mr-2" />
+                  ) : contact.isCurrentUser ? (
+                    'That is you'
+                  ) : contact.requestStatus !== 'none' ? (
+                    contact.requestStatus.replace('_', ' ')
+                  ) : (
+                    <>
+                      <Send size={14} className="mr-2" />
+                      Establish Connection
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
-    </>
+    </ResponsiveModal>
   );
 }

@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+// CloudDownload — отличная альтернатива, подчеркивающая загрузку из облака
+import { FileText, ChevronLeft, CloudDownload, Send, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface RecoveryOptionsProps {
   onPasswordRecovery: (password: string) => void;
@@ -12,6 +16,8 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const wordCount = seedInput.trim().split(/\s+/).filter(Boolean).length;
+
   const handlePasswordSubmit = async () => {
     if (!password) return;
     setLoading(true);
@@ -19,7 +25,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
     try {
       await onPasswordRecovery(password);
     } catch (err: any) {
-      setError(err.message || 'Invalid credentials');
+      setError(err.message || 'Access denied. Check your password.');
     } finally {
       setLoading(false);
     }
@@ -28,7 +34,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
   const handleSeedSubmit = async () => {
     const words = seedInput.trim().split(/\s+/);
     if (words.length !== 12) {
-      setError('Please enter exactly 12 words');
+      setError('The phrase must contain exactly 12 words.');
       return;
     }
     setLoading(true);
@@ -36,126 +42,144 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
     try {
       await onSeedRecovery(words);
     } catch (err: any) {
-      setError(err.message || 'Invalid seed phrase');
+      setError(err.message || 'Invalid Seed Phrase. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const renderHeader = (title: string, subtitle: string) => (
+    <div className="text-center mb-8">
+      <h2 className="text-3xl font-black tracking-tight text-foreground mb-2">{title}</h2>
+      <p className="text-muted-foreground font-medium">{subtitle}</p>
+    </div>
+  );
+
   if (!method) {
     return (
-      <div className="max-w-md mx-auto p-6">
-        <h2 className="text-2xl font-bold text-center mb-4">Restore Access</h2>
-        <p className="text-center text-muted-foreground mb-6">Choose your recovery method:</p>
+      <div className="w-full max-w-md mx-auto p-2">
+        {renderHeader('Restore Access', 'Choose your path back to the Sky')}
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <button
             onClick={() => setMethod('password')}
-            className="w-full p-4 border-2 rounded-lg hover:border-primary hover:bg-accent transition text-left"
+            className="w-full group p-6 rounded-[2rem] border-2 border-primary/10 bg-card/40 backdrop-blur-xl hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 text-left shadow-sm"
           >
-            <div className="font-medium mb-1">🔑 Password (Cloud Recovery)</div>
-            <div className="text-sm text-muted-foreground">If you saved your seed in the cloud</div>
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                <CloudDownload size={24} />
+              </div>
+              <div>
+                <div className="font-black text-lg text-foreground">Cloud Recovery</div>
+                <div className="text-sm text-muted-foreground font-medium">
+                  Unlock with your Master Password
+                </div>
+              </div>
+            </div>
           </button>
 
           <button
             onClick={() => setMethod('seed')}
-            className="w-full p-4 border-2 rounded-lg hover:border-primary hover:bg-accent transition text-left"
+            className="w-full group p-6 rounded-[2rem] border-2 border-primary/10 bg-card/40 backdrop-blur-xl hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 text-left shadow-sm"
           >
-            <div className="font-medium mb-1">📝 Seed Phrase (12 words)</div>
-            <div className="text-sm text-muted-foreground">Enter your 12-word seed phrase</div>
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                <FileText size={24} />
+              </div>
+              <div>
+                <div className="font-black text-lg text-foreground">Seed Phrase</div>
+                <div className="text-sm text-muted-foreground font-medium">
+                  Use your 12-word recovery key
+                </div>
+              </div>
+            </div>
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (method === 'password') {
-    return (
-      <div className="max-w-md mx-auto p-6">
-        <button
-          onClick={() => setMethod(null)}
-          className="mb-4 text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Back
-        </button>
-
-        <h2 className="text-2xl font-bold mb-4">Cloud Recovery</h2>
-        <p className="text-muted-foreground mb-6">Enter your password</p>
-
-        <div className="space-y-4 mb-6">
-          <input
-            type="password"
-            value={password}
-            onChange={e => {
-              setPassword(e.target.value);
-              setError('');
-            }}
-            placeholder="Password"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
-          />
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-          </div>
-        )}
-
-        <button
-          onClick={handlePasswordSubmit}
-          disabled={!password || loading}
-          className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition disabled:opacity-50"
-        >
-          {loading ? 'Recovering...' : 'Recover Account →'}
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-6">
+    <div className="w-full max-w-md mx-auto p-2">
       <button
-        onClick={() => setMethod(null)}
-        className="mb-4 text-sm text-muted-foreground hover:text-foreground"
+        onClick={() => {
+          setMethod(null);
+          setError('');
+        }}
+        className="flex items-center gap-2 mb-6 text-sm font-bold text-muted-foreground/60 hover:text-primary transition-colors group"
       >
-        ← Back
+        <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+        Return to selection
       </button>
 
-      <h2 className="text-2xl font-bold mb-4">Enter Seed Phrase</h2>
-      <p className="text-muted-foreground mb-6">
-        Enter your 12-word seed phrase (separated by spaces)
-      </p>
-
-      <div className="space-y-4 mb-6">
-        <textarea
-          value={seedInput}
-          onChange={e => {
-            setSeedInput(e.target.value);
-            setError('');
-          }}
-          placeholder="word1 word2 word3 ..."
-          rows={4}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono"
-        />
-        <p className="text-xs text-muted-foreground">
-          {seedInput.trim().split(/\s+/).filter(Boolean).length} / 12 words
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-        </div>
+      {method === 'password' ? (
+        <>
+          {renderHeader('Cloud Sync', 'Enter your Master Password to sync your Identity')}
+          <div className="space-y-6">
+            <input
+              type="password"
+              value={password}
+              onChange={e => {
+                setPassword(e.target.value);
+                setError('');
+              }}
+              placeholder="Master Password"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-primary/10 bg-card/40 backdrop-blur-md focus:border-primary focus:bg-background outline-none transition-all text-lg shadow-inner font-medium"
+              onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {renderHeader('Identity Seed', 'Paste or type your 12-word recovery phrase')}
+          <div className="space-y-2">
+            <textarea
+              value={seedInput}
+              onChange={e => {
+                setSeedInput(e.target.value);
+                setError('');
+              }}
+              placeholder="word1 word2 word3..."
+              rows={4}
+              className="w-full px-6 py-4 rounded-2xl border-2 border-primary/10 bg-card/40 backdrop-blur-md focus:border-primary focus:bg-background outline-none transition-all text-lg font-mono shadow-inner leading-relaxed resize-none"
+            />
+            <div className="flex justify-end px-2">
+              <span
+                className={`text-[10px] font-black uppercase tracking-widest ${wordCount === 12 ? 'text-primary' : 'text-muted-foreground/40'}`}
+              >
+                {wordCount} / 12 Words
+              </span>
+            </div>
+          </div>
+        </>
       )}
 
-      <button
-        onClick={handleSeedSubmit}
-        disabled={loading}
-        className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition disabled:opacity-50"
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 p-4 rounded-2xl bg-destructive/5 border border-destructive/20 flex items-start gap-3"
+          >
+            <AlertCircle className="text-destructive shrink-0" size={18} />
+            <p className="text-sm font-medium text-destructive">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Button
+        onClick={method === 'password' ? handlePasswordSubmit : handleSeedSubmit}
+        disabled={loading || (method === 'password' ? !password : wordCount < 12)}
+        className="w-full mt-8 py-8 text-xl font-black rounded-[2rem] bg-primary text-primary-foreground shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
       >
-        {loading ? 'Recovering...' : 'Recover Account →'}
-      </button>
+        {loading ? (
+          'Decrypting Sky...'
+        ) : (
+          <span className="flex items-center gap-2">
+            Enter the Sky <Send size={20} />
+          </span>
+        )}
+      </Button>
     </div>
   );
 }

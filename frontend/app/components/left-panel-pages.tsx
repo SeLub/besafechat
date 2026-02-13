@@ -5,6 +5,8 @@ import { DisplayNameModal } from '@/components/display-name-modal';
 import { PrivacySettingsModal } from '@/components/privacy-settings-modal';
 import { StorageSettingsModal } from '@/components/storage-settings-modal';
 import { ThemeSelectorModal } from '@/components/theme-selector-modal';
+import { HelpSupportModal } from '@/components/help-support-modal';
+import { LanguageSettingsModal } from '@/components/language-settings-modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -17,6 +19,7 @@ import {
   AtSign,
   Bell,
   Camera,
+  ChevronRight,
   Database,
   Edit3,
   Globe,
@@ -26,6 +29,7 @@ import {
   Palette,
   Shield,
   User,
+  Volume2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
@@ -73,6 +77,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const [storageModalOpen, setStorageModalOpen] = useState(false);
   const [devicesModalOpen, setDevicesModalOpen] = useState(false);
   const [displayNameModalOpen, setDisplayNameModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [languageModalOpen, setLanguageModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -144,25 +150,36 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   if (page === 'profile') {
     return (
       <>
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center p-4 border-b border-border">
-            <Button variant="ghost" size="icon" onClick={onBack} className="mr-3">
+        <div className="flex flex-col h-full bg-card/30 backdrop-blur-xl">
+          {/* Sky Header */}
+          <div className="flex items-center p-5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="mr-3 rounded-2xl hover:bg-primary/10 transition-colors"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-lg font-semibold">My Profile</h2>
+            <h2 className="text-xl font-black tracking-tight text-foreground italic">
+              Identity<span className="text-primary not-italic">.</span>
+            </h2>
           </div>
 
-          {/* Profile Photo Section */}
-          <div className="p-6 text-center border-b border-border">
+          {/* Profile Photo Section - Теперь более стильная */}
+          <div className="px-6 py-8 text-center relative overflow-hidden">
+            {/* Декоративный эффект "облака" на фоне */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-primary/10 blur-[60px] rounded-full -z-10" />
+
             <div className="relative inline-block">
-              <Avatar className="h-24 w-24 mx-auto">
-                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+              <Avatar className="h-28 w-28 mx-auto ring-4 ring-background shadow-2xl">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white text-3xl font-black">
                   {getInitials(userProfile?.profile?.displayName)}
                 </AvatarFallback>
                 {userProfile?.profile?.avatarUrl && (
                   <AvatarImage
                     src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
+                    className="object-cover"
                   />
                 )}
               </Avatar>
@@ -175,62 +192,73 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
               />
               <Button
                 size="icon"
-                className="absolute -bottom-2 -right-2 rounded-full h-8 w-8"
+                className="absolute -bottom-1 -right-1 rounded-2xl h-10 w-10 shadow-lg hover:scale-110 transition-transform bg-primary text-white"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-5 w-5" />
               </Button>
             </div>
+
+            <h3 className="mt-4 text-xl font-black text-foreground">
+              {userProfile?.profile?.displayName || 'Unknown Traveler'}
+            </h3>
+            <p className="text-sm font-bold text-primary/60 italic">
+              @{userProfile?.handle?.value || 'no-handle'}
+            </p>
           </div>
 
-          {/* Profile Info */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              <ProfileField
-                icon={<User className="h-5 w-5" />}
-                label="Display Name"
-                value={userProfile?.profile?.displayName || 'Not set'}
-                onEdit={() => setDisplayNameModalOpen(true)}
-              />
+          {/* Profile Info - Чистые карточки */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
+            <div className="space-y-2">
+              <div className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40">
+                Identity
+              </div>
+              <div className="overflow-hidden rounded-[2rem] border border-primary/5 bg-primary/5 shadow-sm">
+                <ProfileField
+                  icon={<User className="h-4 w-4" />}
+                  label="Display Name"
+                  value={userProfile?.profile?.displayName || 'Set your name'}
+                  onEdit={() => setDisplayNameModalOpen(true)}
+                />
+                <ProfileField
+                  icon={<AtSign className="h-4 w-4" />}
+                  label="Handle ID"
+                  value={
+                    userProfile?.handle?.value ? `@${userProfile.handle.value}` : 'Set username'
+                  }
+                  onEdit={() => setUsernameModalOpen(true)}
+                />
+              </div>
+            </div>
 
-              <ProfileField
-                icon={<AtSign className="h-5 w-5" />}
-                label="Username"
-                value={userProfile?.handle?.value ? `@${userProfile.handle.value}` : 'Not set'}
-                onEdit={() => setUsernameModalOpen(true)}
-              />
-
-              {userProfile?.handle?.alias && (
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-sm text-muted-foreground mb-1">Alias</div>
-                  <div className="font-medium">@{userProfile.handle.alias}</div>
+            {userProfile?.profile?.bio && (
+              <div className="space-y-2">
+                <div className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40">
+                  About
                 </div>
-              )}
-
-              {userProfile?.profile?.bio && (
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-sm text-muted-foreground mb-1">Bio</div>
-                  <div>{userProfile.profile.bio}</div>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
-                    <div className="text-sm text-muted-foreground">Public Key</div>
+                <div className="p-5 rounded-[2rem] border border-primary/5 bg-primary/5 shadow-sm">
+                  <div className="text-sm font-medium leading-relaxed text-foreground/80 italic">
+                    "{userProfile.profile.bio}"
                   </div>
                 </div>
-                <div className="text-xs font-mono bg-muted p-3 rounded-lg break-all">
-                  {userProfile?.identity?.publicKey || 'Public Key Not Available'}
+              </div>
+            )}
+
+            {/* Public Key - Сделаем более "технологичным" */}
+            <div className="space-y-2">
+              <div className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40">
+                Security Key
+              </div>
+              <div className="p-5 rounded-[2rem] border border-primary/5 bg-primary/5 shadow-sm">
+                <div className="text-[11px] font-mono break-all text-muted-foreground leading-tight">
+                  {userProfile?.identity?.publicKey || 'Key not generated'}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Username Modal */}
         <UsernameSetupModal
           isOpen={usernameModalOpen}
           onClose={() => setUsernameModalOpen(false)}
@@ -238,7 +266,6 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           onSave={handleSaveUsername}
         />
 
-        {/* Display Name Modal */}
         <DisplayNameModal
           isOpen={displayNameModalOpen}
           onClose={() => setDisplayNameModalOpen(false)}
@@ -277,113 +304,113 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   if (page === 'settings') {
     return (
       <>
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center p-4 border-b border-border">
-            <Button variant="ghost" size="icon" onClick={onBack} className="mr-3">
+        <div className="flex flex-col h-full bg-card/30 backdrop-blur-xl">
+          {/* Sky Header */}
+          <div className="flex items-center p-5 mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="mr-3 rounded-2xl hover:bg-primary/10 transition-colors"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-lg font-semibold">Settings</h2>
+            <h2 className="text-xl font-black tracking-tight text-foreground italic">
+              Settings<span className="text-primary not-italic">.</span>
+            </h2>
           </div>
 
           {/* Settings List */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="py-2">
-              <SettingsSection title="Notifications">
-                <SettingsItem
-                  icon={<Bell className="h-5 w-5" />}
-                  label="Message Notifications"
-                  hasSwitch
-                  defaultChecked
-                />
-                <SettingsItem
-                  icon={<Bell className="h-5 w-5" />}
-                  label="Sound"
-                  hasSwitch
-                  defaultChecked
-                />
-              </SettingsSection>
+          <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6">
+            <SettingsSection title="Notifications">
+              <SettingsItem
+                icon={<Bell className="h-4 w-4" />}
+                label="Message Notifications"
+                hasSwitch
+                defaultChecked
+              />
+              <SettingsItem
+                icon={<Volume2 className="h-4 w-4" />} // Добавь импорт Volume2 из lucide-react
+                label="Sound Effects"
+                hasSwitch
+                defaultChecked
+              />
+            </SettingsSection>
 
-              <SettingsSection title="Privacy & Security">
-                <SettingsItem
-                  icon={<Shield className="h-5 w-5" />}
-                  label="Privacy Settings"
-                  onClick={() => setPrivacyModalOpen(true)}
-                />
-                <SettingsItem
-                  icon={<Shield className="h-5 w-5" />}
-                  label="Devices"
-                  onClick={() => setDevicesModalOpen(true)}
-                />
-              </SettingsSection>
+            <SettingsSection title="Privacy & Security">
+              <SettingsItem
+                icon={<Shield className="h-4 w-4" />}
+                label="Privacy Settings"
+                onClick={() => setPrivacyModalOpen(true)}
+              />
+              <SettingsItem
+                icon={<Key className="h-4 w-4" />}
+                label="Devices & Sessions"
+                onClick={() => setDevicesModalOpen(true)}
+              />
+            </SettingsSection>
 
-              <SettingsSection title="Appearance">
-                <SettingsItem
-                  icon={<Palette className="h-5 w-5" />}
-                  label="Theme"
-                  onClick={() => setThemeModalOpen(true)}
-                />
-              </SettingsSection>
+            <SettingsSection title="Appearance & Data">
+              <SettingsItem
+                icon={<Palette className="h-4 w-4" />}
+                label="Sky Theme"
+                onClick={() => setThemeModalOpen(true)}
+              />
+              <SettingsItem
+                icon={<Database className="h-4 w-4" />}
+                label="Storage & History"
+                onClick={() => setStorageModalOpen(true)}
+              />
+            </SettingsSection>
 
-              <SettingsSection title="Storage">
-                <SettingsItem
-                  icon={<Database className="h-5 w-5" />}
-                  label="Message History"
-                  onClick={() => setStorageModalOpen(true)}
-                />
-              </SettingsSection>
+            <SettingsSection title="Advanced">
+              <SettingsItem
+                icon={<Globe className="h-4 w-4" />}
+                label="Interface Language"
+                onClick={() => setLanguageModalOpen(true)}
+              />
+              <SettingsItem
+                icon={<HelpCircle className="h-4 w-4" />}
+                label="Help & Support"
+                onClick={() => setHelpModalOpen(true)}
+              />
+            </SettingsSection>
 
-              <SettingsSection title="Advanced">
-                <SettingsItem
-                  icon={<Globe className="h-5 w-5" />}
-                  label="Language"
-                  onClick={() => {
-                    console.log('Mock Language functionality.');
-                  }}
-                />
-                <SettingsItem
-                  icon={<HelpCircle className="h-5 w-5" />}
-                  label="Help & Support"
-                  onClick={() => {
-                    console.log('Help & Support clicked.');
-                  }}
-                />
-              </SettingsSection>
-
-              <div className="p-4 border-t border-border">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-destructive"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="h-5 w-5 mr-3" />
-                  Log Out
-                </Button>
-              </div>
+            {/* Logout Section */}
+            <div className="pt-4">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] text-destructive hover:bg-destructive/10 transition-all font-bold group"
+              >
+                <div className="p-2 rounded-xl bg-destructive/5 group-hover:scale-110 transition-transform">
+                  <LogOut className="h-5 w-5" />
+                </div>
+                <span>Exit the Sky</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Privacy Modal */}
+        {/* Сохраняем все модальные окна, они управляются теми же стейтами */}
         <PrivacySettingsModal
           isOpen={privacyModalOpen}
           onClose={() => setPrivacyModalOpen(false)}
         />
-
-        {/* Theme Modal */}
         <ThemeSelectorModal isOpen={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
-
-        {/* Storage Modal */}
         <StorageSettingsModal
           isOpen={storageModalOpen}
           onClose={() => setStorageModalOpen(false)}
         />
-
-        {/* Devices Modal */}
         <DevicesSettingsModal
           isOpen={devicesModalOpen}
           onClose={() => setDevicesModalOpen(false)}
         />
+
+        <LanguageSettingsModal
+          isOpen={languageModalOpen}
+          onClose={() => setLanguageModalOpen(false)}
+        />
+        <HelpSupportModal isOpen={helpModalOpen} onClose={() => setHelpModalOpen(false)} />
       </>
     );
   }
@@ -400,15 +427,26 @@ interface ProfileFieldProps {
 
 function ProfileField({ icon, label, value, onEdit }: ProfileFieldProps) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50">
-      <div className="flex items-center space-x-3">
-        <div className="text-muted-foreground">{icon}</div>
+    <div className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-colors group border-b border-primary/5 last:border-0">
+      <div className="flex items-center space-x-4">
+        <div className="text-primary/60 group-hover:text-primary transition-colors group-hover:scale-110 transition-transform duration-200">
+          {icon}
+        </div>
         <div>
-          <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="font-medium">{value}</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-0.5">
+            {label}
+          </div>
+          <div className="text-sm font-bold text-foreground/80 group-hover:text-foreground truncate max-w-[160px]">
+            {value}
+          </div>
         </div>
       </div>
-      <Button variant="ghost" size="icon" onClick={onEdit}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onEdit}
+        className="rounded-full hover:bg-primary/20 text-primary/40 hover:text-primary transition-colors"
+      >
         <Edit3 className="h-4 w-4" />
       </Button>
     </div>
@@ -422,9 +460,13 @@ interface SettingsSectionProps {
 
 function SettingsSection({ title, children }: SettingsSectionProps) {
   return (
-    <div className="mb-6">
-      <div className="px-4 py-2 text-sm font-medium text-muted-foreground">{title}</div>
-      <div>{children}</div>
+    <div className="space-y-2">
+      <div className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40">
+        {title}
+      </div>
+      <div className="overflow-hidden rounded-[2rem] border border-primary/5 bg-primary/5 shadow-sm">
+        {children}
+      </div>
     </div>
   );
 }
@@ -440,7 +482,7 @@ interface SettingsItemProps {
 function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: SettingsItemProps) {
   return (
     <div
-      className="flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer"
+      className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-colors cursor-pointer group border-b border-primary/5 last:border-0"
       onClick={!hasSwitch ? onClick : undefined}
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -450,11 +492,21 @@ function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: Setti
       role="button"
       tabIndex={0}
     >
-      <div className="flex items-center space-x-3">
-        <div className="text-muted-foreground">{icon}</div>
-        <span>{label}</span>
+      <div className="flex items-center space-x-4">
+        <div className="text-primary/60 group-hover:text-primary transition-colors group-hover:scale-110 transition-transform duration-200">
+          {icon}
+        </div>
+        <span className="text-sm font-bold text-foreground/80 group-hover:text-foreground">
+          {label}
+        </span>
       </div>
-      {hasSwitch && <Switch defaultChecked={defaultChecked} />}
+      {hasSwitch ? (
+        <Switch defaultChecked={defaultChecked} className="data-[state=checked]:bg-primary" />
+      ) : (
+        <div className="text-primary/20 group-hover:text-primary/60 transition-colors">
+          <ChevronRight size={16} /> {/* Добавь импорт ChevronRight */}
+        </div>
+      )}
     </div>
   );
 }

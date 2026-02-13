@@ -1,6 +1,6 @@
+import { API_CONFIG } from '../services/api-config';
 import type { ApiResponse } from '../types/api';
 import type { FullProfile } from '../types/profile';
-import { API_CONFIG } from '../services/api-config';
 
 const API_BASE = API_CONFIG.BASE_URL;
 
