@@ -33,7 +33,6 @@ function ChatRouteContent() {
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [currentView, setCurrentView] = useState<'chats' | 'chat'>('chats'); // For mobile
   const socketRef = useRef<Socket | null>(null);
-  const lastLoadedChatRef = useRef<string | undefined>(undefined);
   const { isMobile } = useMediaQuery(); // Add media query hook
   const { user } = useAuth();
   const {
@@ -127,8 +126,8 @@ function ChatRouteContent() {
 
   const handleChatSelect = useCallback(
     async (chatId: string) => {
-      if (lastLoadedChatRef.current === chatId) return; // Prevent reload of same chat
-      lastLoadedChatRef.current = chatId;
+      // If clicking the same chat that's already loading/loaded, allow reload
+      // This handles the case where user goes back and clicks the same chat again
       setSelectedChatId(chatId);
       setRightPanelOpen(false);
 

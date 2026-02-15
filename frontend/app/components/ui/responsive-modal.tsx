@@ -23,35 +23,39 @@ export function ResponsiveModal({ isOpen, onClose, title, children }: Responsive
   // --- МОБИЛЬНАЯ ВЕРСИЯ (Drawer/BottomSheet) ---
   if (isMobile) {
     return createPortal(
-      <Drawer.Root open={isOpen} onOpenChange={open => !open && onClose()}>
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000]" />
-          <Drawer.Content className="bg-card fixed bottom-0 left-0 right-0 z-[1001] flex flex-col rounded-t-[2.5rem] border-t border-primary/10 outline-none">
-            {/* Hidden title and description for accessibility */}
-            <div className="sr-only">
-              <h2 id="drawer-title">{title}</h2>
-              <p id="drawer-description">Modal content for {title}</p>
-            </div>
+      <Dialog.Root open={isOpen} onOpenChange={onClose}>
+        <Dialog.Portal>
+          <Drawer.Root open={isOpen} onOpenChange={open => !open && onClose()}>
+            <Drawer.Portal>
+              <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000]" />
+              <Drawer.Content className="bg-card fixed bottom-0 left-0 right-0 z-[1001] flex flex-col rounded-t-[2.5rem] border-t border-primary/10 outline-none">
+                {/* Dialog Title and Description for accessibility - required by Dialog */}
+                <Dialog.Title className="sr-only">{title}</Dialog.Title>
+                <Dialog.Description className="sr-only">
+                  Modal content for {title}
+                </Dialog.Description>
 
-            {/* Декоративная полоска для свайпа */}
-            <div className="mx-auto mt-4 h-1.5 w-12 shrink-0 rounded-full bg-primary/20" />
+                {/* Декоративная полоска для свайпа */}
+                <div className="mx-auto mt-4 h-1.5 w-12 shrink-0 rounded-full bg-primary/20" />
 
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-black italic tracking-tight">{title}</h2>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-full bg-primary/5"
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {children}
-            </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>,
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-black italic tracking-tight">{title}</h2>
+                    <button
+                      onClick={onClose}
+                      className="p-2 rounded-full bg-primary/5"
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  {children}
+                </div>
+              </Drawer.Content>
+            </Drawer.Portal>
+          </Drawer.Root>
+        </Dialog.Portal>
+      </Dialog.Root>,
       document.body
     );
   }
