@@ -1,8 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { X, Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
+import { Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
+import { ResponsiveModal } from './ui/responsive-modal';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -25,6 +27,8 @@ interface RightPanelProps {
 
 export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
   const { getOnlineStatus } = useOnlineStatusContext();
+  const { isMobile } = useMediaQuery();
+
   if (!isOpen || !chatInfo) return null;
 
   const getInitials = (name: string) => {
@@ -43,22 +47,8 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
     return chatInfo.name;
   };
 
-  return (
-    <div className="w-80 border-l border-primary/5 bg-card/50 backdrop-blur-2xl flex flex-col animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between p-5">
-        <h3 className="font-black uppercase tracking-widest text-[10px] text-muted-foreground">
-          Identity Profile
-        </h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="rounded-full hover:bg-primary/10"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
+  const content = (
+    <div className="flex flex-col">
       <div className="px-6 py-8 text-center">
         <div className="relative inline-block mb-4">
           <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
@@ -85,7 +75,6 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-2">
-        {/* Карточки информации вместо просто списка */}
         <InfoCard label="Bio" value={chatInfo.bio || 'No bio set in the Sky'} />
         <InfoCard label="Handle ID" value={chatInfo.handleId} isMono />
 
@@ -96,6 +85,50 @@ export function RightPanel({ isOpen, onClose, chatInfo }: RightPanelProps) {
           </div>
         </div>
       </div>
+    </div>
+  );
+
+  // On mobile, show as responsive modal (drawer on small screens)
+  if (isMobile) {
+    return (
+      <ResponsiveModal isOpen={isOpen} onClose={onClose} title="Identity Profile">
+        {content}
+      </ResponsiveModal>
+    );
+  }
+
+  // On desktop, show as fixed side panel
+  return (
+    <div
+      id="RightColumn"
+      className="w-80 border-l border-primary/5 bg-card/50 backdrop-blur-2xl flex flex-col animate-in slide-in-from-right duration-300"
+    >
+      <div className="flex items-center justify-between p-5">
+        <h3 className="font-black uppercase tracking-widest text-[10px] text-muted-foreground">
+          Identity Profile
+        </h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="rounded-full hover:bg-primary/10"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6l-12 12M6 6l12 12" />
+          </svg>
+        </Button>
+      </div>
+      {content}
     </div>
   );
 }

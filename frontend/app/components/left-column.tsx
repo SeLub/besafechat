@@ -1,5 +1,5 @@
-import { HamburgerMenu } from '@/components/hamburger-menu';
 import { ChatList } from '@/components/chat-list';
+import { HamburgerMenu } from '@/components/hamburger-menu';
 import { LeftPanelPages } from '@/components/left-panel-pages';
 
 interface LeftColumnProps {
@@ -34,7 +34,7 @@ export function LeftColumn({
   return (
     <div
       id="LeftColumn"
-      className="w-80 border-r border-primary/5 bg-card/30 backdrop-blur-xl flex flex-col shadow-[4px_0_24px_-12px_rgba(0,0,0,0.05)]"
+      className="w-full md:w-80 border-r border-primary/5 bg-card/30 backdrop-blur-xl flex flex-col shadow-[4px_0_24px_-12px_rgba(0,0,0,0.05)]"
     >
       {leftPanelPage ? (
         <LeftPanelPages

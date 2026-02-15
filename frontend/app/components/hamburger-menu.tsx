@@ -101,7 +101,7 @@ export function HamburgerMenu({
         className={`fixed top-0 left-0 h-full z-50 transform transition-transform duration-500 ease-out 
     bg-card/95 backdrop-blur-2xl border-r border-primary/5
     /* Устанавливаем ширину, которая соответствует твоей LeftColumn */
-    w-80 
+    w-full md:w-80
     ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
     shadow-[20px_0_40px_rgba(0,0,0,0.1)]`}
       >

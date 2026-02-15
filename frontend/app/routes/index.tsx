@@ -1,19 +1,20 @@
-import { ContactRequestModal } from '@/components/contact-request-modal';
 import { AuthGuard } from '@/components/auth-guard';
+import { ContactRequestModal } from '@/components/contact-request-modal';
 import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
 import { NewChatModal } from '@/components/new-chat-modal';
 import { RightPanel } from '@/components/right-panel';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useChats } from '@/hooks/use-chats';
-import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
-import { StorageService } from '@/services/storage.service';
+import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { StorageService } from '@/services/storage.service';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { toast } from 'sonner';
-import { AnimatePresence, motion } from 'framer-motion';
 
 function ChatRouteContent() {
   const [messages, setMessages] = useState<
@@ -30,8 +31,10 @@ function ChatRouteContent() {
     request: any;
   }>({ isOpen: false, request: null });
   const [requestActionLoading, setRequestActionLoading] = useState(false);
+  const [currentView, setCurrentView] = useState<'chats' | 'chat'>('chats'); // For mobile
   const socketRef = useRef<Socket | null>(null);
   const lastLoadedChatRef = useRef<string | undefined>(undefined);
+  const { isMobile } = useMediaQuery(); // Add media query hook
   const { user } = useAuth();
   const {
     chats,
@@ -129,6 +132,11 @@ function ChatRouteContent() {
       setSelectedChatId(chatId);
       setRightPanelOpen(false);
 
+      // On mobile, switch to chat view
+      if (isMobile) {
+        setCurrentView('chat');
+      }
+
       // Save to localStorage for persistence
       localStorage.setItem('selectedChatId', chatId);
 
@@ -150,7 +158,7 @@ function ChatRouteContent() {
       console.log('📚 Loaded', loadedMessages.length, 'messages');
       setMessages(loadedMessages);
     },
-    [setSelectedChatId, setRightPanelOpen, getChatById, setMessages, user]
+    [setSelectedChatId, setRightPanelOpen, getChatById, setMessages, user, isMobile]
   );
 
   const handleNewChat = () => {
@@ -181,22 +189,38 @@ function ChatRouteContent() {
           });
           setSelectedChatId(newChatId);
 
+          // On mobile, switch to chat view
+          if (isMobile) {
+            setCurrentView('chat');
+          }
+
           // Load online status for the newly added chat
           await loadOnlineStatuses();
         } else {
           // Fallback if API fails
           const newChatId = addChat({ id: chatId });
           setSelectedChatId(newChatId);
+
+          // On mobile, switch to chat view
+          if (isMobile) {
+            setCurrentView('chat');
+          }
         }
       } catch (error) {
         // Fallback if API fails
         const newChatId = addChat({ id: chatId });
         setSelectedChatId(newChatId);
+
+        // On mobile, switch to chat view
+        if (isMobile) {
+          setCurrentView('chat');
+        }
+
         console.log(error);
       }
       setNewChatModalOpen(false);
     },
-    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses]
+    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses, isMobile]
   );
 
   const chatsRef = useRef(chats);
@@ -315,8 +339,14 @@ function ChatRouteContent() {
         credentials: 'include',
       });
       if (res.ok) {
+        const result = await res.json();
         setContactRequestModal({ isOpen: false, request: null });
         toast.success('Request accepted');
+
+        // If chat was created, navigate to it
+        if (result.chatId) {
+          await handleChatCreated(result.chatId);
+        }
       } else {
         toast.error('Failed to accept request');
       }
@@ -396,7 +426,13 @@ function ChatRouteContent() {
   };
 
   const handleBackToChats = () => {
-    setLeftPanelPage(null);
+    if (isMobile && currentView === 'chat') {
+      // On mobile, if we're viewing a chat, go back to chat list
+      setCurrentView('chats');
+    } else {
+      // Otherwise, just reset the left panel page
+      setLeftPanelPage(null);
+    }
   };
 
   const selectedChat = getChatById(selectedChatId || '');
@@ -410,49 +446,64 @@ function ChatRouteContent() {
         transition={{ duration: 0.5, ease: 'easeOut' }}
         className="flex h-screen bg-background text-foreground overflow-hidden"
       >
-        <LeftColumn
-          leftPanelPage={leftPanelPage}
-          userProfile={user}
-          chats={chats}
-          selectedChatId={selectedChatId}
-          onProfileClick={handleProfileClick}
-          onContactsClick={handleContactsClick}
-          onSettingsClick={handleSettingsClick}
-          onNotificationsClick={handleNotificationsClick}
-          onBackToChats={handleBackToChats}
-          onChatSelect={handleChatSelect}
-          onNewChat={handleNewChat}
-          onChatCreated={handleChatCreated}
-        />
+        {/* Left Column - Show on desktop always, on mobile only when showing chats or left panel page */}
+        {(!isMobile || currentView === 'chats' || leftPanelPage !== null) && (
+          <LeftColumn
+            leftPanelPage={leftPanelPage}
+            userProfile={user}
+            chats={chats}
+            selectedChatId={selectedChatId}
+            onProfileClick={handleProfileClick}
+            onContactsClick={handleContactsClick}
+            onSettingsClick={handleSettingsClick}
+            onNotificationsClick={handleNotificationsClick}
+            onBackToChats={handleBackToChats}
+            onChatSelect={chatId => {
+              handleChatSelect(chatId);
+            }}
+            onNewChat={handleNewChat}
+            onChatCreated={handleChatCreated}
+          />
+        )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedChatId || 'empty'}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex-1 flex"
-          >
-            <MiddleColumn
-              selectedChat={selectedChat}
-              messages={messages}
-              rightPanelOpen={rightPanelOpen}
-              onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
-              onSendMessage={handleSendMessage}
-            />
-          </motion.div>
-        </AnimatePresence>
+        {/* Middle Column - Show on desktop always, on mobile only when viewing a chat */}
+        {(!isMobile || currentView === 'chat') && leftPanelPage === null && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedChatId || 'empty'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 flex"
+            >
+              <MiddleColumn
+                selectedChat={selectedChat}
+                messages={messages}
+                rightPanelOpen={rightPanelOpen}
+                onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
+                onSendMessage={handleSendMessage}
+                onBackToChats={() => {
+                  if (isMobile) {
+                    setCurrentView('chats');
+                  }
+                }} // Pass the back function to MiddleColumn
+              />
+            </motion.div>
+          </AnimatePresence>
+        )}
 
-        {/* Right Panel */}
-        <RightPanel
-          isOpen={rightPanelOpen}
-          onClose={() => setRightPanelOpen(false)}
-          chatInfo={selectedChat}
-        />
+        {/* Right Panel - Show on desktop always, on mobile as modal when opened */}
+        {(!isMobile || rightPanelOpen) && (
+          <RightPanel
+            isOpen={rightPanelOpen}
+            onClose={() => setRightPanelOpen(false)}
+            chatInfo={selectedChat}
+          />
+        )}
       </motion.div>
 
-      {/* Модалки выносим за пределы анимированного контейнера Main, 
+      {/* Модалки выносим за пределы анимированного контейнера Main,
         чтобы они не дергались при его появлении */}
 
       <NewChatModal

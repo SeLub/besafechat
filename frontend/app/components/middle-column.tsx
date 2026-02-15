@@ -1,6 +1,6 @@
-import { MiddleHeader } from '@/components/middle-header';
-import { MessageList } from '@/components/message-list';
 import { MessageInput } from '@/components/message-input';
+import { MessageList } from '@/components/message-list';
+import { MiddleHeader } from '@/components/middle-header';
 
 interface MiddleColumnProps {
   selectedChat: any;
@@ -13,6 +13,7 @@ interface MiddleColumnProps {
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   onSendMessage: (message: string) => void;
+  onBackToChats?: () => void; // For mobile navigation
 }
 
 export function MiddleColumn({
@@ -21,6 +22,7 @@ export function MiddleColumn({
   rightPanelOpen,
   onToggleRightPanel,
   onSendMessage,
+  onBackToChats, // Accept the back function prop
 }: MiddleColumnProps) {
   return (
     <div
@@ -33,6 +35,7 @@ export function MiddleColumn({
             selectedChat={selectedChat}
             rightPanelOpen={rightPanelOpen}
             onToggleRightPanel={onToggleRightPanel}
+            onBackToChats={onBackToChats} // Pass the back function to header
           />
           <MessageList messages={messages} selectedChat={selectedChat} />
           <MessageInput onSendMessage={onSendMessage} />
