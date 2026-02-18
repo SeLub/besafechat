@@ -23,6 +23,7 @@ export function LeftColumn({
   userProfile,
   chats,
   selectedChatId,
+  onHandleClick,
   onProfileClick,
   onContactsClick,
   onSettingsClick,
@@ -50,6 +51,7 @@ export function LeftColumn({
           <div className="flex items-center justify-between p-4 mb-2">
             <HamburgerMenu
               userProfile={userProfile}
+              onHandleClick={onHandleClick}
               onProfileClick={onProfileClick}
               onContactsClick={onContactsClick}
               onSettingsClick={onSettingsClick}

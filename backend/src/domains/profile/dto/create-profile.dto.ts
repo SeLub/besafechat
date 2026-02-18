@@ -5,9 +5,9 @@ import {
   IsOptional,
   IsString,
   IsEmail,
-  IsPhoneNumber,
   Length,
   IsObject,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateProfileDto {
@@ -26,20 +26,22 @@ export class CreateProfileDto {
     description: 'First name',
     example: 'John',
     required: false,
+    maxLength: 100,
   })
   @IsOptional()
   @IsString()
-  @Length(1, 100)
+  @Length(0, 100)
   firstName?: string;
 
   @ApiProperty({
     description: 'Last name',
     example: 'Doe',
     required: false,
+    maxLength: 100,
   })
   @IsOptional()
   @IsString()
-  @Length(1, 100)
+  @Length(0, 100)
   lastName?: string;
 
   @ApiProperty({
@@ -48,16 +50,21 @@ export class CreateProfileDto {
     required: false,
   })
   @IsOptional()
+  @ValidateIf((o) => o.email !== '' && o.email !== undefined && o.email !== null)
   @IsEmail()
   email?: string;
 
   @ApiProperty({
-    description: 'Phone number',
+    description: 'Phone number (international format or local)',
     example: '+1234567890',
     required: false,
+    minLength: 7,
+    maxLength: 20,
   })
   @IsOptional()
-  @IsPhoneNumber()
+  @ValidateIf((o) => o.phone !== '' && o.phone !== undefined && o.phone !== null)
+  @IsString()
+  @Length(7, 20)
   phone?: string;
 
   @ApiProperty({
@@ -73,10 +80,11 @@ export class CreateProfileDto {
     description: 'Bio/description',
     example: 'Software developer and open source enthusiast',
     required: false,
+    maxLength: 256,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 500)
+  @Length(0, 256)
   bio?: string;
 
   @ApiProperty({

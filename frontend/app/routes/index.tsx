@@ -1,5 +1,6 @@
 import { AuthGuard } from '@/components/auth-guard';
 import { ContactRequestModal } from '@/components/contact-request-modal';
+import { HandleProfilesPanel } from '@/components/handle-profiles-panel';
 import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
 import { NewChatModal } from '@/components/new-chat-modal';
@@ -32,6 +33,7 @@ function ChatRouteContent() {
   }>({ isOpen: false, request: null });
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [currentView, setCurrentView] = useState<'chats' | 'chat'>('chats'); // For mobile
+  const [handleProfilesOpen, setHandleProfilesOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const { isMobile } = useMediaQuery(); // Add media query hook
   const { user } = useAuth();
@@ -416,7 +418,7 @@ function ChatRouteContent() {
   }, [chats.length, chats, handleChatSelect]);
 
   const handleHandleClick = () => {
-    console.log('Handle clicked!');
+    setHandleProfilesOpen(true);
   };
 
   const handleProfileClick = () => {
@@ -530,6 +532,13 @@ function ChatRouteContent() {
         onAccept={handleAcceptRequest}
         onReject={handleRejectRequest}
         loading={requestActionLoading}
+      />
+
+      <HandleProfilesPanel
+        isOpen={handleProfilesOpen}
+        userProfile={user}
+        onClose={() => setHandleProfilesOpen(false)}
+        layout="modal"
       />
     </>
   );

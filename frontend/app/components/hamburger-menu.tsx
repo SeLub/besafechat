@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useNotifications } from '~/hooks/use-notifications-context';
@@ -6,7 +5,7 @@ import { useNotificationHistory } from '@/hooks/use-notification-history';
 import { ChevronRight, Menu, Moon, Settings, Sun, User, Users, Bell, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { useAvatarUpdate } from '~/hooks/avatar-update-context';
+import { UserProfileCard } from './user-profile-card';
 
 interface HamburgerMenuProps {
   userProfile?: {
@@ -51,26 +50,12 @@ export function HamburgerMenu({
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { counts, clearNotifications } = useNotifications();
   const { unreadCount } = useNotificationHistory();
-  const { lastAvatarUpdateTimestamp } = useAvatarUpdate();
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
     document.documentElement.classList.toggle('dark');
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) {
-      const publicKey = userProfile?.identity?.publicKey;
-      return publicKey ? publicKey.slice(0, 2).toUpperCase() : 'U';
-    }
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   return (
@@ -111,7 +96,7 @@ export function HamburgerMenu({
           {/* Header */}
           <div className="flex items-center justify-between p-5">
             <h2 className="text-xl font-black tracking-tight italic">
-              Leteem<span className="text-primary not-italic">.</span>
+              Liberty<span className="text-primary not-italic">.</span>
             </h2>
             <Button
               variant="ghost"
@@ -123,46 +108,14 @@ export function HamburgerMenu({
             </Button>
           </div>
 
-          {/* U                     ser Profile Card */}
-          <div className="px-4 py-2">
-            <div
-              className="p-4 rounded-[2rem] bg-primary/5 border border-primary/5 cursor-pointer hover:bg-primary/10 transition-all group outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              role="button"
-              tabIndex={0} // Делаем элемент доступным для фокусировки через Tab
-              onClick={() => {
-                setIsOpen(false);
-                onHandleClick?.();
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault(); // Предотвращаем скролл при нажатии пробела
-                  setIsOpen(false);
-                  onHandleClick?.();
-                }
-              }}
-            >
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white font-bold">
-                    {getInitials(userProfile?.profile?.displayName)}
-                  </AvatarFallback>
-                  {userProfile?.profile?.avatarUrl && (
-                    <AvatarImage
-                      src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
-                    />
-                  )}
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="font-black text-sm truncate group-hover:text-primary transition-colors">
-                    {userProfile?.profile?.displayName || 'Traveler'}
-                  </div>
-                  <div className="text-[10px] font-bold text-primary/40 uppercase tracking-widest truncate">
-                    @{userProfile?.handle?.alias || userProfile?.handle?.value || 'id-unknown'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* User Profile Card */}
+          <UserProfileCard
+            userProfile={userProfile}
+            onClick={() => {
+              setIsOpen(false);
+              onHandleClick?.();
+            }}
+          />
 
           {/* Menu Items Grouped */}
           <div className="flex-1 px-4 py-6 space-y-6">

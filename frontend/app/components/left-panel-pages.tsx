@@ -7,18 +7,16 @@ import { StorageSettingsModal } from '@/components/storage-settings-modal';
 import { ThemeSelectorModal } from '@/components/theme-selector-modal';
 import { HelpSupportModal } from '@/components/help-support-modal';
 import { LanguageSettingsModal } from '@/components/language-settings-modal';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarUpload } from '@/components/avatar-upload';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
 import { useAuth } from '~/hooks/use-auth-context';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
-import { MediaService } from '@/services/media.service';
 import {
   ArrowLeft,
   AtSign,
   Bell,
-  Camera,
   ChevronRight,
   Database,
   Edit3,
@@ -32,10 +30,9 @@ import {
   Volume2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { UserService } from '~/services';
-import { useAvatarUpdate } from '~/hooks/avatar-update-context'; // Import useAvatarUpdate
 
 interface LeftPanelPageProps {
   page: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
@@ -67,10 +64,9 @@ interface LeftPanelPageProps {
 }
 
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
-  const { user, logout, checkAuth, refreshUser } = useAuth();
+  const { logout, checkAuth, refreshUser } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } =
     useNotificationHistory();
-  const { lastAvatarUpdateTimestamp, triggerAvatarUpdate } = useAvatarUpdate();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -79,8 +75,6 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const [displayNameModalOpen, setDisplayNameModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!page) return null;
 
@@ -102,33 +96,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
     window.location.href = '/auth';
   };
 
-  const handleAvatarUpload = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      // Use the authenticated user's ID from the auth context
-      const userId = user?.identity?.id;
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
-
-      // Use the MediaService uploadAvatar method which properly handles the upload
-      await MediaService.uploadAvatar(file);
-      toast.success('Avatar updated');
-      // Refresh the user profile to get the potentially updated avatar URL (though it's static)
-      // And then trigger an avatar update in the context to force image reload
-      await refreshUser();
-      triggerAvatarUpdate();
-    } catch (error) {
-      console.error('Failed to upload avatar:', error);
-      toast.error('Failed to upload avatar');
-    } finally {
-      setUploading(false);
-    }
+  const handleAvatarUploadSuccess = async () => {
+    await refreshUser();
   };
 
   const handleSaveUsername = async (username: string, isSearchable: boolean) => {
@@ -166,39 +135,18 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
             </h2>
           </div>
 
-          {/* Profile Photo Section - Теперь более стильная */}
+          {/* Profile Photo Section */}
           <div className="px-6 py-8 text-center relative overflow-hidden">
             {/* Декоративный эффект "облака" на фоне */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-primary/10 blur-[60px] rounded-full -z-10" />
 
-            <div className="relative inline-block">
-              <Avatar className="h-28 w-28 mx-auto ring-4 ring-background shadow-2xl">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white text-3xl font-black">
-                  {getInitials(userProfile?.profile?.displayName)}
-                </AvatarFallback>
-                {userProfile?.profile?.avatarUrl && (
-                  <AvatarImage
-                    src={`${userProfile.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`}
-                    className="object-cover"
-                  />
-                )}
-              </Avatar>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
-              />
-              <Button
-                size="icon"
-                className="absolute -bottom-1 -right-1 rounded-2xl h-10 w-10 shadow-lg hover:scale-110 transition-transform bg-primary text-white"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <Camera className="h-5 w-5" />
-              </Button>
-            </div>
+            <AvatarUpload
+              avatarUrl={userProfile?.profile?.avatarUrl}
+              fallback={getInitials(userProfile?.profile?.displayName)}
+              size="lg"
+              showLabel={false}
+              onUploadSuccess={handleAvatarUploadSuccess}
+            />
 
             <h3 className="mt-4 text-xl font-black text-foreground">
               {userProfile?.profile?.displayName || 'Unknown Traveler'}
