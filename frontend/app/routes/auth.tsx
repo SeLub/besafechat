@@ -104,7 +104,7 @@ export default function AuthRoute() {
             onClick={handleCreateAccount}
             className="w-full py-7 text-lg rounded-2xl bg-primary text-primary-foreground font-black shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
           >
-            Enter the Sky
+            Create Identity
           </Button>
 
           <Button

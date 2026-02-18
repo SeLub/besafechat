@@ -32,6 +32,7 @@ interface HamburgerMenuProps {
       settings: Record<string, any>;
     };
   };
+  onHandleClick?: () => void;
   onProfileClick?: () => void;
   onContactsClick?: () => void;
   onSettingsClick?: () => void;
@@ -40,6 +41,7 @@ interface HamburgerMenuProps {
 
 export function HamburgerMenu({
   userProfile,
+  onHandleClick,
   onProfileClick,
   onContactsClick,
   onSettingsClick,
@@ -121,7 +123,7 @@ export function HamburgerMenu({
             </Button>
           </div>
 
-          {/* User Profile Card */}
+          {/* U                     ser Profile Card */}
           <div className="px-4 py-2">
             <div
               className="p-4 rounded-[2rem] bg-primary/5 border border-primary/5 cursor-pointer hover:bg-primary/10 transition-all group outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -129,13 +131,13 @@ export function HamburgerMenu({
               tabIndex={0} // Делаем элемент доступным для фокусировки через Tab
               onClick={() => {
                 setIsOpen(false);
-                onProfileClick?.();
+                onHandleClick?.();
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault(); // Предотвращаем скролл при нажатии пробела
                   setIsOpen(false);
-                  onProfileClick?.();
+                  onHandleClick?.();
                 }
               }}
             >

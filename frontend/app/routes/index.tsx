@@ -219,7 +219,14 @@ function ChatRouteContent() {
       }
       setNewChatModalOpen(false);
     },
-    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, loadOnlineStatuses, isMobile]
+    [
+      user?.identity.id,
+      addChat,
+      setSelectedChatId,
+      setNewChatModalOpen,
+      loadOnlineStatuses,
+      isMobile,
+    ]
   );
 
   const chatsRef = useRef(chats);
@@ -408,6 +415,10 @@ function ChatRouteContent() {
     }
   }, [chats.length, chats, handleChatSelect]);
 
+  const handleHandleClick = () => {
+    console.log('Handle clicked!');
+  };
+
   const handleProfileClick = () => {
     setLeftPanelPage('profile');
   };
@@ -452,6 +463,7 @@ function ChatRouteContent() {
             userProfile={user}
             chats={chats}
             selectedChatId={selectedChatId}
+            onHandleClick={handleHandleClick}
             onProfileClick={handleProfileClick}
             onContactsClick={handleContactsClick}
             onSettingsClick={handleSettingsClick}

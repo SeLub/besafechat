@@ -7,6 +7,7 @@ interface LeftColumnProps {
   userProfile: any;
   chats: any[];
   selectedChatId?: string;
+  onHandleClick: () => void;
   onProfileClick: () => void;
   onContactsClick: () => void;
   onSettingsClick: () => void;

@@ -176,7 +176,7 @@ export function RecoveryOptions({ onPasswordRecovery, onSeedRecovery }: Recovery
           'Decrypting Sky...'
         ) : (
           <span className="flex items-center gap-2">
-            Enter the Sky <Send size={20} />
+            Create Identity <Send size={20} />
           </span>
         )}
       </Button>
