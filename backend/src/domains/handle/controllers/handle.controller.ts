@@ -74,20 +74,20 @@ export class HandleController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Create a new handle. Profile is created automatically for account-type handles.' })
   @ApiBody({ type: CreateHandleDto })
-  async createHandle(@CurrentIdentity() identity: any, @Body() dto: CreateHandleDto) {
+  async createHandle(@CurrentIdentity() identity: any, @Body() _dto: CreateHandleDto) {
+    // Generate unique handle value
+    const generatedValue = this.handleService.generateHandleValue();
+
     const handle = await this.handleService.createHandle({
-      value: dto.value,
-      type: dto.type,
+      value: generatedValue,
+      type: 'account',
       ownerIdentityId: identity.id,
-      alias: dto.alias,
-      isSearchable: dto.isSearchable,
-      isPrimary: dto.isPrimary,
-      // For account-type handles, provide default profile data
-      ...(dto.type === 'account' && {
-        profileData: {
-          displayName: 'Anonym User',
-        },
-      }),
+      alias: null,
+      isSearchable: true,
+      isPrimary: false,
+      profileData: {
+        displayName: 'Anonym User',
+      },
     });
 
     return new ApiResponseDto(true, handle);
@@ -143,8 +143,8 @@ export class HandleController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete handle' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete handle and return updated list' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
   async deleteHandle(@CurrentIdentity() identity: any, @Param('id', ParseUUIDPipe) id: string) {
     // Проверяем что handle принадлежит identity
@@ -154,7 +154,11 @@ export class HandleController {
     }
 
     await this.handleService.deleteHandle(id);
-    return { success: true, message: 'Handle deleted successfully' };
+
+    // Получаем обновленный список handles
+    const updatedHandles = await this.handleService.getHandlesByIdentity(identity.id);
+
+    return new ApiResponseDto(true, { handles: updatedHandles });
   }
 
   @Post(':id/alias')

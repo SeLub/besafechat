@@ -1,25 +1,8 @@
 import { X } from 'lucide-react';
+import type { Handle } from '~/types/handle';
 import { HandlesList } from './handles-list';
 import { ProfileEditor } from './profile-editor';
-import { CreateHandleForm } from './create-handle-form';
 import { ProfileAvatarSection } from './profile-avatar-section';
-
-interface Handle {
-  id: string;
-  value: string;
-  type: 'account' | 'team' | 'channel';
-  isPrimary: boolean;
-  isSearchable: boolean;
-  createdAt: string;
-  profile?: {
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    bio: string | null;
-    email: string | null;
-    phone: string | null;
-  };
-}
 
 interface HandleProfilesModalProps {
   isOpen: boolean;
@@ -27,15 +10,13 @@ interface HandleProfilesModalProps {
   selectedHandleId: string | null;
   isLoading: boolean;
   isSaving: boolean;
-  showCreateForm: boolean;
   onClose: () => void;
   onSelectHandle: (id: string) => void;
   onCreateHandle: () => void;
-  onCancelCreate: () => void;
-  onSubmitCreate: (handleName: string) => Promise<void>;
   onSaveProfile: (handleId: string, updates: any) => Promise<void>;
   onUpdateHandle: (handleId: string, updates: Partial<Handle>) => Promise<void>;
   onSetPrimaryHandle: (handleId: string) => Promise<void>;
+  onDeleteHandle?: (handleId: string) => Promise<void>;
 }
 
 export function HandleProfilesModal({
@@ -44,15 +25,13 @@ export function HandleProfilesModal({
   selectedHandleId,
   isLoading,
   isSaving,
-  showCreateForm,
   onClose,
   onSelectHandle,
   onCreateHandle,
-  onCancelCreate,
-  onSubmitCreate,
   onSaveProfile,
   onUpdateHandle,
   onSetPrimaryHandle,
+  onDeleteHandle,
 }: HandleProfilesModalProps) {
   if (!isOpen) return null;
 
@@ -92,28 +71,21 @@ export function HandleProfilesModal({
               </div>
 
               {/* Middle: Profile Avatar & Settings */}
-              {!showCreateForm && selectedHandle && (
+              {selectedHandle && (
                 <div className="col-span-3 border-r border-primary/10 pr-6">
                   <ProfileAvatarSection
                     handle={selectedHandle}
                     onUpdateHandle={onUpdateHandle}
                     onSetPrimary={onSetPrimaryHandle}
+                    onDeleteHandle={onDeleteHandle}
                     isLoading={isSaving}
                   />
                 </div>
               )}
 
-              {/* Right: Profile Editor or Create Form */}
-              <div className={showCreateForm ? 'col-span-9' : 'col-span-6'}>
-                {showCreateForm ? (
-                  <CreateHandleForm onSubmit={onSubmitCreate} onCancel={onCancelCreate} />
-                ) : (
-                  <ProfileEditor
-                    handle={selectedHandle}
-                    onSave={onSaveProfile}
-                    isSaving={isSaving}
-                  />
-                )}
+              {/* Right: Profile Editor */}
+              <div className="col-span-6">
+                <ProfileEditor handle={selectedHandle} onSave={onSaveProfile} isSaving={isSaving} />
               </div>
             </div>
           </div>

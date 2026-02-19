@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Check } from 'lucide-react';
+import { Check, CheckCircle, XCircle } from 'lucide-react';
 import { AvatarUpload } from './avatar-upload';
+import { API_ENDPOINTS } from '@/services/api-gateway';
+import { apiRequest } from '@/services/api-utils';
 
 interface Handle {
   id: string;
@@ -35,6 +37,75 @@ export function ProfileAvatarSection({
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [localAlias, setLocalAlias] = useState(handle?.alias || '');
   const [isSearchable, setIsSearchable] = useState(handle?.isSearchable || false);
+  const [aliasStatus, setAliasStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [aliasMessage, setAliasMessage] = useState<string>('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Validate alias format
+  const validateAliasFormat = (alias: string): boolean => {
+    if (!alias) return true;
+    const aliasRegex = /^[a-z0-9_-]+$/;
+    return aliasRegex.test(alias);
+  };
+
+  // Check alias availability
+  const checkAliasAvailability = async (alias: string) => {
+    if (!alias || alias === handle?.alias) {
+      setAliasStatus('idle');
+      setAliasMessage('');
+      return;
+    }
+
+    if (!validateAliasFormat(alias)) {
+      setAliasStatus('invalid');
+      setAliasMessage('Alias can only contain lowercase letters, digits, hyphens and underscores');
+      return;
+    }
+
+    setAliasStatus('checking');
+    setAliasMessage('');
+
+    try {
+      const data = await apiRequest<{ available: boolean }>(
+        API_ENDPOINTS.HANDLES.CHECK_AVAILABILITY(alias)
+      );
+
+      if (data.available) {
+        setAliasStatus('available');
+        setAliasMessage('');
+      } else {
+        setAliasStatus('taken');
+        setAliasMessage('This alias is already taken');
+      }
+    } catch (err: any) {
+      setAliasStatus('idle');
+      setAliasMessage('');
+    }
+  };
+
+  // Handle alias input with debounce
+  const handleAliasChange = (value: string) => {
+    setLocalAlias(value);
+    setAliasStatus('idle');
+    setAliasMessage('');
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      checkAliasAvailability(value);
+    }, 500);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   if (!handle) {
     return (
@@ -54,12 +125,29 @@ export function ProfileAvatarSection({
   };
 
   const handleSaveAlias = async () => {
+    if (aliasStatus === 'taken' || aliasStatus === 'invalid') {
+      toast.error(aliasMessage || 'Please fix the alias before saving');
+      return;
+    }
+
+    if (aliasStatus === 'checking') {
+      toast.error('Please wait for availability check to complete');
+      return;
+    }
+
     try {
       setIsSavingSettings(true);
-      await onUpdateHandle(handle.id, {
-        alias: localAlias || null,
+      await apiRequest(API_ENDPOINTS.HANDLES.SET_ALIAS(handle.id), {
+        method: 'POST',
+        body: JSON.stringify({
+          alias: localAlias || null,
+        }),
       });
       toast.success('Alias updated');
+      setAliasStatus('idle');
+      setAliasMessage('');
+      // Update parent state
+      await onUpdateHandle(handle.id, { alias: localAlias || null });
     } catch (err: any) {
       toast.error(err.message || 'Failed to update alias');
     } finally {
@@ -124,18 +212,46 @@ export function ProfileAvatarSection({
             <input
               type="text"
               value={localAlias}
-              onChange={e => setLocalAlias(e.target.value)}
+              onChange={e => handleAliasChange(e.target.value)}
               placeholder="e.g. john-doe"
-              className="flex-1 rounded border border-primary/20 px-2 py-1 text-xs bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`flex-1 rounded border px-2 py-1 text-xs bg-background text-foreground focus:outline-none focus:ring-2 ${
+                aliasStatus === 'taken' || aliasStatus === 'invalid'
+                  ? 'border-red-500 focus:ring-red-500/50'
+                  : aliasStatus === 'available'
+                  ? 'border-green-500 focus:ring-green-500/50'
+                  : 'border-primary/20 focus:ring-primary/50'
+              }`}
             />
             <button
               onClick={handleSaveAlias}
-              disabled={isSavingSettings}
-              className="px-2 py-1 rounded bg-primary text-primary-foreground text-xs font-bold disabled:opacity-50 hover:bg-primary/90 transition-colors"
+              disabled={isSavingSettings || aliasStatus === 'taken' || aliasStatus === 'invalid' || aliasStatus === 'checking'}
+              className={`px-2 py-1 rounded text-xs font-bold transition-colors flex items-center justify-center ${
+                aliasStatus === 'available'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : aliasStatus === 'taken' || aliasStatus === 'invalid'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              } disabled:opacity-50`}
             >
-              <Check className="h-4 w-4" />
+              {aliasStatus === 'available' ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : aliasStatus === 'taken' || aliasStatus === 'invalid' ? (
+                <XCircle className="h-4 w-4" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
             </button>
           </div>
+          {aliasMessage && (
+            <p className={`text-xs mt-1 ${
+              aliasStatus === 'invalid' || aliasStatus === 'taken' ? 'text-red-500' : 'text-green-600'
+            }`}>
+              {aliasMessage}
+            </p>
+          )}
+          {aliasStatus === 'checking' && (
+            <p className="text-xs text-yellow-600 mt-1">Checking availability...</p>
+          )}
         </div>
 
         {/* Searchable Toggle */}

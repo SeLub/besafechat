@@ -2,37 +2,17 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiRequest } from '@/services/api-utils';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import type { Handle } from '~/types/handle';
 import { HandleProfilesModal } from './handle-profiles-modal';
-
-interface Handle {
-  id: string;
-  value: string;
-  alias: string | null;
-  type: 'account' | 'team' | 'channel';
-  isPrimary: boolean;
-  isSearchable: boolean;
-  createdAt: string;
-  profile?: {
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    bio: string | null;
-    email: string | null;
-    phone: string | null;
-    settings: Record<string, any>;
-  };
-}
 
 interface HandleProfilesPanelProps {
   isOpen: boolean;
-  userProfile: any;
   onClose: () => void;
   layout?: 'modal' | 'drawer';
 }
 
 export function HandleProfilesPanel({
   isOpen,
-  userProfile,
   onClose,
   layout = 'modal',
 }: HandleProfilesPanelProps) {
@@ -40,8 +20,6 @@ export function HandleProfilesPanel({
   const [selectedHandleId, setSelectedHandleId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,7 +30,6 @@ export function HandleProfilesPanel({
   const fetchHandles = async () => {
     try {
       setIsLoading(true);
-      setError(null);
       console.log('[HandleProfilesPanel] Fetching handles from:', API_ENDPOINTS.HANDLES.GET_ALL);
       const response = await apiRequest<{ handles: Handle[] }>(API_ENDPOINTS.HANDLES.GET_ALL, {
         method: 'GET',
@@ -80,30 +57,28 @@ export function HandleProfilesPanel({
       }
     } catch (err: any) {
       console.error('[HandleProfilesPanel] Error fetching handles:', err);
-      setError(err.message || 'Failed to load handles');
       toast.error('Failed to load handles: ' + (err.message || err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateHandle = async (handleName: string) => {
+  const handleCreateHandle = async () => {
     try {
-      const newHandle = await apiRequest<Handle>(API_ENDPOINTS.HANDLES.CREATE, {
+      setIsSaving(true);
+      const response = await apiRequest<Handle>(API_ENDPOINTS.HANDLES.CREATE, {
         method: 'POST',
-        body: JSON.stringify({
-          value: handleName,
-          type: 'account',
-          profileData: { displayName: 'Anonym User' },
-        }),
+        body: JSON.stringify({ type: 'account' }),
       });
+      const newHandle = response;
       setHandles([...handles, newHandle]);
       setSelectedHandleId(newHandle.id);
-      setShowCreateForm(false);
       toast.success('Handle created successfully');
     } catch (err: any) {
+      console.error('[HandleProfilesPanel] Error creating handle:', err);
       toast.error(err.message || 'Failed to create handle');
-      throw err;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -163,6 +138,34 @@ export function HandleProfilesPanel({
     }
   };
 
+  const handleDeleteHandle = async (handleId: string) => {
+    try {
+      setIsSaving(true);
+      const response = await apiRequest<{ handles: Handle[] }>(
+        API_ENDPOINTS.HANDLES.DELETE(handleId),
+        {
+          method: 'DELETE',
+        }
+      );
+
+      // Use the updated handles list from the server
+      const updatedHandles = response.handles || [];
+      setHandles(updatedHandles);
+
+      // If deleted handle was selected, select the first remaining handle
+      if (selectedHandleId === handleId) {
+        setSelectedHandleId(updatedHandles.length > 0 ? updatedHandles[0].id : null);
+      }
+
+      toast.success('Handle deleted successfully');
+    } catch (err: any) {
+      console.error('[HandleProfilesPanel] Error deleting handle:', err);
+      toast.error(err.message || 'Failed to delete handle');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (layout === 'modal') {
     return (
       <HandleProfilesModal
@@ -171,15 +174,13 @@ export function HandleProfilesPanel({
         selectedHandleId={selectedHandleId}
         isLoading={isLoading}
         isSaving={isSaving}
-        showCreateForm={showCreateForm}
         onClose={onClose}
         onSelectHandle={setSelectedHandleId}
-        onCreateHandle={() => setShowCreateForm(true)}
-        onCancelCreate={() => setShowCreateForm(false)}
-        onSubmitCreate={handleCreateHandle}
+        onCreateHandle={handleCreateHandle}
         onSaveProfile={handleSaveProfile}
         onUpdateHandle={handleUpdateHandle}
         onSetPrimaryHandle={handleSetPrimaryHandle}
+        onDeleteHandle={handleDeleteHandle}
       />
     );
   }

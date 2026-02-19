@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Identity } from '../../identity/identity.entity';
 import { Handle, HandleType } from '../handle.entity';
 import { Profile } from '../../profile/profile.entity';
@@ -22,6 +23,18 @@ export class HandleService {
     private dataSource: DataSource,
     private mediaService: MediaService
   ) {}
+
+  /**
+   * Генерирует уникальное значение handle в формате user_{uuid_prefix}
+   * @returns строка handle в формате user_{16_символов_uuid}
+   */
+  generateHandleValue(): string {
+    const handleId = uuidv4();
+    // Берем первые 16 символов UUID (без дефисов для компактности)
+    const uuidWithoutDashes = handleId.replace(/-/g, '');
+    const hashPrefix = uuidWithoutDashes.substring(0, 16);
+    return `user_${hashPrefix}`;
+  }
 
   // Существующие методы
   async searchByUsername(username: string) {
@@ -193,7 +206,7 @@ export class HandleService {
     value: string;
     type: HandleType;
     ownerIdentityId: string;
-    alias?: string;
+    alias?: string | null;
     isSearchable?: boolean;
     isPrimary?: boolean;
     profileData?: {

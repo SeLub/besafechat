@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Param,
@@ -88,10 +89,16 @@ export class MediaController {
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid file or file too large' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async uploadAvatar(@CurrentHandle() handle: any, @UploadedFile() file: MulterFile) {
+  async uploadAvatar(
+    @CurrentHandle() handle: any,
+    @UploadedFile() file: MulterFile,
+    @Body('handleId') providedHandleId?: string
+  ) {
     if (!file) throw new BadRequestException('No file provided');
 
-    const url = await this.mediaService.uploadAvatar(handle.id, file.buffer);
+    // Use provided handleId if available, otherwise use current handle
+    const handleId = providedHandleId || handle.id;
+    const url = await this.mediaService.uploadAvatar(handleId, file.buffer);
     return new ApiResponseDto(true, { url });
   }
 

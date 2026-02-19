@@ -1,13 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-
-interface Handle {
-  id: string;
-  value: string;
-  type: 'account' | 'team' | 'channel';
-  isPrimary: boolean;
-  isSearchable: boolean;
-}
+import type { Handle } from '~/types/handle';
 
 interface HandlesListProps {
   handles: Handle[];
@@ -40,19 +33,25 @@ export function HandlesList({
                   : 'bg-primary/5 hover:bg-primary/10 border border-transparent'
               }`}
             >
-              <div className="font-bold">@{handle.value}</div>
-              {handle.alias && (
-                <div className="text-xs text-foreground/50 mb-1">alias: @{handle.alias}</div>
-              )}
+              <div className="font-bold">
+                {handle?.profile?.displayName}{' '}
+                <span className="text-xs text-foreground/60 space-x-2">
+                  @{handle.alias ? handle.alias : handle.value}
+                </span>
+              </div>
               <div className="text-xs text-foreground/60 space-x-2">
                 {handle.isPrimary && (
                   <span className="inline-block bg-primary/20 px-2 py-0.5 rounded text-primary text-[10px] font-bold">
                     Primary
                   </span>
                 )}
-                {handle.isSearchable && (
+                {handle.isSearchable ? (
                   <span className="inline-block bg-primary/10 px-2 py-0.5 rounded text-primary/60 text-[10px] font-bold">
                     Searchable
+                  </span>
+                ) : (
+                  <span className="inline-block bg-red-500/20 px-2 py-0.5 rounded text-red-600 text-[10px] font-bold">
+                    Private
                   </span>
                 )}
               </div>

@@ -46,8 +46,12 @@ export const API_ENDPOINTS = {
     GET_ALL: '/handles',
     CREATE: '/handles',
     UPDATE: (handleId: string) => `/handles/${handleId}`,
+    DELETE: (handleId: string) => `/handles/${handleId}`,
     CHECK_AVAILABILITY: (value: string) => `/handles/alias/check/${encodeURIComponent(value)}`,
-    SEARCHABLE: (handleId: string) => `/handles/${handleId}/searchable`,
+    SET_SEARCHABLE: (handleId: string) => `/handles/${handleId}/searchable`,
+    SET_ALIAS: (handleId: string) => `/handles/${handleId}/alias`,
+    SET_PRIMARY: (handleId: string) => `/handles/primary/${handleId}`,
+    CHECK_ALIAS: (alias: string) => `/handles/alias/check/${encodeURIComponent(alias)}`,
   },
 
   // Profiles endpoints
