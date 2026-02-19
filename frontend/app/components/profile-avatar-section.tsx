@@ -224,11 +224,17 @@ export function ProfileAvatarSection({
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-primary/10 blur-[60px] rounded-full -z-10" />
 
         <AvatarUpload
-          avatarUrl={handle.profile?.avatarUrl}
-          fallback={getInitials(handle.value)}
-          size="md"
-          onUploadSuccess={onAvatarUploaded}
-        />
+           avatarUrl={handle.profile?.avatarUrl}
+           fallback={getInitials(handle.value)}
+           handleId={handle.id}
+           size="md"
+           onUploadSuccess={async (updatedHandle) => {
+             // Update parent state with new handle data
+             await onUpdateHandle(handle.id, updatedHandle);
+             // Also call original callback if provided
+             onAvatarUploaded?.();
+           }}
+         />
 
         <div className="text-center">
           <h3 className="font-bold text-sm">@{handle.value}</h3>

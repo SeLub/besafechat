@@ -44,6 +44,7 @@ export const API_ENDPOINTS = {
   // Handles/Privacy endpoints
   HANDLES: {
     GET_ALL: '/handles',
+    GET_BY_ID: (handleId: string) => `/handles/${handleId}`,
     CREATE: '/handles',
     DELETE: (handleId: string) => `/handles/${handleId}`,
     CHECK_AVAILABILITY: (value: string) => `/handles/alias/check/${encodeURIComponent(value)}`,

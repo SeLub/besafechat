@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Camera } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MediaService } from '@/services/media.service';
 import { useAvatarUpdate } from '~/hooks/avatar-update-context';
+import { apiRequest } from '@/services/api-utils';
+import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface AvatarUploadProps {
   avatarUrl?: string | null;
   fallback: string;
   handleId?: string;
-  onUploadSuccess?: () => void;
+  onUploadSuccess?: (handle: any) => Promise<void>;
   size?: 'sm' | 'md' | 'lg';
   showLabel?: boolean;
 }
@@ -45,7 +46,7 @@ export function AvatarUpload({
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !handleId) return;
 
     // Validate file size
     if (file.size > 5 * 1024 * 1024) {
@@ -65,11 +66,21 @@ export function AvatarUpload({
       await MediaService.uploadAvatar(file, handleId);
       toast.success('Avatar updated successfully');
 
+      // Fetch updated handle with new avatarUrl
+      const response = await apiRequest<any>(
+        API_ENDPOINTS.HANDLES.GET_BY_ID(handleId),
+        {
+          method: 'GET',
+        }
+      );
+
       // Trigger avatar update in context to force image reload
       triggerAvatarUpdate();
 
-      // Call optional callback
-      onUploadSuccess?.();
+      // Call optional callback with updated handle
+      if (onUploadSuccess && response) {
+        await onUploadSuccess(response.handle || response);
+      }
     } catch (error) {
       console.error('Failed to upload avatar:', error);
       toast.error('Failed to upload avatar');
@@ -107,30 +118,20 @@ export function AvatarUpload({
         />
 
         {/* Overlay with upload button */}
-        <button
-          type="button"
-          className={`absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${sizeConfig.container} hover:bg-black/60 z-20`}
-          onClick={handleAvatarClick}
-          disabled={uploading}
-          aria-label="Change avatar"
-        >
-          <div className="flex flex-col items-center gap-2 pointer-events-none">
-            <Camera className="h-6 w-6 text-white" />
-            <span className="text-xs text-white font-bold">
-              {uploading ? 'Uploading...' : 'Change photo'}
-            </span>
-          </div>
-        </button>
-
-        {/* Fallback button for mobile/non-hover */}
-        <Button
-          size="icon"
-          className={`absolute -bottom-2 -right-2 rounded-full shadow-lg hover:scale-110 transition-transform bg-primary text-white hover:bg-primary/90 ${sizeConfig.button}`}
-          onClick={handleAvatarClick}
-          disabled={uploading}
-        >
-          <Camera className={sizeConfig.icon} />
-        </Button>
+         <button
+           type="button"
+           className={`absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${sizeConfig.container} hover:bg-black/60 z-20`}
+           onClick={handleAvatarClick}
+           disabled={uploading}
+           aria-label="Change avatar"
+         >
+           <div className="flex flex-col items-center gap-2 pointer-events-none">
+             <Camera className="h-6 w-6 text-white" />
+             <span className="text-xs text-white font-bold">
+               {uploading ? 'Uploading...' : 'Change photo'}
+             </span>
+           </div>
+         </button>
       </div>
 
       {showLabel && (
