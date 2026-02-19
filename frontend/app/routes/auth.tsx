@@ -93,9 +93,7 @@ export default function AuthRoute() {
             </svg>
           </motion.div>
           <h1 className="text-4xl font-black tracking-tight text-foreground mb-2">Leteem</h1>
-          <p className="text-muted-foreground font-medium">
-            Your Identity. Your Freedom. Your Sky.
-          </p>
+          <p className="text-muted-foreground font-medium">End-To-End Encrypted Messenger</p>
         </div>
 
         {/* Контент страницы /auth после того как сервер вернул 401 или ключ не совпал */}
@@ -116,8 +114,8 @@ export default function AuthRoute() {
           </Button>
 
           <p className="text-center text-[11px] text-muted-foreground/60 mt-6 px-4">
-            By entering the Sky, you agree to our decentralized protocol rules. Your Identity is
-            yours alone.
+            By entering the messenger, you agree to our decentralized protocol rules. Your Identity
+            is yours alone.
           </p>
         </div>
       </PageWrapper>

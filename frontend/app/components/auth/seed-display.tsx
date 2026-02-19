@@ -43,7 +43,7 @@ export function SeedDisplay({ seed, onConfirm }: SeedDisplayProps) {
           Your Recovery Seed
         </h2>
         <p className="text-muted-foreground font-medium px-4">
-          These 12 words are the key to your digitalSky. Write them down in order and keep them in a
+          These 12 words are the key to your Identity. Write them down in order and keep them in a
           place where only you can find them.
         </p>
       </div>
