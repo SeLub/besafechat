@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Check, CheckCircle, XCircle } from 'lucide-react';
+import { Check, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { AvatarUpload } from './avatar-upload';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { apiRequest } from '@/services/api-utils';
@@ -23,6 +23,7 @@ interface ProfileAvatarSectionProps {
   handle?: Handle;
   onUpdateHandle: (handleId: string, updates: Partial<Handle>) => Promise<void>;
   onSetPrimary: (handleId: string) => Promise<void>;
+  onDeleteHandle?: (handleId: string) => Promise<void>;
   isLoading?: boolean;
   onAvatarUploaded?: () => void;
 }
@@ -31,6 +32,7 @@ export function ProfileAvatarSection({
   handle,
   onUpdateHandle,
   onSetPrimary,
+  onDeleteHandle,
   isLoading,
   onAvatarUploaded,
 }: ProfileAvatarSectionProps) {
@@ -39,6 +41,7 @@ export function ProfileAvatarSection({
   const [isSearchable, setIsSearchable] = useState(handle?.isSearchable || false);
   const [aliasStatus, setAliasStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [aliasMessage, setAliasMessage] = useState<string>('');
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Validate alias format
@@ -191,6 +194,28 @@ export function ProfileAvatarSection({
     }
   };
 
+  const handleDeleteHandle = async () => {
+    if (!isDeleteConfirming) {
+      // First click - show confirmation
+      setIsDeleteConfirming(true);
+      return;
+    }
+
+    // Second click - perform deletion
+    try {
+      setIsSavingSettings(true);
+      if (onDeleteHandle) {
+        await onDeleteHandle(handle.id);
+        setIsDeleteConfirming(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete handle');
+      setIsDeleteConfirming(false);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Profile Photo Section */}
@@ -298,6 +323,22 @@ export function ProfileAvatarSection({
             Primary Handle
           </div>
         )}
+      </div>
+
+      {/* Delete Button */}
+      <div className="pt-4 border-t border-primary/10">
+        <button
+          onClick={handleDeleteHandle}
+          disabled={isSavingSettings}
+          className={`w-full px-3 py-2 rounded text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
+            isDeleteConfirming
+              ? 'bg-red-600 text-white hover:bg-red-700'
+              : 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+          } disabled:opacity-50`}
+        >
+          <Trash2 className="h-4 w-4" />
+          {isDeleteConfirming ? 'Are you sure?' : 'Delete Handle'}
+        </button>
       </div>
 
       {/* Metadata */}

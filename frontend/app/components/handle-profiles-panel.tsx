@@ -114,7 +114,7 @@ export function HandleProfilesPanel({
   const handleSetPrimaryHandle = async (handleId: string) => {
     try {
       setIsSaving(true);
-      await apiRequest<Handle>(`/handles/${handleId}/primary`, {
+      await apiRequest<Handle>(API_ENDPOINTS.HANDLES.SET_PRIMARY(handleId), {
         method: 'POST',
       });
       setHandles(handles.map(h => ({ ...h, isPrimary: h.id === handleId })));
