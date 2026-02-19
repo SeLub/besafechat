@@ -155,14 +155,24 @@ export function ProfileAvatarSection({
     }
   };
 
-  const handleSaveSearchable = async () => {
+  const handleToggleSearchable = async () => {
+    const newSearchableStatus = !isSearchable;
+    setIsSearchable(newSearchableStatus);
+
     try {
       setIsSavingSettings(true);
-      await onUpdateHandle(handle.id, {
-        isSearchable,
+      await apiRequest(API_ENDPOINTS.HANDLES.SET_SEARCHABLE(handle.id), {
+        method: 'POST',
+        body: JSON.stringify({
+          isSearchable: newSearchableStatus,
+        }),
       });
       toast.success('Searchable status updated');
+      // Update parent state to reflect server state
+      await onUpdateHandle(handle.id, { isSearchable: newSearchableStatus });
     } catch (err: any) {
+      // Revert on error
+      setIsSearchable(!newSearchableStatus);
       toast.error(err.message || 'Failed to update searchable status');
     } finally {
       setIsSavingSettings(false);
@@ -258,7 +268,7 @@ export function ProfileAvatarSection({
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold">Searchable</label>
           <button
-            onClick={handleSaveSearchable}
+            onClick={handleToggleSearchable}
             disabled={isSavingSettings}
             className={`relative w-10 h-5 rounded-full transition-colors ${
               isSearchable ? 'bg-green-600' : 'bg-primary/20'
