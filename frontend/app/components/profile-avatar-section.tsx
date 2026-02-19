@@ -101,6 +101,17 @@ export function ProfileAvatarSection({
     }, 500);
   };
 
+  // Sync local state when handle changes
+  useEffect(() => {
+    if (handle) {
+      setLocalAlias(handle.alias || '');
+      setIsSearchable(handle.isSearchable || false);
+      setAliasStatus('idle');
+      setAliasMessage('');
+      setIsDeleteConfirming(false);
+    }
+  }, [handle?.id]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
