@@ -105,22 +105,10 @@ export function HandleProfilesPanel({
   };
 
   const handleUpdateHandle = async (handleId: string, updates: Partial<Handle>) => {
-    try {
-      setIsSaving(true);
-      const response = await apiRequest<Handle>(
-        API_ENDPOINTS.HANDLES.UPDATE(handleId),
-        {
-          method: 'PUT',
-          body: JSON.stringify(updates),
-        }
-      );
-      setHandles(handles.map(h => (h.id === handleId ? { ...h, ...response } : h)));
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update handle');
-      throw err;
-    } finally {
-      setIsSaving(false);
-    }
+    // Simply update the local state with the new handle data
+    // This is called by specialized endpoints (alias, searchable, primary)
+    // which handle the API calls and validation themselves
+    setHandles(handles.map(h => (h.id === handleId ? { ...h, ...updates } : h)));
   };
 
   const handleSetPrimaryHandle = async (handleId: string) => {

@@ -277,38 +277,6 @@ export class HandleService {
     });
   }
 
-  async updateHandle(id: string, data: Partial<Handle>): Promise<Handle> {
-    const handle = await this.findById(id);
-
-    // Запрет изменения value
-    if (data.value && data.value !== handle.value) {
-      throw new BadRequestException('Handle value cannot be changed');
-    }
-
-    // Запрет изменения типа
-    if (data.type && data.type !== handle.type) {
-      throw new BadRequestException('Handle type cannot be changed');
-    }
-
-    // Если устанавливается isPrimary=true, снимаем primary с других handle этого identity
-    if (data.isPrimary === true && handle.type === 'account') {
-      await this.handleRepository.update(
-        {
-          ownerIdentityId: handle.ownerIdentityId,
-          type: 'account',
-          isPrimary: true,
-          id: handle.id, // Исключаем текущий handle
-        },
-        { isPrimary: false }
-      );
-    }
-
-    // Обновление остальных полей
-    Object.assign(handle, data);
-
-    return this.handleRepository.save(handle);
-  }
-
   async deleteHandle(id: string): Promise<void> {
     const handle = await this.findById(id);
 

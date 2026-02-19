@@ -10,7 +10,6 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Put,
   Query,
   UseGuards,
   UsePipes,
@@ -29,7 +28,6 @@ import { ApiResponseDto } from '../../../common/dto/api-response.dto';
 import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { CreateHandleDto } from '../dto/create-handle.dto';
-import { UpdateHandleDto } from '../dto/update-handle.dto';
 import { Handle } from '../handle.entity';
 import { HandleService } from '../services/handle.service';
 
@@ -74,7 +72,7 @@ export class HandleController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Create a new handle. Profile is created automatically for account-type handles.' })
   @ApiBody({ type: CreateHandleDto })
-  async createHandle(@CurrentIdentity() identity: any, @Body() _dto: CreateHandleDto) {
+  async createHandle(@CurrentIdentity() identity: any) {
     // Generate unique handle value
     const generatedValue = this.handleService.generateHandleValue();
 
@@ -116,30 +114,6 @@ export class HandleController {
   async getHandleById(@Param('id', ParseUUIDPipe) id: string) {
     const handle = await this.handleService.findById(id);
     return new ApiResponseDto(true, { handle });
-  }
-
-  @Put(':id')
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiOperation({ summary: 'Update handle' })
-  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
-  @ApiBody({ type: UpdateHandleDto })
-  async updateHandle(
-    @CurrentIdentity() identity: any,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateHandleDto
-  ) {
-    // Проверяем что handle принадлежит identity
-    const handle = await this.handleService.findById(id);
-    if (handle.ownerIdentityId !== identity.id) {
-      throw new NotFoundException('Handle not found');
-    }
-
-    const updatedHandle = await this.handleService.updateHandle(id, dto);
-    return {
-      success: true,
-      message: 'Handle updated successfully',
-      data: updatedHandle,
-    };
   }
 
   @Delete(':id')

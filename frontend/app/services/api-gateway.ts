@@ -45,7 +45,6 @@ export const API_ENDPOINTS = {
   HANDLES: {
     GET_ALL: '/handles',
     CREATE: '/handles',
-    UPDATE: (handleId: string) => `/handles/${handleId}`,
     DELETE: (handleId: string) => `/handles/${handleId}`,
     CHECK_AVAILABILITY: (value: string) => `/handles/alias/check/${encodeURIComponent(value)}`,
     SET_SEARCHABLE: (handleId: string) => `/handles/${handleId}/searchable`,
