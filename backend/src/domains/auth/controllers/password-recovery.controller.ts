@@ -36,7 +36,7 @@ export class PasswordRecoveryController {
         available: isAvailable,
         reason: isAvailable ? null : 'password_already_in_use',
       };
-    } catch (error) {
+    } catch {
       throw new ServiceUnavailableException('Recovery service temporarily unavailable');
     }
   }

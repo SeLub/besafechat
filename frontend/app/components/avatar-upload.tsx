@@ -6,6 +6,7 @@ import { MediaService } from '@/services/media.service';
 import { useAvatarUpdate } from '~/hooks/avatar-update-context';
 import { apiRequest } from '@/services/api-utils';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import React from 'react';
 
 interface AvatarUploadProps {
   avatarUrl?: string | null;
@@ -67,12 +68,9 @@ export function AvatarUpload({
       toast.success('Avatar updated successfully');
 
       // Fetch updated handle with new avatarUrl
-      const response = await apiRequest<any>(
-        API_ENDPOINTS.HANDLES.GET_BY_ID(handleId),
-        {
-          method: 'GET',
-        }
-      );
+      const response = await apiRequest<any>(API_ENDPOINTS.HANDLES.GET_BY_ID(handleId), {
+        method: 'GET',
+      });
 
       // Trigger avatar update in context to force image reload
       triggerAvatarUpdate();
@@ -118,20 +116,20 @@ export function AvatarUpload({
         />
 
         {/* Overlay with upload button */}
-         <button
-           type="button"
-           className={`absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${sizeConfig.container} hover:bg-black/60 z-20`}
-           onClick={handleAvatarClick}
-           disabled={uploading}
-           aria-label="Change avatar"
-         >
-           <div className="flex flex-col items-center gap-2 pointer-events-none">
-             <Camera className="h-6 w-6 text-white" />
-             <span className="text-xs text-white font-bold">
-               {uploading ? 'Uploading...' : 'Change photo'}
-             </span>
-           </div>
-         </button>
+        <button
+          type="button"
+          className={`absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${sizeConfig.container} hover:bg-black/60 z-20`}
+          onClick={handleAvatarClick}
+          disabled={uploading}
+          aria-label="Change avatar"
+        >
+          <div className="flex flex-col items-center gap-2 pointer-events-none">
+            <Camera className="h-6 w-6 text-white" />
+            <span className="text-xs text-white font-bold">
+              {uploading ? 'Uploading...' : 'Change photo'}
+            </span>
+          </div>
+        </button>
       </div>
 
       {showLabel && (

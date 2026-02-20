@@ -1,8 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '~/hooks/use-notifications-context';
-import { useOnlineStatusContext } from '~/hooks/use-online-status-context';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock, MessageCircle, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Clock, MessageCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
@@ -45,7 +44,7 @@ interface ContactsPageProps {
   onChatSelect: (userId: string) => void;
 }
 
-export function ContactsPage({ onBack }: ContactsPageProps) {
+export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);

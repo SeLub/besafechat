@@ -1,6 +1,6 @@
 ///home/selub/Documents/progs/besafechat/backend/src/app.module.ts
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './db/database.module';
 import { AuthModule } from './domains/auth/auth.module';
