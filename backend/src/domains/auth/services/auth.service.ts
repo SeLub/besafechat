@@ -156,11 +156,13 @@ export class AuthService {
           ownerIdentityId: handle?.ownerIdentityId,
         });
         
-        // Validate that handle belongs to this identity
-        if (!handle.ownerIdentityId) {
-          console.warn(`[Auth Service] Active handle ${activeHandleId} has no ownerIdentityId, reloading...`);
-          // Reload with explicit select
-          handle = await this.handleService.findById(activeHandleId);
+        // Validate that handle exists and belongs to this identity
+        if (!handle || !handle.ownerIdentityId) {
+          if (handle && !handle.ownerIdentityId) {
+            console.warn(`[Auth Service] Active handle ${activeHandleId} has no ownerIdentityId, reloading...`);
+            // Reload with explicit select
+            handle = await this.handleService.findById(activeHandleId);
+          }
         }
         
         if (!handle || handle.ownerIdentityId !== identityId) {
