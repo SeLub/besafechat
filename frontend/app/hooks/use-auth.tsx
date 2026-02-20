@@ -14,6 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = async () => {
     try {
       const user = await authenticateUser();
+      console.log('[useAuth.checkAuth] Got user:', user?.handle?.id, user?.handle?.value);
       setUser(user);
     } catch (error) {
       handleAuthError(error, false);
@@ -121,9 +122,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Переключение на другой handle (создание новой сессии)
+  const switchToHandle = async (handleId: string) => {
+    try {
+      console.log('[useAuth] Switching to handle:', handleId);
+      await AuthService.switchToHandle(handleId);
+      console.log('[useAuth] Handle switch successful, reloading auth');
+      // Обновляем профиль после переключения на новый handle
+      await checkAuth();
+      console.log('[useAuth] Auth check complete, user:', user);
+    } catch (error) {
+      console.error('[useAuth] Handle switch error:', error);
+      handleAuthError(error, false);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, register, login, logout, checkAuth, refreshUser }}
+      value={{ user, loading, register, login, logout, checkAuth, refreshUser, switchToHandle }}
     >
       {children}
     </AuthContext.Provider>

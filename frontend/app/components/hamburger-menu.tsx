@@ -1,10 +1,27 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { useNotifications } from '~/hooks/use-notifications-context';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
-import { ChevronRight, Menu, Moon, Settings, Sun, User, Users, Bell, X } from 'lucide-react';
+import { API_ENDPOINTS } from '@/services/api-gateway';
+import { apiRequest } from '@/services/api-utils';
+import {
+  Bell,
+  Briefcase,
+  ChevronRight,
+  Menu,
+  Moon,
+  Settings,
+  Sun,
+  User,
+  Users,
+  X,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '~/hooks/use-auth-context';
+import { useNotifications } from '~/hooks/use-notifications-context';
+import type { Handle } from '~/types/handle';
+import { HandleProfilesPanel } from './handle-profiles-panel';
+import { HandleSwitcherModal } from './handle-switcher-modal';
 import { UserProfileCard } from './user-profile-card';
 
 interface HamburgerMenuProps {
@@ -48,10 +65,35 @@ export function HamburgerMenu({
 }: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [handleProfilesOpen, setHandleProfilesOpen] = useState(false);
+  const [handleSwitcherOpen, setHandleSwitcherOpen] = useState(false);
+  const [userHandles, setUserHandles] = useState<Handle[]>([]);
+  const [loadingHandles, setLoadingHandles] = useState(false);
   const { counts, clearNotifications } = useNotifications();
   const { unreadCount } = useNotificationHistory();
+  const { user, switchToHandle } = useAuth();
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
+
+  // Fetch handles when switcher modal opens
+  useEffect(() => {
+    if (handleSwitcherOpen) {
+      const fetchHandles = async () => {
+        try {
+          setLoadingHandles(true);
+          const response = await apiRequest<{ handles: Handle[] }>(API_ENDPOINTS.HANDLES.GET_ALL, {
+            method: 'GET',
+          });
+          setUserHandles(response.handles || []);
+        } catch (err) {
+          console.error('Error fetching handles:', err);
+        } finally {
+          setLoadingHandles(false);
+        }
+      };
+      fetchHandles();
+    }
+  }, [handleSwitcherOpen]);
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -113,7 +155,7 @@ export function HamburgerMenu({
             userProfile={userProfile}
             onClick={() => {
               setIsOpen(false);
-              onHandleClick?.();
+              setHandleSwitcherOpen(true);
             }}
           />
 
@@ -130,6 +172,14 @@ export function HamburgerMenu({
                   onClick={() => {
                     setIsOpen(false);
                     onProfileClick?.();
+                  }}
+                />
+                <MenuItem
+                  icon={<Briefcase className="h-4 w-4" />}
+                  label="Handle Setup"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setHandleProfilesOpen(true);
                   }}
                 />
                 <MenuItem
@@ -188,6 +238,22 @@ export function HamburgerMenu({
           </div>
         </div>
       </div>
+
+      {/* Handle Switcher Modal */}
+      <HandleSwitcherModal
+        isOpen={handleSwitcherOpen}
+        onClose={() => setHandleSwitcherOpen(false)}
+        handles={userHandles}
+        activeHandleId={user?.handle?.id || null}
+        onSwitchHandle={switchToHandle}
+        isLoading={loadingHandles}
+      />
+
+      {/* Handle Profiles Modal */}
+      <HandleProfilesPanel
+        isOpen={handleProfilesOpen}
+        onClose={() => setHandleProfilesOpen(false)}
+      />
     </>
   );
 }

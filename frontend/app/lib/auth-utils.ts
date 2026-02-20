@@ -11,27 +11,35 @@ const API_BASE = API_CONFIG.BASE_URL;
  */
 export async function silentAuthCheck(silent: boolean = false): Promise<FullProfile | null> {
   try {
+    console.log('[silentAuthCheck] Fetching /auth/profile');
     const res = await fetch(`${API_BASE}/auth/profile`, {
       credentials: 'include',
     });
 
+    console.log('[silentAuthCheck] Response status:', res.status);
+    
     if (res.ok) {
       const response: ApiResponse<FullProfile> = await res.json();
+      console.log('[silentAuthCheck] Got profile:', response.data?.handle?.id);
       return response.success && response.data ? response.data : null;
     } else if (res.status === 401) {
       // 401 is an expected response for unauthenticated users
+      console.log('[silentAuthCheck] 401 - User not authenticated');
       if (!silent) {
         console.debug('User not authenticated (401 response)');
       }
       return null;
     } else {
       // Other errors might indicate actual problems
+      const errorText = await res.text();
+      console.error('[silentAuthCheck] Auth check failed:', { status: res.status, error: errorText });
       if (!silent) {
         console.error(`Auth check failed with status: ${res.status}`);
       }
       return null;
     }
   } catch (error) {
+    console.error('[silentAuthCheck] Network error:', error);
     if (!silent) {
       console.error('Network error during auth check:', error);
     }

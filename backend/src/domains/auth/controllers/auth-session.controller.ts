@@ -230,8 +230,34 @@ export class AuthSessionController {
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtSessionGuard)
-  async getProfile(@CurrentIdentity() identity: any) {
-    const profile = await this.authService.getIdentityProfile(identity.id);
+  async getProfile(
+    @CurrentIdentity() identity: any,
+    @CurrentSession() session: any
+  ) {
+    console.log('[Auth Controller] getProfile called:');
+    console.log('[Auth Controller] Session:', {
+      id: session?.id,
+      activeHandleId: session?.activeHandleId,
+      identityId: session?.identityId,
+    });
+    console.log('[Auth Controller] Identity:', {
+      id: identity?.id,
+    });
+
+    // Use activeHandleId from session if available, otherwise service will use primary handle
+    const activeHandleId = session?.activeHandleId || undefined;
+    console.log('[Auth Controller] Calling getIdentityProfile with activeHandleId:', activeHandleId);
+    
+    const profile = await this.authService.getIdentityProfile(
+      identity.id,
+      activeHandleId
+    );
+    
+    console.log('[Auth Controller] Returned profile handle:', {
+      id: profile.handle?.id,
+      value: profile.handle?.value,
+    });
+    
     return new ApiResponseDto(true, profile);
   }
 
@@ -278,31 +304,47 @@ export class AuthSessionController {
     return new ApiResponseDto(true);
   }
 
-  @Post('switch-handle')
-  @ApiOperation({ summary: 'Switch active handle in current session' })
+  @Post('sessions/create-with-handle/:handleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create new session with specified handle' })
   @ApiCookieAuth()
-  @ApiResponse({ status: 200, description: 'Handle switched successfully' })
+  @ApiParam({
+    name: 'handleId',
+    description: 'Handle ID to create session for',
+    type: String,
+  })
+  @ApiResponse({ status: 200, description: 'New session created successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid handle or max sessions reached' })
   @UseGuards(JwtSessionGuard)
-  @ApiBody({ schema: { properties: { handleId: { type: 'string' } } } })
-  async switchHandle(
+  async createSessionWithHandle(
     @CurrentUser() user: AuthenticatedUser,
-    @CurrentSession() session: any,
-    @Body('handleId') handleId: string
+    @Param('handleId') handleId: string,
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: ResponseWithCookies
   ) {
     if (!handleId) {
       throw new BadRequestException('Handle ID is required');
     }
 
-    const updatedSession = await this.authService.switchActiveHandle(
+    const ipAddress = req.ip || 'unknown';
+    const userAgent = (req as any).headers?.['user-agent'] || 'Unknown device';
+    const deviceName = userAgent.substring(0, 100); // Limit to 100 chars
+
+    const result = await this.authService.createSessionWithHandle(
       user.identityId,
-      session.id,
-      handleId
+      handleId,
+      deviceName,
+      ipAddress
     );
 
+    // Set HttpOnly cookies for new session
+    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+
     return new ApiResponseDto(true, {
-      message: 'Handle switched successfully',
-      activeHandleId: updatedSession.activeHandleId,
+      sessionId: result.session.id,
+      activeHandleId: result.session.activeHandleId,
+      message: 'New session created successfully',
     });
   }
 

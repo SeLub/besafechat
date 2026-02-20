@@ -114,7 +114,7 @@ export class HandleService {
   async findById(id: string): Promise<Handle> {
     const handle = await this.handleRepository.findOne({
       where: { id },
-      relations: ['ownerIdentity'],
+      relations: ['ownerIdentity', 'profile'],
     });
 
     if (!handle) {

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { HandleService } from '../../handle/services/handle.service';
 import { IdentityService } from '../../identity/services/identity.service';
@@ -135,21 +135,77 @@ export class AuthService {
     return await this.sessionService.refreshSession(refreshToken, ipAddress);
   }
 
-  async getIdentityProfile(identityId: string) {
+  async getIdentityProfile(identityId: string, activeHandleId?: string) {
+    console.log('[Auth Service] getIdentityProfile called:', { identityId, activeHandleId });
+    
     const identity = await this.identityService.findByIdentityId(identityId);
     if (!identity) {
       throw new UnauthorizedException('Identity not found');
     }
 
-    // Получаем primary handle (always guaranteed to exist from loginWithPublicKey)
-    const primaryHandle = await this.handleService.getPrimaryHandle(identityId);
+    // If activeHandleId is provided (from session), use it; otherwise use primary handle
+    let handle: any;
+    if (activeHandleId) {
+      console.log(`[Auth Service] Fetching handle by activeHandleId: ${activeHandleId}`);
+      try {
+        handle = await this.handleService.findById(activeHandleId);
+        console.log(`[Auth Service] Fetched handle:`, {
+          found: !!handle,
+          id: handle?.id,
+          value: handle?.value,
+          ownerIdentityId: handle?.ownerIdentityId,
+        });
+        
+        // Validate that handle belongs to this identity
+        if (!handle.ownerIdentityId) {
+          console.warn(`[Auth Service] Active handle ${activeHandleId} has no ownerIdentityId, reloading...`);
+          // Reload with explicit select
+          handle = await this.handleService.findById(activeHandleId);
+        }
+        
+        if (!handle || handle.ownerIdentityId !== identityId) {
+          console.warn(`[Auth Service] Active handle ${activeHandleId} not found or doesn't belong to identity ${identityId}, falling back to primary`);
+          // Fallback to primary handle if active handle not found or doesn't match
+          handle = await this.handleService.getPrimaryHandle(identityId);
+          console.log(`[Auth Service] Fallback to primary handle:`, {
+            id: handle?.id,
+            value: handle?.value,
+          });
+        }
+      } catch (error) {
+        console.error(`[Auth Service] Error fetching active handle ${activeHandleId}:`, error);
+        // Fallback to primary handle on error
+        handle = await this.handleService.getPrimaryHandle(identityId);
+        console.log(`[Auth Service] Error fallback to primary handle:`, {
+          id: handle?.id,
+          value: handle?.value,
+        });
+      }
+    } else {
+      // Fallback to primary handle (always guaranteed to exist from loginWithPublicKey)
+      console.log(`[Auth Service] No activeHandleId provided, using primary handle for identity ${identityId}`);
+      handle = await this.handleService.getPrimaryHandle(identityId);
+      console.log(`[Auth Service] Primary handle:`, {
+        id: handle?.id,
+        value: handle?.value,
+      });
+    }
+    
+    if (!handle) {
+      throw new UnauthorizedException('No valid handle found for identity');
+    }
+    
+    console.log(`[Auth Service] Final handle to return:`, {
+      id: handle?.id,
+      value: handle?.value,
+    });
 
     // Получаем profile для handle из handle relation
-    const profile = primaryHandle.profile;
+    const profile = handle.profile;
     if (!profile) {
       throw new UnauthorizedException('Profile not found for handle');
     }
-    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(primaryHandle.id);
+    const avatarUrl = await this.mediaService.getAvatarUrlIfExists(handle.id);
 
     return {
       identity: {
@@ -158,12 +214,12 @@ export class AuthService {
         createdAt: identity.createdAt,
       },
       handle: {
-        id: primaryHandle.id,
-        value: primaryHandle.value,
-        alias: primaryHandle.alias,
-        isSearchable: primaryHandle.isSearchable,
-        isPrimary: primaryHandle.isPrimary,
-        createdAt: primaryHandle.createdAt,
+        id: handle.id,
+        value: handle.value,
+        alias: handle.alias,
+        isSearchable: handle.isSearchable,
+        isPrimary: handle.isPrimary,
+        createdAt: handle.createdAt,
       },
       profile: {
         displayName: profile.displayName,
@@ -192,7 +248,31 @@ export class AuthService {
     await this.sessionService.revokeAllSessions(identityId, excludeSessionId);
   }
 
-  async switchActiveHandle(identityId: string, sessionId: string, handleId: string) {
-    return await this.sessionService.switchActiveHandle(sessionId, handleId, identityId);
+  async createSessionWithHandle(
+    identityId: string,
+    handleId: string,
+    deviceName: string,
+    ipAddress: string
+  ) {
+    // Verify handle belongs to this identity
+    const handle = await this.handleService.findById(handleId);
+    if (!handle || handle.ownerIdentityId !== identityId) {
+      throw new BadRequestException('Handle not found or does not belong to this identity');
+    }
+
+    // Create new session with this handle as activeHandle
+    const result = await this.sessionService.createSession(
+      identityId,
+      deviceName,
+      undefined, // deviceType
+      ipAddress,
+      undefined, // userAgent
+      handleId // activeHandleId
+    );
+
+    return {
+      session: result.session,
+      tokens: result.tokens,
+    };
   }
 }
