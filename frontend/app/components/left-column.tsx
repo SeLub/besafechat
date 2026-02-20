@@ -1,5 +1,5 @@
-import { HamburgerMenu } from '@/components/hamburger-menu';
 import { ChatList } from '@/components/chat-list';
+import { HamburgerMenu } from '@/components/hamburger-menu';
 import { LeftPanelPages } from '@/components/left-panel-pages';
 
 interface LeftColumnProps {
@@ -7,6 +7,7 @@ interface LeftColumnProps {
   userProfile: any;
   chats: any[];
   selectedChatId?: string;
+  onHandleClick: () => void;
   onProfileClick: () => void;
   onContactsClick: () => void;
   onSettingsClick: () => void;
@@ -18,21 +19,24 @@ interface LeftColumnProps {
 }
 
 export function LeftColumn({
-  leftPanelPage,
-  userProfile,
-  chats,
-  selectedChatId,
-  onProfileClick,
-  onContactsClick,
-  onSettingsClick,
-  onNotificationsClick,
-  onBackToChats,
-  onChatSelect,
-  onNewChat,
-  onChatCreated,
-}: LeftColumnProps) {
+   leftPanelPage,
+   userProfile,
+   chats,
+   selectedChatId,
+   onProfileClick,
+   onContactsClick,
+   onSettingsClick,
+   onNotificationsClick,
+   onBackToChats,
+   onChatSelect,
+   onNewChat,
+   onChatCreated,
+ }: LeftColumnProps) {
   return (
-    <div id="LeftColumn" className="w-80 border-r border-border flex flex-col">
+    <div
+      id="LeftColumn"
+      className="w-full md:w-80 border-r border-primary/5 bg-card/30 backdrop-blur-xl flex flex-col shadow-[4px_0_24px_-12px_rgba(0,0,0,0.05)]"
+    >
       {leftPanelPage ? (
         <LeftPanelPages
           page={leftPanelPage}
@@ -43,7 +47,7 @@ export function LeftColumn({
       ) : (
         <>
           {/* Header with Hamburger Menu */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center justify-between p-4 mb-2">
             <HamburgerMenu
               userProfile={userProfile}
               onProfileClick={onProfileClick}
@@ -51,17 +55,21 @@ export function LeftColumn({
               onSettingsClick={onSettingsClick}
               onNotificationsClick={onNotificationsClick}
             />
-            <h2 className="text-lg font-semibold">BeSafeChat</h2>
+            <h2 className="text-xl font-black tracking-tighter text-foreground italic">
+              Leteem<span className="text-primary not-italic">.</span>
+            </h2>
             <div className="w-10" />
           </div>
 
           {/* Chat List */}
-          <ChatList
-            chats={chats}
-            selectedChatId={selectedChatId}
-            onChatSelect={onChatSelect}
-            onNewChat={onNewChat}
-          />
+          <div className="flex-1 overflow-hidden px-2">
+            <ChatList
+              chats={chats}
+              selectedChatId={selectedChatId}
+              onChatSelect={onChatSelect}
+              onNewChat={onNewChat}
+            />
+          </div>
         </>
       )}
     </div>

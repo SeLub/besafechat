@@ -16,6 +16,10 @@ export class ProfileService {
     private mediaService: MediaService
   ) {}
 
+  /**
+   * Internal method to create profile (should only be called from HandleService)
+   * @internal
+   */
   async createProfile(data: {
     handleId: string;
     displayName: string;

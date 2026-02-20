@@ -13,9 +13,10 @@ const shutdown = async (signal: string) => {
 };
 
 export const handleUncaughtErrors = () => {
-  process.on('unhandledRejection', (reason: any) => {
+  process.on('unhandledRejection', (reason: unknown) => {
     // Don't exit on EADDRINUSE errors as they're handled elsewhere
-    if (reason?.code === 'EADDRINUSE') {
+    const reasonObj = reason as Record<string, unknown> | null;
+    if (reasonObj?.code === 'EADDRINUSE') {
       logger.warn({ reason }, 'Port already in use, will retry...');
     } else {
       logger.error({ reason }, 'Unhandled Rejection:');
@@ -25,7 +26,7 @@ export const handleUncaughtErrors = () => {
 
   process.on('uncaughtException', (error: Error) => {
     // Check if the error object has a 'code' property and if it's EADDRINUSE
-    const errorCode = (error as any).code;
+    const errorCode = (error as unknown as Record<string, unknown>).code;
     if (errorCode === 'EADDRINUSE') {
       logger.warn({ error }, 'Port already in use, will retry...');
     } else {

@@ -7,12 +7,14 @@ import { HandleService } from './services/handle.service';
 import { HandleController } from './controllers/handle.controller';
 import { ProfileModule } from '../profile/profile.module';
 import { SessionModule } from '../session/session.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Handle, Identity]),
     forwardRef(() => ProfileModule),
     forwardRef(() => SessionModule),
+    forwardRef(() => MediaModule),
   ],
   controllers: [HandleController],
   providers: [HandleService],

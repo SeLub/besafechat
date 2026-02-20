@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { ResponsiveModal } from './ui/responsive-modal';
 
 interface ContactRequestModalProps {
   isOpen: boolean;
@@ -47,10 +47,10 @@ export function ContactRequestModal({
 
   const getDisplayName = () => {
     if (!request?.from) return 'Unknown User';
-    
+
     const { displayName, firstName, lastName } = request.from;
     const fullName = [firstName, lastName].filter(Boolean).join(' ');
-    
+
     // If both firstName and lastName exist and displayName is different from full name
     if (firstName && lastName && displayName !== fullName) {
       return (
@@ -60,7 +60,7 @@ export function ContactRequestModal({
         </>
       );
     }
-    
+
     // If only one name exists, show with label
     if (firstName && !lastName) {
       return (
@@ -70,7 +70,7 @@ export function ContactRequestModal({
         </>
       );
     }
-    
+
     if (lastName && !firstName) {
       return (
         <>
@@ -79,76 +79,62 @@ export function ContactRequestModal({
         </>
       );
     }
-    
+
     // Only displayName
     return <div className="text-lg font-semibold">{displayName || 'Unknown User'}</div>;
   };
 
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/50 z-50" />
+  if (!isOpen || !request) return null;
 
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[420px] bg-background border border-border rounded-lg shadow-lg z-50">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">Contact Request</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="p-6">
-          <div className="flex flex-col items-center mb-4">
-            <Avatar className="h-20 w-20 mb-3">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                {getInitials(request.from)}
-              </AvatarFallback>
-              {request.from?.avatarUrl && <AvatarImage src={request.from.avatarUrl} />}
-            </Avatar>
-            {getDisplayName()}
-            <div className="text-sm text-muted-foreground">@{request.from?.alias || request.from?.value || 'unknown'}</div>
-          </div>
-
-          {request.from?.bio && (
-            <div className="text-sm text-muted-foreground text-center mb-4">
-              {request.from.bio}
-            </div>
-          )}
-
-          {request.message && (
-            <div className="mb-4 p-3 bg-muted rounded-lg">
-              <div className="text-xs text-muted-foreground mb-1">Message:</div>
-              <div className="text-sm">{request.message}</div>
-            </div>
-          )}
-
-          <div className="flex space-x-2">
-            <Button
-              className="flex-1"
-              onClick={() => onAccept(request.id)}
-              disabled={loading}
-            >
-              Accept
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => onReject(request.id)}
-              disabled={loading}
-            >
-              Reject
-            </Button>
-          </div>
-
-          <Button
-            variant="ghost"
-            className="w-full mt-2"
-            onClick={onClose}
-            disabled={loading}
-          >
-            Later
-          </Button>
-        </div>
+  const content = (
+    <div className="flex flex-col items-center">
+      <Avatar className="h-20 w-20 mb-3">
+        <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+          {getInitials(request.from)}
+        </AvatarFallback>
+        {request.from?.avatarUrl && <AvatarImage src={request.from.avatarUrl} />}
+      </Avatar>
+      {getDisplayName()}
+      <div className="text-sm text-muted-foreground">
+        @{request.from?.alias || request.from?.value || 'unknown'}
       </div>
-    </>
+
+      {request.from?.bio && (
+        <div className="text-sm text-muted-foreground text-center mt-4 mb-4">
+          {request.from.bio}
+        </div>
+      )}
+
+      {request.message && (
+        <div className="mb-4 p-3 bg-muted rounded-lg w-full">
+          <div className="text-xs text-muted-foreground mb-1">Message:</div>
+          <div className="text-sm">{request.message}</div>
+        </div>
+      )}
+
+      <div className="flex space-x-2 w-full">
+        <Button className="flex-1" onClick={() => onAccept(request.id)} disabled={loading}>
+          Accept
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => onReject(request.id)}
+          disabled={loading}
+        >
+          Reject
+        </Button>
+      </div>
+
+      <Button variant="ghost" className="w-full mt-2" onClick={onClose} disabled={loading}>
+        Later
+      </Button>
+    </div>
+  );
+
+  return (
+    <ResponsiveModal isOpen={isOpen} onClose={onClose} title="Contact Request">
+      {content}
+    </ResponsiveModal>
   );
 }

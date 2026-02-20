@@ -43,7 +43,21 @@ export const API_ENDPOINTS = {
 
   // Handles/Privacy endpoints
   HANDLES: {
-    SEARCHABLE: (handleId: string) => `${API_CONFIG.BASE_URL}/handles/${handleId}/searchable`,
+    GET_ALL: '/handles',
+    GET_BY_ID: (handleId: string) => `/handles/${handleId}`,
+    CREATE: '/handles',
+    DELETE: (handleId: string) => `/handles/${handleId}`,
+    CHECK_AVAILABILITY: (value: string) => `/handles/alias/check/${encodeURIComponent(value)}`,
+    SET_SEARCHABLE: (handleId: string) => `/handles/${handleId}/searchable`,
+    SET_ALIAS: (handleId: string) => `/handles/${handleId}/alias`,
+    SET_PRIMARY: (handleId: string) => `/handles/primary/${handleId}`,
+    CHECK_ALIAS: (alias: string) => `/handles/alias/check/${encodeURIComponent(alias)}`,
+  },
+
+  // Profiles endpoints
+  PROFILES: {
+    UPDATE_BY_HANDLE: (handleId: string) => `/profiles/${handleId}`,
+    GET_BY_HANDLE: (handleId: string) => `/profiles/${handleId}`,
   },
 
   // WebSocket endpoints

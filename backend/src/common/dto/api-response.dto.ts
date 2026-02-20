@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class ApiResponseDto<T = any> {
+export class ApiResponseDto<T = Record<string, unknown>> {
   @ApiProperty({
     description: 'Indicates whether the request was successful',
     example: true,

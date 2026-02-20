@@ -100,14 +100,14 @@ export function useChats() {
     } catch (error) {
       console.error('Failed to load online statuses:', error);
     }
-  }, []);
+  }, [chats]);
 
   // Load online statuses once when chats are loaded (initial sync)
   useEffect(() => {
     if (chats.length > 0) {
       loadOnlineStatuses();
     }
-  }, [chats.length]);
+  }, [chats.length, loadOnlineStatuses]);
 
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {

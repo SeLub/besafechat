@@ -105,11 +105,13 @@ describe('useOnlineStatusContext - Manual Implementation', () => {
   it('should handle errors during initial sync gracefully', async () => {
     global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'));
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+      // Suppress error logs
+    });
 
     try {
       await mockContext.loadInitialStatuses(['user-1']);
-    } catch (error) {
+    } catch {
       // Expected
     }
 

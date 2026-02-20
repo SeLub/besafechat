@@ -8,12 +8,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
  */
 
 describe('WebSocket Online Status Integration', () => {
-  let statusMap: Record<string, boolean> = {};
-  let eventHandlers: Record<string, Function[]> = {};
-
-  // Mock WebSocket context integration
-  const mockWebSocketIntegration = {
-    registerEventHandler: (event: string, handler: Function) => {
+   let statusMap: Record<string, boolean> = {};
+   let eventHandlers: Record<string, Array<(data: unknown) => void>> = {};
+ 
+   // Mock WebSocket context integration
+   const mockWebSocketIntegration = {
+     registerEventHandler: (event: string, handler: (data: unknown) => void) => {
       if (!eventHandlers[event]) {
         eventHandlers[event] = [];
       }

@@ -1,15 +1,7 @@
-import { createContext, useContext, useCallback, useState, useEffect } from 'react';
+import { useContext, useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { API_CONFIG } from '../services/api-config';
-
-interface OnlineStatusContextType {
-  getOnlineStatus: (handleId: string | undefined) => boolean;
-  updateOnlineStatus: (handleId: string, isOnline: boolean) => void;
-  bulkUpdateOnlineStatus: (statuses: Record<string, boolean>) => void;
-  loadInitialStatuses: (handleIds: string[]) => Promise<void>;
-}
-
-const OnlineStatusContext = createContext<OnlineStatusContextType | undefined>(undefined);
+import { OnlineStatusContext } from '../contexts/online-status.context';
 
 interface OnlineStatusProviderProps {
   children: ReactNode;
@@ -63,20 +55,21 @@ export function OnlineStatusProvider({ children }: OnlineStatusProviderProps) {
     [bulkUpdateOnlineStatus]
   );
 
-  const value: OnlineStatusContextType = {
-    getOnlineStatus,
-    updateOnlineStatus,
-    bulkUpdateOnlineStatus,
-    loadInitialStatuses,
-  };
+  const value = {
+     getOnlineStatus,
+     updateOnlineStatus,
+     bulkUpdateOnlineStatus,
+     loadInitialStatuses,
+   };
 
-  return <OnlineStatusContext.Provider value={value}>{children}</OnlineStatusContext.Provider>;
-}
-
-export function useOnlineStatusContext(): OnlineStatusContextType {
-  const context = useContext(OnlineStatusContext);
-  if (context === undefined) {
-    throw new Error('useOnlineStatusContext must be used within OnlineStatusProvider');
+   return <OnlineStatusContext.Provider value={value}>{children}</OnlineStatusContext.Provider>;
   }
-  return context;
-}
+
+  // eslint-disable-next-line react-refresh/only-export-components
+ export function useOnlineStatusContext() {
+   const context = useContext(OnlineStatusContext);
+   if (context === undefined) {
+     throw new Error('useOnlineStatusContext must be used within OnlineStatusProvider');
+   }
+   return context;
+  }

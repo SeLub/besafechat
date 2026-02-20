@@ -1,5 +1,5 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/session/services/session.service.ts
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
@@ -22,20 +22,35 @@ export class SessionService {
     userAgent?: string,
     activeHandleId?: string // Добавили параметр активного Handle
   ) {
-    // Ограничение: макс. 5 сессий
+    console.log('[Session Service] createSession called:', {
+      identityId,
+      deviceName,
+      activeHandleId,
+    });
+
+    // Ограничение: макс. 50 сессий
     const activeSessions = await this.sessionRepository.count({
       where: { identityId, revoked: false },
     });
 
-    if (activeSessions >= 5) {
+    if (activeSessions >= 50) {
       throw new UnauthorizedException('Maximum number of active sessions reached (5)');
     }
 
     // Если activeHandleId не указан, найти primary handle
     let handleId = activeHandleId;
     if (!handleId) {
+      console.log(
+        `[Session Service] No activeHandleId provided, fetching primary handle for identity ${identityId}`
+      );
       const primaryHandle = await this.handleService.getPrimaryHandle(identityId);
       handleId = primaryHandle?.id;
+      console.log(`[Session Service] Primary handle:`, {
+        id: handleId,
+        value: primaryHandle?.value,
+      });
+    } else {
+      console.log(`[Session Service] Using provided activeHandleId: ${handleId}`);
     }
 
     // Генерируем токены
@@ -61,43 +76,22 @@ export class SessionService {
       revoked: false,
     });
 
+    console.log('[Session Service] Created session object:', {
+      id: session.id,
+      activeHandleId: session.activeHandleId,
+    });
+
     const savedSession = await this.sessionRepository.save(session);
+
+    console.log('[Session Service] Saved session:', {
+      id: savedSession.id,
+      activeHandleId: savedSession.activeHandleId,
+    });
 
     return {
       session: savedSession,
       tokens: { accessToken, refreshToken },
     };
-  }
-
-  async switchActiveHandle(
-    sessionId: string,
-    handleId: string,
-    identityId: string
-  ): Promise<Session> {
-    // Проверяем что сессия принадлежит Identity
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId, identityId },
-    });
-
-    if (!session) {
-      throw new NotFoundException('Session not found');
-    }
-
-    // Проверяем что Handle принадлежит Identity
-    const handle = await this.handleService.findById(handleId);
-    if (!handle || handle.ownerIdentityId !== identityId) {
-      throw new UnauthorizedException('Handle does not belong to identity');
-    }
-
-    // Проверяем что Handle типа 'account'
-    if (handle.type !== 'account') {
-      throw new UnauthorizedException('Cannot switch to non-account handle');
-    }
-
-    session.activeHandleId = handleId;
-    session.lastActiveAt = new Date();
-
-    return this.sessionRepository.save(session);
   }
 
   async revokeSession(identityId: string, sessionId: string) {
