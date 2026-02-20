@@ -129,8 +129,8 @@ export function PasswordCreation({ onPasswordCreated }: PasswordCreationProps) {
 
       <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6">
         <p className="text-sm text-orange-800 dark:text-orange-200">
-          <strong>⚠️ Important:</strong> Without this password AND your backup file, you cannot
-          recover your account. Use a password manager!
+          <strong>⚠️ Important:</strong> Without this password, you cannot recover your account. Use
+          a password manager!
         </p>
       </div>
 

@@ -1,9 +1,10 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, Clock, Send, X } from 'lucide-react';
+import { Check, Clock, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { ResponsiveModal } from './ui/responsive-modal';
 interface ContactRequest {
   id: string;
   from: {
@@ -24,10 +25,11 @@ interface ContactRequest {
 }
 
 interface ContactRequestsProps {
-  onBack: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export function ContactRequests({ onBack }: ContactRequestsProps) {
+export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
@@ -141,48 +143,38 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center p-4 border-b border-border">
-        <Button variant="ghost" size="icon" onClick={onBack} className="mr-3">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h2 className="text-lg font-semibold">Contact Requests</h2>
-      </div>
-
+  const contentJSX = (
+    <>
       {/* Tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border -mx-6 px-6 mb-4">
         <button
           onClick={() => setActiveTab('incoming')}
-          className={`flex-1 p-3 text-sm font-medium ${
-            activeTab === 'incoming'
+          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'incoming'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-          }`}
+            }`}
         >
           Incoming ({incomingRequests.length})
         </button>
         <button
           onClick={() => setActiveTab('outgoing')}
-          className={`flex-1 p-3 text-sm font-medium ${
-            activeTab === 'outgoing'
+          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'outgoing'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-          }`}
+            }`}
         >
           Sent ({outgoingRequests.length})
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="space-y-4 max-h-[60vh] overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center py-8">
             <div className="text-muted-foreground">Loading requests...</div>
           </div>
         ) : (
-          <div className="p-4 space-y-4">
+          <>
             {activeTab === 'incoming' ? (
               incomingRequests.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
@@ -262,13 +254,12 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              request.status === 'pending'
+                            className={`text-xs px-2 py-1 rounded-full ${request.status === 'pending'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : request.status === 'accepted'
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
-                            }`}
+                              }`}
                           >
                             {request.status === 'pending' && (
                               <Clock className="h-3 w-3 inline mr-1" />
@@ -291,9 +282,15 @@ export function ContactRequests({ onBack }: ContactRequestsProps) {
                 </div>
               ))
             )}
-          </div>
+          </>
         )}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <ResponsiveModal isOpen={isOpen} onClose={onClose} title="Contact Requests">
+      {contentJSX}
+    </ResponsiveModal>
   );
 }

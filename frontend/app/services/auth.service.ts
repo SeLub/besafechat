@@ -229,6 +229,35 @@ export class AuthService {
   }
 
   /**
+   * Переключение на другой handle (создание новой сессии)
+   */
+  static async switchToHandle(handleId: string): Promise<{ sessionId: string; activeHandleId: string }> {
+    const res = await fetch(`${this.API_BASE}/auth/sessions/create-with-handle/${handleId}`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      const error = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Failed to switch handle: ${error}`);
+    }
+
+    const data: ApiResponse<{ sessionId: string; activeHandleId: string; message: string }> = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to switch handle');
+    }
+
+    if (!data.data) {
+      throw new Error('Missing data in successful response');
+    }
+
+    return {
+      sessionId: data.data.sessionId,
+      activeHandleId: data.data.activeHandleId,
+    };
+  }
+
+  /**
    * Получение публичного ключа пользователя (для отладки)
    */
   static async getUserPublicKey(userId: string): Promise<string> {

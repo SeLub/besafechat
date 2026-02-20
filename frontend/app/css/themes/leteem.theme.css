@@ -1,8 +1,8 @@
 /* Telegram Theme - Classic blue messenger */
-[data-theme="telegram"] {
+[data-theme='leteem'] {
   /* Light mode */
   --background: hsl(207, 70%, 90%);
-  --foreground: hsl(0, 0%, 0%);
+  --foreground: hsl(206.3, 100%, 30%);
   --card: hsl(0, 0%, 100%);
   --card-foreground: hsl(0, 0%, 0%);
   --popover: hsl(0, 0%, 100%);
@@ -28,7 +28,7 @@
   --online-status: hsl(140, 50%, 48%);
 }
 
-[data-theme="telegram"].dark {
+[data-theme='leteem'].dark {
   /* Dark mode */
   --background: hsl(207, 30%, 14%);
   --foreground: hsl(0, 0%, 100%);

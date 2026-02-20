@@ -7,16 +7,40 @@ export interface AuthenticatedUser {
   publicKey: Buffer;
 }
 
-export interface AuthenticatedRequest {
-  cookies?: Record<string, string>;
-  ip?: string;
-  url: string;
-  socket?: { remoteAddress?: string };
-  user?: AuthenticatedUser;
-  identity?: any; // НОВОЕ: Identity объект из JWT Guard
-  handle?: any; // НОВОЕ: Handle объект из JWT Guard
-  session?: any; // НОВОЕ: Session объект из JWT Guard
-}
+export interface Identity {
+   id: string;
+   publicKey: string;
+   createdAt?: Date;
+   [key: string]: unknown;
+ }
+
+ export interface Handle {
+   id: string;
+   value: string;
+   alias?: string | null;
+   isSearchable?: boolean;
+   isPrimary?: boolean;
+   ownerIdentityId?: string;
+   [key: string]: unknown;
+ }
+
+ export interface Session {
+   id: string;
+   identityId: string;
+   handleId: string;
+   [key: string]: unknown;
+ }
+
+ export interface AuthenticatedRequest {
+   cookies?: Record<string, string>;
+   ip?: string;
+   url: string;
+   socket?: { remoteAddress?: string };
+   user?: AuthenticatedUser;
+   identity?: Identity;
+   handle?: Handle;
+   session?: Session;
+ }
 
 export interface CookieOptions {
   httpOnly?: boolean;

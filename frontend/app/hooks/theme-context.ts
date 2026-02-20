@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 
-type Theme = 'besafe' | 'telegram' | 'minimal';
+type Theme = 'besafe' | 'leteem' | 'minimal';
 
 interface ThemeContextType {
   theme: Theme;

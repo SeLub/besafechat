@@ -1,0 +1,290 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+// Mock uuid to avoid ESM issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mocked-uuid'),
+}));
+
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { Handle } from '../../src/domains/handle/handle.entity';
+import { HandleService } from '../../src/domains/handle/services/handle.service';
+import { Identity } from '../../src/domains/identity/identity.entity';
+import { MediaService } from '../../src/domains/media/media.service';
+import { Profile } from '../../src/domains/profile/profile.entity';
+
+describe('Handle Service - Auto Profile Creation', () => {
+  let handleService: HandleService;
+  let handleRepository: Repository<Handle>;
+  let profileRepository: Repository<Profile>;
+  let dataSource: DataSource;
+  let identityRepository: Repository<Identity>;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        HandleService,
+        {
+          provide: getRepositoryToken(Handle),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(Identity),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(Profile),
+          useClass: Repository,
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn().mockImplementation(async (callback) => {
+              const mockManager = {
+                findOne: jest.fn(),
+                update: jest.fn(),
+                create: jest.fn(),
+                save: jest.fn(),
+              };
+              return callback(mockManager);
+            }),
+          },
+        },
+        {
+          provide: MediaService,
+          useValue: {
+            getAvatarUrlIfExists: jest.fn().mockResolvedValue(null),
+          },
+        },
+      ],
+    }).compile();
+
+    handleService = module.get<HandleService>(HandleService);
+    handleRepository = module.get<Repository<Handle>>(getRepositoryToken(Handle));
+    profileRepository = module.get<Repository<Profile>>(getRepositoryToken(Profile));
+    dataSource = module.get<DataSource>(DataSource);
+    identityRepository = module.get<Repository<Identity>>(getRepositoryToken(Identity));
+  });
+
+  describe('createHandle', () => {
+    it('should create handle and profile together for account-type handles', async () => {
+      const identityId = 'test-identity-id';
+      const handleValue = 'test_user';
+      const displayName = 'Test User';
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockImplementation((entity, data) => data),
+        save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      };
+
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
+        return callback(mockManager);
+      });
+
+      const result = await handleService.createHandle({
+        value: handleValue,
+        type: 'account',
+        ownerIdentityId: identityId,
+        isSearchable: true,
+        isPrimary: true,
+        profileData: {
+          displayName,
+        },
+      });
+
+      // Verify handle was created with correct properties
+      expect(result.value).toBe(handleValue);
+      expect(result.type).toBe('account');
+      expect(result.ownerIdentityId).toBe(identityId);
+
+      // Verify manager.create was called for both Handle and Profile
+      const createCalls = (mockManager.create as jest.Mock).mock.calls;
+      expect(createCalls.length).toBeGreaterThanOrEqual(2);
+
+      // Verify profile was created with displayName
+      const profileCreateCall = createCalls.find((call) => call[0] === Profile);
+      expect(profileCreateCall).toBeDefined();
+      expect(profileCreateCall[1].displayName).toBe(displayName);
+      expect(profileCreateCall[1].handleId).toBe(result.id);
+    });
+
+    it('should create handle without profile for team-type handles', async () => {
+      const identityId = 'test-identity-id';
+      const handleValue = 'test_team';
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockImplementation((entity, data) => data),
+        save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      };
+
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
+        return callback(mockManager);
+      });
+
+      const result = await handleService.createHandle({
+        value: handleValue,
+        type: 'team',
+        ownerIdentityId: identityId,
+        isSearchable: true,
+        isPrimary: false,
+      });
+
+      // Verify handle was created
+      expect(result.value).toBe(handleValue);
+      expect(result.type).toBe('team');
+
+      // Verify profile was NOT created
+      const createCalls = (mockManager.create as jest.Mock).mock.calls;
+      const profileCreateCall = createCalls.find((call) => call[0] === Profile);
+      expect(profileCreateCall).toBeUndefined();
+    });
+
+    it('should create handle without profile for channel-type handles', async () => {
+      const identityId = 'test-identity-id';
+      const handleValue = 'test_channel';
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockImplementation((entity, data) => data),
+        save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      };
+
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
+        return callback(mockManager);
+      });
+
+      const result = await handleService.createHandle({
+        value: handleValue,
+        type: 'channel',
+        ownerIdentityId: identityId,
+        isSearchable: true,
+        isPrimary: false,
+      });
+
+      // Verify handle was created
+      expect(result.value).toBe(handleValue);
+      expect(result.type).toBe('channel');
+
+      // Verify profile was NOT created
+      const createCalls = (mockManager.create as jest.Mock).mock.calls;
+      const profileCreateCall = createCalls.find((call) => call[0] === Profile);
+      expect(profileCreateCall).toBeUndefined();
+    });
+
+    it('should use default displayName if profileData not provided for account-type', async () => {
+      const identityId = 'test-identity-id';
+      const handleValue = 'test_user';
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockImplementation((entity, data) => data),
+        save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      };
+
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
+        return callback(mockManager);
+      });
+
+      const result = await handleService.createHandle({
+        value: handleValue,
+        type: 'account',
+        ownerIdentityId: identityId,
+        isSearchable: true,
+        isPrimary: true,
+        // No profileData provided
+      });
+
+      // Verify profile was created with default displayName
+      const createCalls = (mockManager.create as jest.Mock).mock.calls;
+      const profileCreateCall = createCalls.find((call) => call[0] === Profile);
+      expect(profileCreateCall).toBeDefined();
+      expect(profileCreateCall[1].displayName).toBe('Anonym User');
+      expect(profileCreateCall[1].settings).toEqual({});
+    });
+
+    it('should create profile with custom settings for account-type', async () => {
+      const identityId = 'test-identity-id';
+      const handleValue = 'test_user';
+      const customSettings = { showEmail: true, showPhone: false };
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockImplementation((entity, data) => data),
+        save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      };
+
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
+        return callback(mockManager);
+      });
+
+      const result = await handleService.createHandle({
+        value: handleValue,
+        type: 'account',
+        ownerIdentityId: identityId,
+        isSearchable: true,
+        isPrimary: true,
+        profileData: {
+          displayName: 'John Doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john@example.com',
+          settings: customSettings,
+        },
+      });
+
+      // Verify profile was created with custom data
+      const createCalls = (mockManager.create as jest.Mock).mock.calls;
+      const profileCreateCall = createCalls.find((call) => call[0] === Profile);
+      expect(profileCreateCall).toBeDefined();
+      expect(profileCreateCall[1].displayName).toBe('John Doe');
+      expect(profileCreateCall[1].firstName).toBe('John');
+      expect(profileCreateCall[1].lastName).toBe('Doe');
+      expect(profileCreateCall[1].email).toBe('john@example.com');
+      expect(profileCreateCall[1].settings).toEqual(customSettings);
+    });
+  });
+
+  describe('getPrimaryHandle', () => {
+    it('should load profile relation when getting primary handle', async () => {
+      const identityId = 'test-identity-id';
+      const mockHandle = {
+        id: 'handle-id',
+        value: 'test_user',
+        type: 'account',
+        isPrimary: true,
+        ownerIdentityId: identityId,
+        profile: {
+          id: 'profile-id',
+          displayName: 'Test User',
+          handleId: 'handle-id',
+        },
+      };
+
+      jest.spyOn(handleRepository, 'findOne').mockResolvedValue(mockHandle as any);
+
+      const result = await handleService.getPrimaryHandle(identityId);
+
+      // Verify findOne was called with profile relation
+      expect(handleRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          ownerIdentityId: identityId,
+          type: 'account',
+          isPrimary: true,
+        },
+        relations: ['ownerIdentity', 'profile'],
+      });
+
+      // Verify profile is loaded
+      expect(result.profile).toBeDefined();
+      expect(result.profile?.displayName).toBe('Test User');
+    });
+  });
+});

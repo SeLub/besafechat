@@ -4,6 +4,14 @@
 
 BeSafeChat is an end-to-end encrypted anonymous messenger that implements a unique Identity-Based Architecture. The system separates cryptographic identity from social identity, enabling secure communications without centralized account authorities.
 
+### Architecture Philosophy
+
+- **Separation of Concerns**: Identity, handles, and profiles are distinct entities
+- **Privacy First**: Server only sees public keys and encrypted data
+- **Zero-Knowledge**: Cloud storage encrypted client-side
+- **Collision Prevention**: Privacy-preserving password uniqueness enforcement
+- **Scalability**: Designed for growth with proper indexing and caching
+
 ## Key Features
 
 ### 1. Identity-Based Architecture
@@ -107,15 +115,15 @@ When a user logs in with a new public key:
 
 ### Key Authentication Endpoints
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/auth/login/challenge` | POST | Request challenge |
-| `/auth/login` | POST | Submit signed challenge |
-| `/auth/profile` | GET | Get current user profile |
-| `/auth/sessions` | GET | List active sessions |
-| `/auth/sessions/revoke/:id` | POST | Revoke specific session |
-| `/auth/logout` | POST | Logout current session |
-| `/auth/refresh` | POST | Refresh access token |
+| Endpoint                    | Method | Purpose                  |
+| --------------------------- | ------ | ------------------------ |
+| `/auth/login/challenge`     | POST   | Request challenge        |
+| `/auth/login`               | POST   | Submit signed challenge  |
+| `/auth/profile`             | GET    | Get current user profile |
+| `/auth/sessions`            | GET    | List active sessions     |
+| `/auth/sessions/revoke/:id` | POST   | Revoke specific session  |
+| `/auth/logout`              | POST   | Logout current session   |
+| `/auth/refresh`             | POST   | Refresh access token     |
 
 ## Architecture Components
 
@@ -339,6 +347,7 @@ pnpm dlx mkcert create-cert --domains 192.168.100.35 localhost 127.0.0.1
 ```
 
 This generates:
+
 - `ca.crt` - Certificate Authority (add to your OS/browser)
 - `ca.key` - CA private key
 - `cert.crt` - Server certificate
@@ -349,6 +358,7 @@ This generates:
 **Enable HTTPS**: Set `HTTPS=true` in `.env`
 
 **Import CA into browsers** (recommended):
+
 - **Firefox**: Preferences → Certificates → Import `ca.crt`
 - **Chrome**: Settings → Security → Manage certificates → Import `ca.crt`
 - **Android**: Settings → Security → Install from storage → select `ca.crt`
@@ -423,6 +433,7 @@ npm test -- --watch
 ```
 
 **Test Structure**:
+
 ```
 backend/tests/
 ├── unit/                    # Isolated component tests
@@ -455,6 +466,7 @@ npm test -- --run
 ```
 
 **Test Structure**:
+
 ```
 frontend/tests/
 └── unit/
@@ -466,33 +478,37 @@ frontend/tests/
 
 #### Test Coverage by Domain
 
-| Domain | Unit Tests | Integration Tests | Total |
-|--------|------------|-------------------|-------|
-| Authentication | 3 | 1 | 4 |
-| Password Recovery | 2 | 1 | 3 |
-| Notifications | 1 | 1 | 2 |
-| Identity/Handle | 2 | 3 | 5 |
-| Frontend | 4 | - | 4 |
-| **Total** | **12** | **6** | **18** |
+| Domain            | Unit Tests | Integration Tests | Total  |
+| ----------------- | ---------- | ----------------- | ------ |
+| Authentication    | 3          | 1                 | 4      |
+| Password Recovery | 2          | 1                 | 3      |
+| Notifications     | 1          | 1                 | 2      |
+| Identity/Handle   | 2          | 3                 | 5      |
+| Frontend          | 4          | -                 | 4      |
+| **Total**         | **12**     | **6**             | **18** |
 
 #### Key Test Files
 
 **Authentication**:
+
 - `auth-service-minimal-fixed.spec.ts` - Login, identity creation, session management
 - `challenge-service-minimal-fixed.spec.ts` - Challenge-response, signature verification
 - `session-refresh-minimal.spec.ts` - Token refresh, expiration handling
 
 **Password Recovery**:
+
 - `password-recovery.service.spec.ts` - Hash uniqueness, claiming, conflicts
 - `password-recovery.integration.spec.ts` - End-to-end recovery flow
 - `password-recovery-simple.spec.ts` (frontend) - Availability check, retry logic
 
 **Notifications**:
+
 - `notification.service.spec.ts` - Redis operations, unread tracking
 - `notification.integration.spec.ts` - Multi-device sync, mark as read
 - `notification-history.spec.ts` (frontend) - Type validation, data structures
 
 **Identity Management**:
+
 - `test-handle-generation.spec.ts` - Default handle from public key
 - `test-alias-availability.spec.ts` - Uniqueness validation
 - `test-full-registration-flow.spec.ts` - Complete user registration
@@ -512,14 +528,6 @@ npm run start:dev
 cd frontend
 npm run dev
 ```
-
-### Architecture Philosophy
-
-- **Separation of Concerns**: Identity, handles, and profiles are distinct entities
-- **Privacy First**: Server only sees public keys and encrypted data
-- **Zero-Knowledge**: Cloud storage encrypted client-side
-- **Collision Prevention**: Privacy-preserving password uniqueness enforcement
-- **Scalability**: Designed for growth with proper indexing and caching
 
 ## Contributing
 

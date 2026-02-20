@@ -69,3 +69,4 @@ cert.crt
 cert.key
 ca.crt
 ca.key
+seeds.txt

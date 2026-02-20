@@ -2,45 +2,34 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
-  Put,
-  Delete,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
-  Query,
-  Req,
-  ParseUUIDPipe,
-  NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
-  ApiQuery,
-  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import {
-  CurrentUser,
-  CurrentIdentity,
-  CurrentHandle,
-} from '../../session/decorators/current-user.decorator';
+import { CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
-import { HandleService } from '../services/handle.service';
-import { SetUsernameDto } from '../dto/set-username.dto';
 import { CreateHandleDto } from '../dto/create-handle.dto';
-import { UpdateHandleDto } from '../dto/update-handle.dto';
-import { CheckAliasAvailabilityDto } from '../dto/check-alias-availability.dto';
-import { AuthenticatedRequest } from '../../../common/types/authenticated-request';
 import { Handle } from '../handle.entity';
+import { HandleService } from '../services/handle.service';
 
 @ApiTags('handles')
 @Controller('handles')
@@ -50,14 +39,14 @@ export class HandleController {
   constructor(private handleService: HandleService) {}
 
   @Get('alias/check/:alias')
-  @ApiOperation({ summary: 'Check if an alias is available' })
+  @ApiOperation({ summary: 'Check if a handle name (value or alias) is available' })
   @ApiParam({
     name: 'alias',
-    description: 'Alias to check for availability',
+    description: 'Handle name to check (checks both value and alias fields)',
     example: 'john-doe',
     type: String,
   })
-  @ApiResponse({ status: 200, description: 'Alias availability checked', type: ApiResponseDto })
+  @ApiResponse({ status: 200, description: 'Handle availability checked', type: ApiResponseDto })
   async checkAliasAvailability(@Param('alias') alias: string) {
     const result = await this.handleService.checkAliasAvailability(alias);
     return new ApiResponseDto(true, result);
@@ -67,29 +56,39 @@ export class HandleController {
   @ApiOperation({ summary: 'Get all handles for current identity' })
   @ApiResponse({ status: 200, description: 'List of handles', type: [Handle] })
   async getMyHandles(@CurrentIdentity() identity: any) {
-    return this.handleService.getHandlesByIdentity(identity.id);
+    console.log('[HandleController] GET /handles - identity:', identity?.id);
+    try {
+      const handles = await this.handleService.getHandlesByIdentity(identity.id);
+      console.log('[HandleController] GET /handles - found handles:', handles.length);
+      return new ApiResponseDto(true, { handles });
+    } catch (error) {
+      console.error('[HandleController] GET /handles - error:', error);
+      throw error;
+    }
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiOperation({ summary: 'Create a new handle' })
+  @ApiOperation({ summary: 'Create a new handle. Profile is created automatically for account-type handles.' })
   @ApiBody({ type: CreateHandleDto })
-  async createHandle(@CurrentIdentity() identity: any, @Body() dto: CreateHandleDto) {
+  async createHandle(@CurrentIdentity() identity: any) {
+    // Generate unique handle value
+    const generatedValue = this.handleService.generateHandleValue();
+
     const handle = await this.handleService.createHandle({
-      value: dto.value,
-      type: dto.type,
+      value: generatedValue,
+      type: 'account',
       ownerIdentityId: identity.id,
-      alias: dto.alias,
-      isSearchable: dto.isSearchable,
-      isPrimary: dto.isPrimary,
+      alias: null,
+      isSearchable: true,
+      isPrimary: false,
+      profileData: {
+        displayName: 'Anonym User',
+      },
     });
 
-    return {
-      success: true,
-      message: 'Handle created successfully',
-      data: handle,
-    };
+    return new ApiResponseDto(true, handle);
   }
 
   @Get('search')
@@ -117,33 +116,9 @@ export class HandleController {
     return new ApiResponseDto(true, { handle });
   }
 
-  @Put(':id')
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiOperation({ summary: 'Update handle' })
-  @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
-  @ApiBody({ type: UpdateHandleDto })
-  async updateHandle(
-    @CurrentIdentity() identity: any,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateHandleDto
-  ) {
-    // Проверяем что handle принадлежит identity
-    const handle = await this.handleService.findById(id);
-    if (handle.ownerIdentityId !== identity.id) {
-      throw new NotFoundException('Handle not found');
-    }
-
-    const updatedHandle = await this.handleService.updateHandle(id, dto);
-    return {
-      success: true,
-      message: 'Handle updated successfully',
-      data: updatedHandle,
-    };
-  }
-
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete handle' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete handle and return updated list' })
   @ApiParam({ name: 'id', description: 'Handle ID', type: String, example: 'abc123-def456-ghi789' })
   async deleteHandle(@CurrentIdentity() identity: any, @Param('id', ParseUUIDPipe) id: string) {
     // Проверяем что handle принадлежит identity
@@ -153,7 +128,11 @@ export class HandleController {
     }
 
     await this.handleService.deleteHandle(id);
-    return { success: true, message: 'Handle deleted successfully' };
+
+    // Получаем обновленный список handles
+    const updatedHandles = await this.handleService.getHandlesByIdentity(identity.id);
+
+    return new ApiResponseDto(true, { handles: updatedHandles });
   }
 
   @Post(':id/alias')

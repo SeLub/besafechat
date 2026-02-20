@@ -15,9 +15,12 @@ export class MediaService {
   private static baseUrl = API_CONFIG.BASE_URL;
 
   // Avatar methods
-  static async uploadAvatar(file: File): Promise<{ url: string }> {
+  static async uploadAvatar(file: File, handleId?: string): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append('file', file);
+    if (handleId) {
+      formData.append('handleId', handleId);
+    }
 
     const response = await fetch(`${this.baseUrl}/media/upload/avatar`, {
       method: 'POST',

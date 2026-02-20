@@ -4,16 +4,16 @@ import { IsOptional, IsString, IsBoolean, Length, Matches } from 'class-validato
 
 export class UpdateHandleDto {
   @ApiPropertyOptional({
-    description: 'Optional alias for the handle',
-    example: 'Johnny',
+    description: 'Optional alias for the handle (username-style, like @john-doe)',
+    example: 'john-doe',
     minLength: 1,
     maxLength: 255,
   })
   @IsOptional()
   @IsString()
   @Length(1, 255)
-  @Matches(/^[a-zA-Z0-9_\-\s]+$/, {
-    message: 'Alias can only contain letters, digits, spaces, hyphens and underscores',
+  @Matches(/^[a-z0-9_-]+$/, {
+    message: 'Alias can only contain lowercase letters, digits, hyphens and underscores',
   })
   alias?: string | null; // Allow null
 

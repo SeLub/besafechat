@@ -1,3 +1,8 @@
+// Mock uuid to avoid ESM issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mocked-uuid'),
+}));
+
 // Jest globals declaration
 declare const describe: any;
 declare const it: any;

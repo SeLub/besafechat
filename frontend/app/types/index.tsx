@@ -25,3 +25,5 @@ export type {
 } from './auth';
 
 export type { Handle, Identity, Profile } from './profile';
+
+export type { Handle as HandleEntity, HandleProfile, HandleType, HandleUpdate } from './handle';

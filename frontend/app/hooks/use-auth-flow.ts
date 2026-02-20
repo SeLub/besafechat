@@ -19,7 +19,6 @@ type AuthMethod = 'cloud' | 'self-custody' | null;
 
 export function useAuthFlow() {
   const [loading, setLoading] = useState(false);
-  const [hasKey, setHasKey] = useState(false);
   const [step, setStep] = useState<AuthStep>('main');
   const [method, setMethod] = useState<AuthMethod>(null);
   const [seed, setSeed] = useState<string[]>([]);
@@ -36,7 +35,6 @@ export function useAuthFlow() {
       } catch (error) {
         console.log('User not authenticated with existing tokens, proceeding normally ', error);
       }
-      setHasKey(false);
     };
 
     attemptAutoLogin();
@@ -114,7 +112,6 @@ export function useAuthFlow() {
   const handleClearKey = async () => {
     await StorageService.clearStoredKey();
     AccountService.clearTemporarySeed();
-    setHasKey(false);
     toast.success('Key cleared');
   };
 
@@ -180,7 +177,6 @@ export function useAuthFlow() {
 
   return {
     loading,
-    hasKey,
     step,
     seed,
     handleCreateAccount,

@@ -1,43 +1,35 @@
-// /home/selub/Documents/progs/besafechat/backend/src/domains/profile/controllers/profile.controller.ts
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
-  Post,
+  Patch,
   Put,
-  Delete,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
-  Query,
   NotFoundException,
-  BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
+  ApiCookieAuth,
   ApiOperation,
   ApiParam,
-  ApiResponse,
-  ApiTags,
   ApiQuery,
-  ApiBearerAuth,
-  ApiCookieAuth,
+  ApiTags,
 } from '@nestjs/swagger';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
-import {
-  CurrentUser,
-  CurrentHandle,
-  CurrentIdentity,
-} from '../../session/decorators/current-user.decorator';
+import { CurrentHandle, CurrentIdentity } from '../../session/decorators/current-user.decorator';
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
-import { ProfileService } from '../services/profile.service';
-import { CreateProfileDto } from '../dto/create-profile.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { UpdateSettingsDto } from '../dto/update-settings.dto';
+import { ProfileService } from '../services/profile.service';
 import { HandleService } from '../../handle/services/handle.service';
 
 @ApiTags('profiles')
@@ -45,33 +37,8 @@ import { HandleService } from '../../handle/services/handle.service';
 export class ProfileController {
   constructor(
     private profileService: ProfileService,
-    private handleService: HandleService
+    private handleService: HandleService,
   ) {}
-
-  @Post()
-  @UseGuards(JwtSessionGuard)
-  @HttpCode(HttpStatus.CREATED)
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiOperation({ summary: 'Create profile for current handle' })
-  @ApiBearerAuth()
-  @ApiCookieAuth()
-  @ApiBody({ type: CreateProfileDto })
-  async createProfile(@CurrentHandle() handle: any, @Body() dto: CreateProfileDto) {
-    // Проверяем что handle типа 'account'
-    if (handle.type !== 'account') {
-      throw new BadRequestException('Profile can only be created for account handles');
-    }
-
-    const profile = await this.profileService.createProfile({
-      handleId: handle.id,
-      ...dto,
-    });
-
-    return new ApiResponseDto(true, {
-      message: 'Profile created successfully',
-      profile,
-    });
-  }
 
   @Get('me')
   @UseGuards(JwtSessionGuard)
@@ -94,11 +61,16 @@ export class ProfileController {
   @Get('search')
   @ApiOperation({ summary: 'Search public profiles' })
   @ApiQuery({ name: 'q', description: 'Search query', required: true })
-  @ApiQuery({ name: 'limit', description: 'Maximum results', required: false, type: Number })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Maximum results',
+    required: false,
+    type: Number,
+  })
   async searchProfiles(@Query('q') query: string, @Query('limit') limit?: number) {
     const profiles = await this.profileService.searchProfiles(
       query,
-      limit ? parseInt(limit.toString()) : 20
+      limit ? parseInt(limit.toString()) : 20,
     );
 
     // Фильтруем приватные данные для публичного поиска
@@ -108,7 +80,7 @@ export class ProfileController {
         alias: profile.handle.alias,
       },
       displayName: profile.displayName,
-      avatarUrl: (profile as any).avatarUrl, // Already computed by ProfileService
+      avatarUrl: (profile as any).avatarUrl,
       bio: profile.bio,
       createdAt: profile.createdAt,
     }));
@@ -116,8 +88,9 @@ export class ProfileController {
     return new ApiResponseDto(true, { profiles: publicProfiles });
   }
 
-  @Put()
+  @Patch()
   @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Update profile for current active handle' })
   @ApiBearerAuth()
@@ -166,10 +139,8 @@ export class ProfileController {
   @ApiBearerAuth()
   @ApiCookieAuth()
   async getIdentityProfiles(@CurrentIdentity() identity: any) {
-    // Получаем все handle пользователя
     const handles = await this.handleService.getHandlesByIdentity(identity.id);
 
-    // Получаем профили для всех handle
     const profiles = await Promise.all(
       handles.map(async (handle) => {
         try {
@@ -184,8 +155,7 @@ export class ProfileController {
             },
             profile,
           };
-        } catch (error) {
-          // Если профиль не найден, возвращаем только handle
+        } catch {
           return {
             handle: {
               id: handle.id,
@@ -197,7 +167,7 @@ export class ProfileController {
             profile: null,
           };
         }
-      })
+      }),
     );
 
     return new ApiResponseDto(true, { profiles });
@@ -214,6 +184,35 @@ export class ProfileController {
     return new ApiResponseDto(true, { message: 'Profile deleted successfully' });
   }
 
+  @Patch(':handleId')
+  @UseGuards(JwtSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Update profile for a specific handle' })
+  @ApiParam({
+    name: 'handleId',
+    description: 'Handle ID',
+    type: String,
+    example: 'abc123-def456-ghi789',
+  })
+  @ApiBearerAuth()
+  @ApiCookieAuth()
+  @ApiBody({ type: UpdateProfileDto })
+  async updateProfileByHandleId(
+    @Param('handleId', ParseUUIDPipe) handleId: string,
+    @CurrentIdentity() identity: any,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const handle = await this.handleService.findById(handleId);
+
+    if (!handle || handle.ownerIdentityId !== identity.id) {
+      throw new NotFoundException('Handle not found');
+    }
+
+    const updatedProfile = await this.profileService.updateProfile(handleId, dto);
+    return new ApiResponseDto(true, { profile: updatedProfile });
+  }
+
   @Get(':handleId')
   @ApiOperation({ summary: 'Get profile by handle ID (admin/private)' })
   @ApiParam({
@@ -227,9 +226,8 @@ export class ProfileController {
   @ApiCookieAuth()
   async getProfileByHandleId(
     @Param('handleId', ParseUUIDPipe) handleId: string,
-    @CurrentIdentity() identity: any
+    @CurrentIdentity() identity: any,
   ) {
-    // Проверяем что handle принадлежит пользователю
     const handle = await this.handleService.findById(handleId);
 
     if (!handle || handle.ownerIdentityId !== identity.id) {

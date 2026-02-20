@@ -7,8 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Identity } from '../../identity/identity.entity';
 import { Handle, HandleType } from '../handle.entity';
+import { Profile } from '../../profile/profile.entity';
+import { MediaService } from '../../media/media.service';
 
 @Injectable()
 export class HandleService {
@@ -17,8 +20,21 @@ export class HandleService {
     private handleRepository: Repository<Handle>,
     @InjectRepository(Identity)
     private identityRepository: Repository<Identity>,
-    private dataSource: DataSource
+    private dataSource: DataSource,
+    private mediaService: MediaService
   ) {}
+
+  /**
+   * Генерирует уникальное значение handle в формате user_{uuid_prefix}
+   * @returns строка handle в формате user_{16_символов_uuid}
+   */
+  generateHandleValue(): string {
+    const handleId = uuidv4();
+    // Берем первые 16 символов UUID (без дефисов для компактности)
+    const uuidWithoutDashes = handleId.replace(/-/g, '');
+    const hashPrefix = uuidWithoutDashes.substring(0, 16);
+    return `user_${hashPrefix}`;
+  }
 
   // Существующие методы
   async searchByUsername(username: string) {
@@ -98,7 +114,7 @@ export class HandleService {
   async findById(id: string): Promise<Handle> {
     const handle = await this.handleRepository.findOne({
       where: { id },
-      relations: ['ownerIdentity'],
+      relations: ['ownerIdentity', 'profile'],
     });
 
     if (!handle) {
@@ -115,7 +131,9 @@ export class HandleService {
     });
   }
 
-  async findByValueOrAlias(query: string): Promise<{ handle: Handle; matchedBy: 'value' | 'alias' } | null> {
+  async findByValueOrAlias(
+    query: string
+  ): Promise<{ handle: Handle; matchedBy: 'value' | 'alias' } | null> {
     const byValue = await this.handleRepository.findOne({
       where: { value: query },
       relations: ['ownerIdentity', 'profile'],
@@ -144,7 +162,7 @@ export class HandleService {
         type: 'account',
         isPrimary: true,
       },
-      relations: ['ownerIdentity'],
+      relations: ['ownerIdentity', 'profile'],
     });
 
     if (!handle) {
@@ -155,22 +173,51 @@ export class HandleService {
   }
 
   async getHandlesByIdentity(identityId: string): Promise<Handle[]> {
-    return this.handleRepository.find({
+    const handles = await this.handleRepository.find({
       where: {
         ownerIdentityId: identityId,
         type: 'account',
       },
+      relations: ['profile'],
       order: { isPrimary: 'DESC', createdAt: 'ASC' },
     });
+
+    // Enrich each handle with avatarUrl
+    const enrichedHandles = await Promise.all(
+      handles.map(async (handle) => {
+        if (handle.profile) {
+          const avatarUrl = await this.mediaService.getAvatarUrlIfExists(handle.id);
+          return {
+            ...handle,
+            profile: {
+              ...handle.profile,
+              avatarUrl,
+            },
+          };
+        }
+        return handle;
+      })
+    );
+
+    return enrichedHandles;
   }
 
   async createHandle(data: {
     value: string;
     type: HandleType;
     ownerIdentityId: string;
-    alias?: string;
+    alias?: string | null;
     isSearchable?: boolean;
     isPrimary?: boolean;
+    profileData?: {
+      displayName?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+      bio?: string;
+      settings?: Record<string, any>;
+    };
   }): Promise<Handle> {
     return this.dataSource.transaction(async (manager) => {
       // Проверка уникальности value
@@ -205,40 +252,29 @@ export class HandleService {
         ownerIdentityId: data.ownerIdentityId,
       });
 
-      return await manager.save(handle);
+      const savedHandle = await manager.save(handle);
+
+      // Автоматическое создание профиля для account-типов
+      if (data.type === 'account') {
+        const profileData = data.profileData || {};
+        const profile = manager.create(Profile, {
+          handleId: savedHandle.id,
+          displayName: profileData.displayName || 'Anonym User',
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          email: profileData.email,
+          phone: profileData.phone,
+          bio: profileData.bio,
+          settings: profileData.settings || {},
+        });
+
+        const savedProfile = await manager.save(profile);
+        // Attach the profile to the handle before returning
+        savedHandle.profile = savedProfile;
+      }
+
+      return savedHandle;
     });
-  }
-
-  async updateHandle(id: string, data: Partial<Handle>): Promise<Handle> {
-    const handle = await this.findById(id);
-
-    // Запрет изменения value
-    if (data.value && data.value !== handle.value) {
-      throw new BadRequestException('Handle value cannot be changed');
-    }
-
-    // Запрет изменения типа
-    if (data.type && data.type !== handle.type) {
-      throw new BadRequestException('Handle type cannot be changed');
-    }
-
-    // Если устанавливается isPrimary=true, снимаем primary с других handle этого identity
-    if (data.isPrimary === true && handle.type === 'account') {
-      await this.handleRepository.update(
-        {
-          ownerIdentityId: handle.ownerIdentityId,
-          type: 'account',
-          isPrimary: true,
-          id: handle.id, // Исключаем текущий handle
-        },
-        { isPrimary: false }
-      );
-    }
-
-    // Обновление остальных полей
-    Object.assign(handle, data);
-
-    return this.handleRepository.save(handle);
   }
 
   async deleteHandle(id: string): Promise<void> {
@@ -333,24 +369,21 @@ export class HandleService {
   }
 
   async checkAliasAvailability(alias: string) {
-    // Check if alias already exists
-    const existingHandle = await this.handleRepository.findOne({
-      where: { alias },
-    });
+    // Check if alias exists in either alias field or value field
+    // This is the unified check for both handle.value and handle.alias uniqueness
+    const existingHandle = await this.handleRepository
+      .createQueryBuilder('handle')
+      .where('handle.alias = :alias OR handle.value = :alias', { alias })
+      .getOne();
 
     if (existingHandle) {
       return {
         available: false,
-        conflict: {
-          handleId: existingHandle.id,
-          type: existingHandle.type,
-          ownerIdentityId: existingHandle.ownerIdentityId
-        }
       };
     }
 
     return {
-      available: true
+      available: true,
     };
   }
 }
