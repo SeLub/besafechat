@@ -1,10 +1,17 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+// Mock uuid to avoid ESM issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mocked-uuid'),
+}));
+
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Handle } from '../../src/domains/handle/handle.entity';
 import { HandleService } from '../../src/domains/handle/services/handle.service';
 import { Identity } from '../../src/domains/identity/identity.entity';
+import { MediaService } from '../../src/domains/media/media.service';
 import { Profile } from '../../src/domains/profile/profile.entity';
 
 describe('Handle Service - Auto Profile Creation', () => {
@@ -44,6 +51,12 @@ describe('Handle Service - Auto Profile Creation', () => {
             }),
           },
         },
+        {
+          provide: MediaService,
+          useValue: {
+            getAvatarUrlIfExists: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 
@@ -67,7 +80,7 @@ describe('Handle Service - Auto Profile Creation', () => {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       };
 
-      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback) => {
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
         return callback(mockManager);
       });
 
@@ -109,7 +122,7 @@ describe('Handle Service - Auto Profile Creation', () => {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       };
 
-      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback) => {
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
         return callback(mockManager);
       });
 
@@ -142,7 +155,7 @@ describe('Handle Service - Auto Profile Creation', () => {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       };
 
-      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback) => {
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
         return callback(mockManager);
       });
 
@@ -175,7 +188,7 @@ describe('Handle Service - Auto Profile Creation', () => {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       };
 
-      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback) => {
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
         return callback(mockManager);
       });
 
@@ -208,7 +221,7 @@ describe('Handle Service - Auto Profile Creation', () => {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       };
 
-      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback) => {
+      jest.spyOn(dataSource, 'transaction').mockImplementation(async (callback: any) => {
         return callback(mockManager);
       });
 
@@ -271,7 +284,7 @@ describe('Handle Service - Auto Profile Creation', () => {
 
       // Verify profile is loaded
       expect(result.profile).toBeDefined();
-      expect(result.profile.displayName).toBe('Test User');
+      expect(result.profile?.displayName).toBe('Test User');
     });
   });
 });

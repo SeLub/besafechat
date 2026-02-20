@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
+
+// Mock uuid to avoid ESM issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mocked-uuid'),
+}));
+
 import { AuthService } from '../../src/domains/auth/services/auth.service';
 import { HandleService } from '../../src/domains/handle/services/handle.service';
 import { IdentityService } from '../../src/domains/identity/services/identity.service';

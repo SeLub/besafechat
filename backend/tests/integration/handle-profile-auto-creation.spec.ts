@@ -1,3 +1,8 @@
+// Mock uuid to avoid ESM issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mocked-uuid'),
+}));
+
 import { beforeAll, describe, expect, it, afterAll } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -288,7 +293,7 @@ describe('Handle Service - Integration Tests (Profile Auto Creation)', () => {
 
       // Verify profile is available
       expect(result.profile).toBeDefined();
-      expect(result.profile.displayName).toBe('Test User');
+      expect(result.profile?.displayName).toBe('Test User');
     });
   });
 });
