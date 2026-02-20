@@ -2,8 +2,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '~/hooks/use-auth-context';
 import { apiRequest } from '@/services/api-utils';
-import { Search, User, X, Sparkles, Send, ShieldAlert, BadgeCheck } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Search, User, Sparkles, Send, ShieldAlert, BadgeCheck } from 'lucide-react';
+ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveModal } from './ui/responsive-modal';
 
@@ -30,7 +30,7 @@ interface ContactProfile {
   ownerIdentityId: string;
 }
 
-export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalProps) {
+export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [contact, setContact] = useState<ContactProfile | null>(null);
   const [loading, setLoading] = useState(false);

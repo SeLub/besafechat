@@ -56,13 +56,12 @@ interface HamburgerMenuProps {
 }
 
 export function HamburgerMenu({
-  userProfile,
-  onHandleClick,
-  onProfileClick,
-  onContactsClick,
-  onSettingsClick,
-  onNotificationsClick,
-}: HamburgerMenuProps) {
+   userProfile,
+   onProfileClick,
+   onContactsClick,
+   onSettingsClick,
+   onNotificationsClick,
+ }: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [handleProfilesOpen, setHandleProfilesOpen] = useState(false);

@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Phone, Video, Search, Bell, Shield, Trash2, Archive, Volume2 } from 'lucide-react';
+import { Phone, Video, Search } from 'lucide-react';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 import { ResponsiveModal } from './ui/responsive-modal';
 import { useMediaQuery } from '@/hooks/use-media-query';

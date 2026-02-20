@@ -29,20 +29,19 @@ interface ProfileAvatarSectionProps {
 }
 
 export function ProfileAvatarSection({
-  handle,
-  onUpdateHandle,
-  onSetPrimary,
-  onDeleteHandle,
-  isLoading,
-  onAvatarUploaded,
-}: ProfileAvatarSectionProps) {
+   handle,
+   onUpdateHandle,
+   onSetPrimary,
+   onDeleteHandle,
+   onAvatarUploaded,
+ }: ProfileAvatarSectionProps) {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [localAlias, setLocalAlias] = useState(handle?.alias || '');
   const [isSearchable, setIsSearchable] = useState(handle?.isSearchable || false);
   const [aliasStatus, setAliasStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
-  const [aliasMessage, setAliasMessage] = useState<string>('');
-  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+   const [aliasMessage, setAliasMessage] = useState<string>('');
+   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Validate alias format
   const validateAliasFormat = (alias: string): boolean => {
@@ -80,10 +79,10 @@ export function ProfileAvatarSection({
         setAliasStatus('taken');
         setAliasMessage('This alias is already taken');
       }
-    } catch (err: any) {
-      setAliasStatus('idle');
-      setAliasMessage('');
-    }
+    } catch {
+       setAliasStatus('idle');
+       setAliasMessage('');
+     }
   };
 
   // Handle alias input with debounce
@@ -109,8 +108,9 @@ export function ProfileAvatarSection({
       setAliasStatus('idle');
       setAliasMessage('');
       setIsDeleteConfirming(false);
-    }
-  }, [handle?.id]);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [handle?.id]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -258,15 +258,16 @@ export function ProfileAvatarSection({
       {/* Handle Settings */}
       <div className="space-y-3 pt-4 border-t border-primary/10">
         {/* Alias Field */}
-        <div>
-          <label className="block text-xs font-bold mb-1">Alias (optional)</label>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={localAlias}
-              onChange={e => handleAliasChange(e.target.value)}
-              placeholder="e.g. john-doe"
-              className={`flex-1 rounded border px-2 py-1 text-xs bg-background text-foreground focus:outline-none focus:ring-2 ${
+          <div>
+            <label htmlFor="alias-input" className="block text-xs font-bold mb-1">Alias (optional)</label>
+            <div className="flex gap-1">
+              <input
+                id="alias-input"
+                type="text"
+                value={localAlias}
+                onChange={e => handleAliasChange(e.target.value)}
+                placeholder="e.g. john-doe"
+                className={`flex-1 rounded border px-2 py-1 text-xs bg-background text-foreground focus:outline-none focus:ring-2 ${
                 aliasStatus === 'taken' || aliasStatus === 'invalid'
                   ? 'border-red-500 focus:ring-red-500/50'
                   : aliasStatus === 'available'
@@ -308,8 +309,9 @@ export function ProfileAvatarSection({
 
         {/* Searchable Toggle */}
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold">Searchable</label>
+          <label htmlFor="searchable-toggle" className="text-xs font-bold">Searchable</label>
           <button
+            id="searchable-toggle"
             onClick={handleToggleSearchable}
             disabled={isSavingSettings}
             className={`relative w-10 h-5 rounded-full transition-colors ${

@@ -61,6 +61,7 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   useEffect(() => {
     // Clear notifications when contacts page is opened
     clearNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async () => {
@@ -134,20 +135,6 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleContactClick = async (userId: string) => {
-    try {
-      // Find or create chat with this contact
-      await fetch(API_ENDPOINTS.CHATS.FIND_OR_CREATE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ otherUserId: userId }),
-      });
-    } catch {
-      toast.error('Failed to open chat');
     }
   };
 

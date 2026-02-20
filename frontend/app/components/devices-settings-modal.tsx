@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { QrCode, Smartphone, Monitor, Tablet, X, ShieldCheck, LogOut } from 'lucide-react';
+import { QrCode, Smartphone, Monitor, Tablet, ShieldCheck, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { ResponsiveModal } from './ui/responsive-modal'; // Используем нашу новую обертку

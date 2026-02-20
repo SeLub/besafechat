@@ -1,5 +1,4 @@
 import { LifeBuoy, BookOpen, MessageSquare, Github, ExternalLink, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from './ui/responsive-modal';
 
 interface HelpSupportModalProps {

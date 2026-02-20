@@ -162,7 +162,7 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
       setTimeout(() => {
         setDraftStatus(null);
       }, 2000);
-    } catch (error) {
+    } catch {
       // Error toast shown in parent
       setDraftStatus(null);
     }
@@ -181,8 +181,9 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
       }}
     >
       <div>
-        <label className="block text-sm font-bold mb-1">Display Name</label>
+        <label htmlFor="display-name" className="block text-sm font-bold mb-1">Display Name</label>
         <input
+          id="display-name"
           type="text"
           value={formData.displayName || ''}
           onChange={e => handleChange('displayName', e.target.value)}
@@ -200,8 +201,9 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-sm font-bold mb-1">First Name</label>
+          <label htmlFor="first-name" className="block text-sm font-bold mb-1">First Name</label>
           <input
+            id="first-name"
             type="text"
             value={formData.firstName || ''}
             onChange={e => handleChange('firstName', e.target.value)}
@@ -216,8 +218,9 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
           )}
         </div>
         <div>
-          <label className="block text-sm font-bold mb-1">Last Name</label>
+          <label htmlFor="last-name" className="block text-sm font-bold mb-1">Last Name</label>
           <input
+            id="last-name"
             type="text"
             value={formData.lastName || ''}
             onChange={e => handleChange('lastName', e.target.value)}
@@ -235,12 +238,13 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-sm font-bold">Bio</label>
+          <label htmlFor="bio" className="block text-sm font-bold">Bio</label>
           <span className={`text-xs ${(formData.bio?.length ?? 0) > 256 ? 'text-red-500' : 'text-foreground/50'}`}>
             {formData.bio?.length ?? 0}/256
           </span>
         </div>
         <textarea
+          id="bio"
           value={formData.bio || ''}
           onChange={e => handleChange('bio', e.target.value)}
           className={`w-full rounded border px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 resize-none ${
@@ -257,8 +261,9 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-sm font-bold mb-1">Email</label>
+          <label htmlFor="email" className="block text-sm font-bold mb-1">Email</label>
           <input
+            id="email"
             type="email"
             value={formData.email || ''}
             onChange={e => handleChange('email', e.target.value)}
@@ -273,8 +278,9 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
           )}
         </div>
         <div>
-          <label className="block text-sm font-bold mb-1">Phone</label>
+          <label htmlFor="phone" className="block text-sm font-bold mb-1">Phone</label>
           <input
+            id="phone"
             type="tel"
             value={formData.phone || ''}
             onChange={e => handleChange('phone', e.target.value)}

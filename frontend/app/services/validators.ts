@@ -72,7 +72,7 @@ export const validators = {
     }
 
     // Allow: +, digits, spaces, hyphens, parentheses, dots
-    const pattern = /^[+]?[\d\s().\-]+$/;
+    const pattern = /^[+]?[\d\s().,-]+$/;
     if (!pattern.test(trimmed)) {
       return 'Phone number can only contain digits, +, spaces, hyphens, parentheses and dots';
     }

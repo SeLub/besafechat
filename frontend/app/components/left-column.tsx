@@ -19,20 +19,19 @@ interface LeftColumnProps {
 }
 
 export function LeftColumn({
-  leftPanelPage,
-  userProfile,
-  chats,
-  selectedChatId,
-  onHandleClick,
-  onProfileClick,
-  onContactsClick,
-  onSettingsClick,
-  onNotificationsClick,
-  onBackToChats,
-  onChatSelect,
-  onNewChat,
-  onChatCreated,
-}: LeftColumnProps) {
+   leftPanelPage,
+   userProfile,
+   chats,
+   selectedChatId,
+   onProfileClick,
+   onContactsClick,
+   onSettingsClick,
+   onNotificationsClick,
+   onBackToChats,
+   onChatSelect,
+   onNewChat,
+   onChatCreated,
+ }: LeftColumnProps) {
   return (
     <div
       id="LeftColumn"

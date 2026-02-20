@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Languages, Check, Globe2 } from 'lucide-react';
+import { Check, Globe2 } from 'lucide-react';
 import { ResponsiveModal } from './ui/responsive-modal';
 import { toast } from 'sonner';
 
