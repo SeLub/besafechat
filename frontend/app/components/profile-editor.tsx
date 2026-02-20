@@ -234,7 +234,12 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
       </div>
 
       <div>
-        <label className="block text-sm font-bold mb-1">Bio</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-bold">Bio</label>
+          <span className={`text-xs ${(formData.bio?.length ?? 0) > 256 ? 'text-red-500' : 'text-foreground/50'}`}>
+            {formData.bio?.length ?? 0}/256
+          </span>
+        </div>
         <textarea
           value={formData.bio || ''}
           onChange={e => handleChange('bio', e.target.value)}
@@ -245,6 +250,7 @@ export function ProfileEditor({ handle, onSave, isSaving }: ProfileEditorProps) 
           }`}
           rows={6}
           placeholder="Tell us about yourself"
+          maxLength={256}
         />
         {fieldErrors.bio && <div className="text-red-600 text-xs mt-1">{fieldErrors.bio}</div>}
       </div>
