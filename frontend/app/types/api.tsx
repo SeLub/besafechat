@@ -8,6 +8,8 @@ export interface LoginResponse {
   identityId: string;
   sessionId: string;
   handleId: string;
+  recovered?: boolean;
+  isNewIdentity?: boolean;
 }
 export interface ProfileResponse {
   identity: {

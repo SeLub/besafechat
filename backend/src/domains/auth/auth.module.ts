@@ -9,6 +9,7 @@ import { RedisModule } from '../redis/redis.module';
 import { SessionModule } from '../session/session.module';
 import { AuthSessionController } from './controllers/auth-session.controller';
 import { PasswordRecoveryController } from './controllers/password-recovery.controller';
+import { IdentityController } from '../identity/controllers/identity.controller';
 import { ClaimedRecoveryPassword } from './entities/claimed-recovery-password.entity';
 import { AuthService } from './services/auth.service';
 import { ChallengeService } from './services/challenge.service';
@@ -33,6 +34,7 @@ import { PasswordRecoveryService } from './services/password-recovery.service';
   controllers: [
     AuthSessionController,
     PasswordRecoveryController, // Add the new controller
+    IdentityController, // Account deletion endpoint
   ],
   exports: [
     AuthService,

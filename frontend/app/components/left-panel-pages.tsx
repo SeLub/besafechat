@@ -7,6 +7,7 @@ import { StorageSettingsModal } from '@/components/storage-settings-modal';
 import { ThemeSelectorModal } from '@/components/theme-selector-modal';
 import { HelpSupportModal } from '@/components/help-support-modal';
 import { LanguageSettingsModal } from '@/components/language-settings-modal';
+import { DeleteAccountModal } from '@/components/modals/delete-account-modal';
 import { AvatarUpload } from '@/components/avatar-upload';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -26,6 +27,7 @@ import {
   LogOut,
   Palette,
   Shield,
+  Trash2,
   User,
   Volume2,
 } from 'lucide-react';
@@ -33,6 +35,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { UserService } from '~/services';
+import { IdentityService } from '~/services/identity.service';
 
 interface LeftPanelPageProps {
   page: 'profile' | 'settings' | 'contacts' | 'notifications' | null;
@@ -75,6 +78,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const [displayNameModalOpen, setDisplayNameModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   if (!page) return null;
 
@@ -94,6 +99,21 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const handleLogout = async () => {
     await logout();
     window.location.href = '/auth';
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      await IdentityService.deleteMyIdentity();
+      toast.success('Account deletion initiated. You have 90 days to recover.');
+      // Logout and redirect to auth
+      await logout();
+      window.location.href = '/auth';
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete account');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleAvatarUploadSuccess = async () => {
@@ -324,18 +344,28 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
               />
             </SettingsSection>
 
-            {/* Logout Section */}
-            <div className="pt-4">
+            {/* Danger Zone */}
+            <SettingsSection title="Danger Zone">
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] text-destructive hover:bg-destructive/10 transition-all font-bold group"
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] text-destructive hover:bg-destructive/10 transition-all font-bold group border-b border-primary/5"
               >
                 <div className="p-2 rounded-xl bg-destructive/5 group-hover:scale-110 transition-transform">
                   <LogOut className="h-5 w-5" />
                 </div>
                 <span>Exit the Sky</span>
               </button>
-            </div>
+
+              <button
+                onClick={() => setDeleteAccountModalOpen(true)}
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] text-destructive hover:bg-destructive/10 transition-all font-bold group"
+              >
+                <div className="p-2 rounded-xl bg-destructive/5 group-hover:scale-110 transition-transform">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <span>Delete My Account</span>
+              </button>
+            </SettingsSection>
           </div>
         </div>
 
@@ -359,6 +389,12 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
           onClose={() => setLanguageModalOpen(false)}
         />
         <HelpSupportModal isOpen={helpModalOpen} onClose={() => setHelpModalOpen(false)} />
+        <DeleteAccountModal
+          isOpen={deleteAccountModalOpen}
+          onClose={() => setDeleteAccountModalOpen(false)}
+          onConfirm={handleDeleteAccount}
+          isLoading={isDeletingAccount}
+        />
       </>
     );
   }

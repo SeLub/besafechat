@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Identity } from './identity.entity';
 import { IdentityService } from './services/identity.service';
 import { IdentityCleanupService } from './services/identity-cleanup.service';
+import { IdentityController } from './controllers/identity.controller';
 
 // Импортируем сущности, необходимые для каскадного удаления
 import { Handle } from '../handle/handle.entity';
@@ -15,7 +16,7 @@ import { Media } from '../media/media.entity';
 import { MessageMetadata } from '../message/message-metadata.entity';
 import { Team } from '../team/team.entity';
 
-// Импортируем модули для доступа к сервисам (например, MediaService)
+// Импортируем модули для доступа к сервисам
 import { MediaModule } from '../media/media.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { MediaModule } from '../media/media.module';
     // Импортируем MediaModule, чтобы внедрить MediaService
     forwardRef(() => MediaModule),
   ],
+  // Note: IdentityController is registered in AuthModule to avoid circular dependency
   providers: [IdentityService, IdentityCleanupService],
   exports: [TypeOrmModule, IdentityService],
 })

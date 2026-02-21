@@ -1,12 +1,23 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/identity/services/identity.service.ts
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, IsNull, Not } from 'typeorm';
+import { Repository, DataSource, IsNull, Not, In } from 'typeorm';
+import * as crypto from 'crypto';
 import { Identity } from '../identity.entity';
 import { Handle } from '../../handle/handle.entity';
 import { Profile } from '../../profile/profile.entity';
 import { Chat } from '../../chat/chat.entity';
-// Импортируйте другие сущности, если нужно восстанавливать их напрямую (ContactRequest, Team и т.д.)
+import { MessageMetadata } from '../../message/message-metadata.entity';
+import { ChannelMessage } from '../../channel/channel-message.entity';
+import { ChatMember } from '../../chat/chat-member.entity';
+import { ContactRequest } from '../../contact/contact-request.entity';
+import { TeamMembership } from '../../team/team-membership.entity';
+import { TeamInvite } from '../../team/team-invite.entity';
+import { ChannelSubscriber } from '../../channel/channel-subscriber.entity';
+import { Channel } from '../../channel/channel.entity';
+import { Team } from '../../team/team.entity';
+import { Media } from '../../media/media.entity';
+import { Session } from '../../session/session.entity';
 
 @Injectable()
 export class IdentityService {
@@ -23,6 +34,14 @@ export class IdentityService {
     private chatRepository: Repository<Chat>,
     private dataSource: DataSource
   ) {}
+
+  /**
+   * Хеширует публичный ключ для быстрого поиска
+   * SHA256(base64_key) → hex string (64 chars)
+   */
+  private hashPublicKey(publicKeyBase64: string): string {
+    return crypto.createHash('sha256').update(publicKeyBase64).digest('hex');
+  }
 
   async registerIdentity(publicKeyBase64: string): Promise<Identity> {
     let publicKeyBuffer: Buffer;
@@ -42,9 +61,11 @@ export class IdentityService {
       return existingIdentity;
     }
 
-    // Создаем новую идентичность
+    // Создаем новую идентичность с хешем для быстрого поиска
+    const publicKeyHash = this.hashPublicKey(publicKeyBase64);
     const identity = this.identityRepository.create({
       masterPublicKey: publicKeyBuffer,
+      publicKeyHash,
     });
     return await this.identityRepository.save(identity);
   }
@@ -60,10 +81,9 @@ export class IdentityService {
    * Найти АКТИВНУЮ identity по публичному ключу
    */
   async findByIdentityPublicKey(publicKeyBase64: string) {
-    const publicKey = Buffer.from(publicKeyBase64, 'base64');
+    const publicKeyHash = this.hashPublicKey(publicKeyBase64);
     return await this.identityRepository.findOne({
-      where: { masterPublicKey: publicKey },
-      // deletedAt: IsNull() применяется автоматически благодаря @DeleteDateColumn
+      where: { publicKeyHash },
     });
   }
 
@@ -72,13 +92,13 @@ export class IdentityService {
    * Используется только для процесса восстановления
    */
   async findDeletedByPublicKey(publicKeyBase64: string) {
-    const publicKey = Buffer.from(publicKeyBase64, 'base64');
+    const publicKeyHash = this.hashPublicKey(publicKeyBase64);
     return await this.identityRepository.findOne({
       where: {
-        masterPublicKey: publicKey,
+        publicKeyHash,
         deletedAt: Not(IsNull()),
       },
-      withDeleted: true, // Разрешаем поиск удаленных записей
+      withDeleted: true,
     });
   }
 
@@ -94,8 +114,9 @@ export class IdentityService {
     try {
       const manager = queryRunner.manager;
 
-      // 1. Восстанавливаем Identity
+      // 1. Восстанавливаем Identity и устанавливаем recoveredAt
       await manager.restore(Identity, { id: identityId });
+      await manager.update(Identity, { id: identityId }, { recoveredAt: new Date() });
       this.logger.log(`Restored Identity: ${identityId}`);
 
       // 2. Восстанавливаем все Handles этой Identity
@@ -115,15 +136,11 @@ export class IdentityService {
         await manager.restore(Profile, { handleId: In(handleIds) });
         this.logger.log(`Restored Profiles for Handles: ${handleIds.length}`);
 
-        // 4. Восстанавливаем Chats, где эти Handles являются участниками или владельцами
-        // Примечание: адаптируйте условия под вашу реальную схему связи Chat <-> Handle
-        // Обычно это поле handleId или participantIds
-        await manager.restore(Chat, [
-          { handleId: In(handleIds) },
-          // Если есть many-to-many таблица участников, её тоже нужно восстановить
-          // Например: await manager.restore(ChatParticipant, { handleId: In(handleIds) });
-        ]);
-        this.logger.log(`Restored Chats related to Handles`);
+        // 4. Восстанавливаем Chats, где эти Handles являются участниками
+        // Примечание: Chat может быть связан через chat_members таблицу
+        // Но так как chat_members hard-deleted, восстанавливаем только через handleId если есть такая связь
+        // В текущей схеме Chat не имеет прямой связи с Handle, поэтому пропускаем
+        this.logger.log(`Skipped Chat restoration (no direct Handle association)`);
       }
 
       // TODO: Добавить восстановление других сущностей при необходимости:
@@ -151,7 +168,186 @@ export class IdentityService {
       await queryRunner.release();
     }
   }
-}
 
-// Вспомогательный импорт для In, если не был импортирован выше
-import { In } from 'typeorm';
+  /**
+   * Soft delete identity with full cascade (start 90-day recovery window)
+   * Explicitly soft-deletes all related entities to maintain data consistency
+   * Note: Database CASCADE rules work for hard delete; for soft delete we handle it in code
+   */
+  async softDeleteIdentity(identityId: string): Promise<{ recoveryDeadline: Date }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      this.logger.log(`[Soft Delete] Starting cascade soft-delete for identity: ${identityId}`);
+
+      const now = new Date();
+      const recoveryDeadline = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+      // First, verify identity exists
+      const identity = await queryRunner.manager.findOne(Identity, {
+        where: { id: identityId },
+      });
+
+      if (!identity) {
+        throw new Error(`Identity ${identityId} not found`);
+      }
+
+      if (identity.deletedAt) {
+        throw new Error(`Identity ${identityId} is already marked for deletion`);
+      }
+
+      // Get all Handles owned by this Identity
+      const handles = await queryRunner.manager.find(Handle, {
+        where: { ownerIdentityId: identityId },
+        select: ['id'],
+      });
+
+      const handleIds = handles.map((h) => h.id);
+      this.logger.log(
+        `[Soft Delete] Found ${handleIds.length} handle(s) for identity ${identityId}`
+      );
+
+      if (handleIds.length > 0) {
+        // Phase 1: Mark messages as deleted
+        // Update MessageMetadata (soft delete with flag)
+        const msgDeleteResult = await queryRunner.manager.update(
+          MessageMetadata,
+          { senderHandleId: In(handleIds) },
+          { deletedAt: now, isDeleted: true }
+        );
+        this.logger.log(
+          `[Soft Delete] Marked ${msgDeleteResult.affected} message metadata records as deleted`
+        );
+
+        // Update ChannelMessage (only has isDeleted flag, no deletedAt)
+        const chanMsgResult = await queryRunner.manager.update(
+          ChannelMessage,
+          { senderHandleId: In(handleIds) },
+          { isDeleted: true }
+        );
+        this.logger.log(
+          `[Soft Delete] Marked ${chanMsgResult.affected} channel message records as deleted`
+        );
+
+        // Phase 2: Delete group memberships & requests (hard delete, no soft delete support)
+        const chatMemberResult = await queryRunner.manager.delete(ChatMember, {
+          memberHandleId: In(handleIds),
+        });
+        this.logger.log(`[Soft Delete] Deleted ${chatMemberResult.affected} chat member records`);
+
+        // Delete contact requests (both sent and received)
+        const contactReqSentResult = await queryRunner.manager.delete(ContactRequest, {
+          fromHandleId: In(handleIds),
+        });
+        const contactReqRecResult = await queryRunner.manager.delete(ContactRequest, {
+          toHandleId: In(handleIds),
+        });
+        this.logger.log(
+          `[Soft Delete] Deleted ${(contactReqSentResult.affected || 0) + (contactReqRecResult.affected || 0)} contact request records`
+        );
+
+        // Delete team memberships
+        const teamMemberResult = await queryRunner.manager.delete(TeamMembership, {
+          memberHandleId: In(handleIds),
+        });
+        this.logger.log(
+          `[Soft Delete] Deleted ${teamMemberResult.affected} team membership records`
+        );
+
+        // Delete team invites (both sent and received)
+        const teamInviteSentResult = await queryRunner.manager.delete(TeamInvite, {
+          inviterHandleId: In(handleIds),
+        });
+        const teamInviteRecResult = await queryRunner.manager.delete(TeamInvite, {
+          invitedHandleId: In(handleIds),
+        });
+        this.logger.log(
+          `[Soft Delete] Deleted ${(teamInviteSentResult.affected || 0) + (teamInviteRecResult.affected || 0)} team invite records`
+        );
+
+        // Delete channel subscriptions
+        const chanSubResult = await queryRunner.manager.delete(ChannelSubscriber, {
+          subscriberHandleId: In(handleIds),
+        });
+        this.logger.log(
+          `[Soft Delete] Deleted ${chanSubResult.affected} channel subscriber records`
+        );
+
+        // Phase 3: Soft delete Profiles (1:1 with Handle)
+        const profileResult = await queryRunner.manager.update(
+          Profile,
+          { handleId: In(handleIds) },
+          { deletedAt: now }
+        );
+        this.logger.log(`[Soft Delete] Soft-deleted ${profileResult.affected} profile records`);
+
+        // Phase 4: Soft delete Handles
+        const handleResult = await queryRunner.manager.update(
+          Handle,
+          { id: In(handleIds) },
+          { deletedAt: now }
+        );
+        this.logger.log(`[Soft Delete] Soft-deleted ${handleResult.affected} handle records`);
+      }
+
+      // Phase 5: Soft delete owned Channels
+      const channelResult = await queryRunner.manager.update(
+        Channel,
+        { ownerIdentityId: identityId },
+        { deletedAt: now }
+      );
+      this.logger.log(`[Soft Delete] Soft-deleted ${channelResult.affected} channel records`);
+
+      // Phase 5: Soft delete owned Teams
+      const teamResult = await queryRunner.manager.update(
+        Team,
+        { ownerIdentityId: identityId },
+        { deletedAt: now }
+      );
+      this.logger.log(`[Soft Delete] Soft-deleted ${teamResult.affected} team records`);
+
+      // Phase 5: Soft delete Media uploaded by this Identity
+      const mediaResult = await queryRunner.manager.update(
+        Media,
+        { uploaderIdentityId: identityId },
+        { deletedAt: now }
+      );
+      this.logger.log(`[Soft Delete] Soft-deleted ${mediaResult.affected} media records`);
+
+      // Phase 6: Revoke all Sessions for this Identity
+      const sessionResult = await queryRunner.manager.update(
+        Session,
+        { identityId },
+        { revoked: true, isActive: false }
+      );
+      this.logger.log(`[Soft Delete] Revoked ${sessionResult.affected} session records`);
+
+      // Phase 7: Soft delete Identity itself
+      const identityResult = await queryRunner.manager.softDelete(Identity, {
+        id: identityId,
+      });
+
+      if (identityResult.affected === 0) {
+        throw new Error(`Failed to soft delete identity ${identityId}`);
+      }
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `[Soft Delete] Successfully completed cascade soft-delete for identity ${identityId}`
+      );
+
+      return { recoveryDeadline };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(
+        `[Soft Delete] Failed to soft-delete identity ${identityId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+}

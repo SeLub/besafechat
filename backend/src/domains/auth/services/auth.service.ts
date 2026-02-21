@@ -62,6 +62,7 @@ export class AuthService {
     userAgent?: string
   ) {
     let isRecovered = false;
+    let isNewIdentity = false;
 
     // 1. Пробуем найти АКТИВНУЮ identity
     let identity = await this.identityService.findByIdentityPublicKey(publicKeyBase64);
@@ -74,6 +75,7 @@ export class AuthService {
         // Совсем не найден -> Новый пользователь (регистрируем)
         this.logger.log(`[Login] New identity detected, registering...`);
         identity = await this.identityService.registerIdentity(publicKeyBase64);
+        isNewIdentity = true;
 
         // Создаем дефолтный handle и профиль для новой идентичности
         const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
@@ -95,19 +97,31 @@ export class AuthService {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays > 90) {
-          // Окно истекло -> Ошибка
-          this.logger.warn(
-            `[Login] Recovery window expired for ${deletedIdentity.id} (${diffDays} days)`
+          // Окно истекло -> Создаем новый аккаунт (не выбрасываем ошибку)
+          this.logger.log(
+            `[Login] Recovery window expired for ${deletedIdentity.id} (${diffDays} days). Creating new identity instead.`
           );
-          throw new ForbiddenException(
-            `Account recovery window expired (${diffDays} days ago). Data has been permanently deleted. Please create a new account.`
-          );
-        }
+          identity = await this.identityService.registerIdentity(publicKeyBase64);
+          isNewIdentity = true;
 
-        // 4. Восстанавливаем аккаунт
-        this.logger.log(`[Login] Recovering deleted account: ${deletedIdentity.id}`);
-        identity = await this.identityService.recoverIdentity(deletedIdentity.id);
-        isRecovered = true;
+          // Создаем дефолтный handle для новой идентичности
+          const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
+          await this.handleService.createHandle({
+            value: generatedHandle,
+            type: 'account',
+            ownerIdentityId: identity.id,
+            isSearchable: true,
+            isPrimary: true,
+            profileData: {
+              displayName: 'Anonym User',
+            },
+          });
+        } else {
+          // 4. Восстанавливаем аккаунт (в пределах 90 дней)
+          this.logger.log(`[Login] Recovering deleted account: ${deletedIdentity.id}`);
+          identity = await this.identityService.recoverIdentity(deletedIdentity.id);
+          isRecovered = true;
+        }
       }
     }
 
@@ -145,7 +159,8 @@ export class AuthService {
       session: sessionResult.session,
       tokens: sessionResult.tokens,
       identity,
-      recovered: isRecovered, // Флаг для фронтенда
+      recovered: isRecovered, // true если восстановлен удаленный аккаунт в пределах 90 дней
+      isNewIdentity, // true если создана совершенно новая identity (никогда не была или истекла)
     };
   }
 

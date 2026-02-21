@@ -22,6 +22,8 @@ export function useAuthFlow() {
   const [step, setStep] = useState<AuthStep>('main');
   const [method, setMethod] = useState<AuthMethod>(null);
   const [seed, setSeed] = useState<string[]>([]);
+  const [showRecoveredModal, setShowRecoveredModal] = useState(false);
+  const [showNewAccountModal, setShowNewAccountModal] = useState(false);
 
   useEffect(() => {
     const attemptAutoLogin = async () => {
@@ -137,8 +139,15 @@ export function useAuthFlow() {
         await StorageService.storePublicKey(publicKeyBase64);
       }
 
-      toast.success('Account recovered!');
-      window.location.href = '/';
+      // Show appropriate modal based on login result
+      if (loginResult.recovered) {
+        setShowRecoveredModal(true);
+      } else if (loginResult.isNewIdentity) {
+        setShowNewAccountModal(true);
+      } else {
+        // Regular login - just redirect
+        window.location.href = '/';
+      }
     } catch (error: any) {
       toast.error(error.message || 'Recovery failed');
       throw error; // Re-throw to allow component to catch if needed
@@ -165,8 +174,15 @@ export function useAuthFlow() {
         await StorageService.storePublicKey(publicKeyBase64);
       }
 
-      toast.success('Account recovered!');
-      window.location.href = '/';
+      // Show appropriate modal based on login result
+      if (loginResult.recovered) {
+        setShowRecoveredModal(true);
+      } else if (loginResult.isNewIdentity) {
+        setShowNewAccountModal(true);
+      } else {
+        // Regular login - just redirect
+        window.location.href = '/';
+      }
     } catch (error: any) {
       toast.error(error.message || 'Recovery failed');
       throw error; // Re-throw to allow component to catch if needed
@@ -175,10 +191,22 @@ export function useAuthFlow() {
     }
   };
 
+  const handleRecoveredModalClose = () => {
+    setShowRecoveredModal(false);
+    window.location.href = '/';
+  };
+
+  const handleNewAccountModalClose = () => {
+    setShowNewAccountModal(false);
+    window.location.href = '/';
+  };
+
   return {
     loading,
     step,
     seed,
+    showRecoveredModal,
+    showNewAccountModal,
     handleCreateAccount,
     handleMethodSelect,
     handleSeedConfirmed,
@@ -188,5 +216,7 @@ export function useAuthFlow() {
     handleRecovery,
     handlePasswordRecovery,
     handleSeedRecovery,
+    handleRecoveredModalClose,
+    handleNewAccountModalClose,
   };
 }

@@ -10,12 +10,16 @@ import { PasswordCreation } from '@/components/auth/password-creation';
 import { RecoveryOptions } from '@/components/auth/recovery-options';
 import { SeedDisplay } from '@/components/auth/seed-display';
 import { SeedVerification } from '@/components/auth/seed-verification';
+import { AccountRecoveredModal } from '@/components/modals/account-recovered-modal';
+import { NewAccountCreatedModal } from '@/components/modals/new-account-created-modal';
 
 export default function AuthRoute() {
   const {
     loading,
     step, // Предполагаем, что тип AuthStep не включает 'initial'
     seed,
+    showRecoveredModal,
+    showNewAccountModal,
     handleCreateAccount,
     handleMethodSelect,
     handleSeedConfirmed,
@@ -24,6 +28,8 @@ export default function AuthRoute() {
     handleRecovery,
     handlePasswordRecovery,
     handleSeedRecovery,
+    handleRecoveredModalClose,
+    handleNewAccountModalClose,
   } = useAuthFlow();
 
   const { isMobile } = useMediaQuery();
@@ -169,5 +175,19 @@ export default function AuthRoute() {
     }
   };
 
-  return <PageWrapper id={step}>{renderStepContent()}</PageWrapper>;
+  return (
+    <>
+      <PageWrapper id={step}>{renderStepContent()}</PageWrapper>
+      
+      {/* Soft Delete Recovery Modals */}
+      <AccountRecoveredModal 
+        isOpen={showRecoveredModal} 
+        onClose={handleRecoveredModalClose} 
+      />
+      <NewAccountCreatedModal 
+        isOpen={showNewAccountModal} 
+        onClose={handleNewAccountModalClose} 
+      />
+    </>
+  );
 }

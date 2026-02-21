@@ -221,6 +221,8 @@ export class AuthSessionController {
       identityId: result.identity.id,
       sessionId: result.session.id,
       handleId: result.session.activeHandleId,
+      recovered: result.recovered,
+      isNewIdentity: result.isNewIdentity,
     });
   }
 
