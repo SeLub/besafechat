@@ -2,6 +2,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -18,7 +19,9 @@ import { ChannelMessage } from './channel-message.entity';
 @Entity('channels')
 @Index('idx_channels_public', ['isPublic', 'createdAt'], { where: '"isPublic" = true' })
 @Index('idx_channels_owner', ['ownerIdentityId'])
-@Index('idx_channels_last_activity', ['lastBroadcastAt'], { where: '"lastBroadcastAt" IS NOT NULL' })
+@Index('idx_channels_last_activity', ['lastBroadcastAt'], {
+  where: '"lastBroadcastAt" IS NOT NULL',
+})
 export class Channel {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -67,7 +70,7 @@ export class Channel {
   };
 
   // Владелец канала
-  @ManyToOne(() => Identity, { nullable: false })
+  @ManyToOne(() => Identity, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ownerIdentityId' })
   ownerIdentity!: Identity;
 
@@ -86,6 +89,9 @@ export class Channel {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   // Связи
   @OneToMany(() => ChannelSubscriber, (subscriber) => subscriber.channel)

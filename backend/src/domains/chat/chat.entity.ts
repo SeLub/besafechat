@@ -18,7 +18,13 @@
 
 //     sessionData - хранение цепочек ключей и ключей сообщений для дешифрования
 
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('chats')
 export class Chat {
@@ -52,4 +58,7 @@ export class Chat {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 }

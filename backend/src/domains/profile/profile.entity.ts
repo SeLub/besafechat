@@ -4,6 +4,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -62,6 +63,9 @@ export class Profile {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;

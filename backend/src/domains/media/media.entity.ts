@@ -2,6 +2,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -71,6 +72,9 @@ export class Media {
 
   @CreateDateColumn({ type: 'timestamptz' })
   uploadedAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   // Время последнего доступа (для очистки неиспользуемых файлов)
   @Column({ type: 'timestamptz', nullable: true })

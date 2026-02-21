@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/backend/src/domains/media/media.module.ts
 import { Module, forwardRef } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { MediaController } from './media.controller';

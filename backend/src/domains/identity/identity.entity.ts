@@ -1,5 +1,12 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/identity/identity.entity.ts
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Handle } from '../handle/handle.entity';
 import { Session } from '../session/session.entity';
 
@@ -13,6 +20,9 @@ export class Identity {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   // Только базовые связи
   @OneToMany(() => Handle, (handle) => handle.ownerIdentity)

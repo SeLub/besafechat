@@ -2,6 +2,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -88,7 +89,7 @@ export class Team {
   };
 
   // Владелец команды (Identity для правовых вопросов)
-  @ManyToOne(() => Identity, { nullable: false })
+  @ManyToOne(() => Identity, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ownerIdentityId' })
   ownerIdentity!: Identity;
 
@@ -100,6 +101,9 @@ export class Team {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   // Связи с членами через Handle
   @OneToMany(() => TeamMembership, (membership) => membership.team)

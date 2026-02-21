@@ -1,4 +1,11 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+// /home/selub/Documents/progs/besafechat/backend/src/domains/auth/services/auth.service.ts
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import { HandleService } from '../../handle/services/handle.service';
 import { IdentityService } from '../../identity/services/identity.service';
@@ -7,29 +14,19 @@ import { SessionService } from '../../session/services/session.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private identityService: IdentityService,
     private sessionService: SessionService,
     private handleService: HandleService,
-    private mediaService: MediaService,
+    private mediaService: MediaService
   ) {}
 
-  /**
-   * Генерирует handle на основе хэша публичного ключа
-   * @param publicKeyBase64 - публичный ключ в формате base64
-   * @returns строка handle в формате user_{hash}
-   */
   generateHandleFromPublicKey(publicKeyBase64: string): string {
-    // Декодируем base64 публичный ключ в байты
     const publicKeyBuffer = Buffer.from(publicKeyBase64, 'base64');
-
-    // Создаем хэш из публичного ключа
     const hash = crypto.createHash('sha256').update(publicKeyBuffer).digest('hex');
-
-    // Берем первые 16 символов хэша для краткости
     const hashPrefix = hash.substring(0, 12);
-
-    // Формируем handle в формате user_{hash}
     return `user_${hashPrefix}`;
   }
 
@@ -38,18 +35,16 @@ export class AuthService {
     deviceName: string,
     deviceType?: string,
     ipAddress?: string,
-    userAgent?: string,
+    userAgent?: string
   ) {
-    // Регистрируем Identity
     const identity = await this.identityService.registerIdentity(publicKeyBase64);
 
-    // Создаем сессию (без активного Handle, он будет установлен позже)
     const sessionResult = await this.sessionService.createSession(
       identity.id,
       deviceName,
       deviceType,
       ipAddress,
-      userAgent,
+      userAgent
     );
 
     return {
@@ -64,40 +59,66 @@ export class AuthService {
     deviceName: string,
     deviceType?: string,
     ipAddress?: string,
-    userAgent?: string,
+    userAgent?: string
   ) {
-    // Ищем Identity по публичному ключу
+    let isRecovered = false;
+
+    // 1. Пробуем найти АКТИВНУЮ identity
     let identity = await this.identityService.findByIdentityPublicKey(publicKeyBase64);
 
     if (!identity) {
-      // Если Identity не существует, регистрируем его (первый вход)
-      identity = await this.identityService.registerIdentity(publicKeyBase64);
+      // 2. Если не активна, проверяем, не была ли она мягко удалена
+      const deletedIdentity = await this.identityService.findDeletedByPublicKey(publicKeyBase64);
 
-      // Создаем дефолтный handle и профиль для новой идентичности
-      // Profile создается автоматически в handleService.createHandle()
-      const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
+      if (!deletedIdentity) {
+        // Совсем не найден -> Новый пользователь (регистрируем)
+        this.logger.log(`[Login] New identity detected, registering...`);
+        identity = await this.identityService.registerIdentity(publicKeyBase64);
 
-      await this.handleService.createHandle({
-        value: generatedHandle,
-        type: 'account',
-        ownerIdentityId: identity.id,
-        isSearchable: true,
-        isPrimary: true,
-        profileData: {
-          displayName: 'Anonym User',
-        },
-      });
+        // Создаем дефолтный handle и профиль для новой идентичности
+        const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
+        await this.handleService.createHandle({
+          value: generatedHandle,
+          type: 'account',
+          ownerIdentityId: identity.id,
+          isSearchable: true,
+          isPrimary: true,
+          profileData: {
+            displayName: 'Anonym User',
+          },
+        });
+      } else {
+        // 3. Найден soft-deleted аккаунт -> Проверяем окно восстановления
+        const now = new Date();
+        const deletedAt = new Date(deletedIdentity.deletedAt!);
+        const diffTime = Math.abs(now.getTime() - deletedAt.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 90) {
+          // Окно истекло -> Ошибка
+          this.logger.warn(
+            `[Login] Recovery window expired for ${deletedIdentity.id} (${diffDays} days)`
+          );
+          throw new ForbiddenException(
+            `Account recovery window expired (${diffDays} days ago). Data has been permanently deleted. Please create a new account.`
+          );
+        }
+
+        // 4. Восстанавливаем аккаунт
+        this.logger.log(`[Login] Recovering deleted account: ${deletedIdentity.id}`);
+        identity = await this.identityService.recoverIdentity(deletedIdentity.id);
+        isRecovered = true;
+      }
     }
 
-    // Получаем primary handle
+    // Получаем primary handle (он должен восстановиться вместе с аккаунтом)
     let activeHandle;
     try {
       activeHandle = await this.handleService.getPrimaryHandle(identity.id);
     } catch {
-      // If no primary handle exists (edge case), create default one
-      // Profile создается автоматически в handleService.createHandle()
+      // Edge case: если хендл не нашелся (например, ошибка БД), создаем новый
+      this.logger.warn(`[Login] Primary handle missing for ${identity.id}, creating default...`);
       const generatedHandle = this.generateHandleFromPublicKey(publicKeyBase64);
-
       activeHandle = await this.handleService.createHandle({
         value: generatedHandle,
         type: 'account',
@@ -110,20 +131,21 @@ export class AuthService {
       });
     }
 
-    // Создаем сессию с активным Handle
+    // Создаем сессию
     const sessionResult = await this.sessionService.createSession(
       identity.id,
       deviceName,
       deviceType,
       ipAddress,
       userAgent,
-      activeHandle.id, // Устанавливаем активный Handle
+      activeHandle.id
     );
 
     return {
       session: sessionResult.session,
       tokens: sessionResult.tokens,
       identity,
+      recovered: isRecovered, // Флаг для фронтенда
     };
   }
 
@@ -137,72 +159,34 @@ export class AuthService {
 
   async getIdentityProfile(identityId: string, activeHandleId?: string) {
     console.log('[Auth Service] getIdentityProfile called:', { identityId, activeHandleId });
-    
+
     const identity = await this.identityService.findByIdentityId(identityId);
     if (!identity) {
       throw new UnauthorizedException('Identity not found');
     }
 
-    // If activeHandleId is provided (from session), use it; otherwise use primary handle
     let handle: any;
     if (activeHandleId) {
       console.log(`[Auth Service] Fetching handle by activeHandleId: ${activeHandleId}`);
       try {
         handle = await this.handleService.findById(activeHandleId);
-        console.log(`[Auth Service] Fetched handle:`, {
-          found: !!handle,
-          id: handle?.id,
-          value: handle?.value,
-          ownerIdentityId: handle?.ownerIdentityId,
-        });
-        
-        // Validate that handle exists and belongs to this identity
-        if (!handle || !handle.ownerIdentityId) {
-          if (handle && !handle.ownerIdentityId) {
-            console.warn(`[Auth Service] Active handle ${activeHandleId} has no ownerIdentityId, reloading...`);
-            // Reload with explicit select
-            handle = await this.handleService.findById(activeHandleId);
-          }
-        }
-        
+
         if (!handle || handle.ownerIdentityId !== identityId) {
-          console.warn(`[Auth Service] Active handle ${activeHandleId} not found or doesn't belong to identity ${identityId}, falling back to primary`);
-          // Fallback to primary handle if active handle not found or doesn't match
+          console.warn(`[Auth Service] Active handle mismatch, falling back to primary`);
           handle = await this.handleService.getPrimaryHandle(identityId);
-          console.log(`[Auth Service] Fallback to primary handle:`, {
-            id: handle?.id,
-            value: handle?.value,
-          });
         }
       } catch (error) {
-        console.error(`[Auth Service] Error fetching active handle ${activeHandleId}:`, error);
-        // Fallback to primary handle on error
+        console.error(`[Auth Service] Error fetching active handle:`, error);
         handle = await this.handleService.getPrimaryHandle(identityId);
-        console.log(`[Auth Service] Error fallback to primary handle:`, {
-          id: handle?.id,
-          value: handle?.value,
-        });
       }
     } else {
-      // Fallback to primary handle (always guaranteed to exist from loginWithPublicKey)
-      console.log(`[Auth Service] No activeHandleId provided, using primary handle for identity ${identityId}`);
       handle = await this.handleService.getPrimaryHandle(identityId);
-      console.log(`[Auth Service] Primary handle:`, {
-        id: handle?.id,
-        value: handle?.value,
-      });
     }
-    
+
     if (!handle) {
       throw new UnauthorizedException('No valid handle found for identity');
     }
-    
-    console.log(`[Auth Service] Final handle to return:`, {
-      id: handle?.id,
-      value: handle?.value,
-    });
 
-    // Получаем profile для handle из handle relation
     const profile = handle.profile;
     if (!profile) {
       throw new UnauthorizedException('Profile not found for handle');
@@ -238,11 +222,7 @@ export class AuthService {
     return await this.sessionService.findActiveSessionsByIdentityId(identityId, currentSessionId);
   }
 
-  async revokeSessionById(
-    identityId: string,
-    sessionIdToRevoke: string,
-    currentSessionId: string,
-  ) {
+  async revokeSessionById(identityId: string, sessionIdToRevoke: string, currentSessionId: string) {
     await this.sessionService.revokeSessionById(identityId, sessionIdToRevoke, currentSessionId);
   }
 
@@ -256,20 +236,18 @@ export class AuthService {
     deviceName: string,
     ipAddress: string
   ) {
-    // Verify handle belongs to this identity
     const handle = await this.handleService.findById(handleId);
     if (!handle || handle.ownerIdentityId !== identityId) {
       throw new BadRequestException('Handle not found or does not belong to this identity');
     }
 
-    // Create new session with this handle as activeHandle
     const result = await this.sessionService.createSession(
       identityId,
       deviceName,
-      undefined, // deviceType
+      undefined,
       ipAddress,
-      undefined, // userAgent
-      handleId // activeHandleId
+      undefined,
+      handleId
     );
 
     return {

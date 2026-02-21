@@ -6,6 +6,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -29,7 +30,7 @@ export class MessageMetadata {
   chatId!: string;
 
   // Отправитель через Handle (type='account')
-  @ManyToOne(() => Handle, { onDelete: 'RESTRICT', nullable: false })
+  @ManyToOne(() => Handle, { onDelete: 'CASCADE', nullable: false })
   @JoinColumn({ name: 'senderHandleId' })
   senderHandle!: Handle;
 
@@ -96,6 +97,9 @@ export class MessageMetadata {
   // Флаги
   @Column({ type: 'boolean', default: false })
   isDeleted!: boolean; // Мягкое удаление
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 
   @Column({ type: 'boolean', default: false })
   isPinned!: boolean; // Закрепленное сообщение

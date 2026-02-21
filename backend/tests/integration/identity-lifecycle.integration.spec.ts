@@ -1,0 +1,246 @@
+// /home/selub/Documents/progs/besafechat/backend/tests/integration/identity-lifecycle.integration.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { DataSource, Repository } from 'typeorm';
+import { Identity } from '../../src/domains/identity/identity.entity';
+import { Handle } from '../../src/domains/handle/handle.entity';
+import { Profile } from '../../src/domains/profile/profile.entity';
+import { Channel } from '../../src/domains/channel/channel.entity';
+import { Team } from '../../src/domains/team/team.entity';
+import { Media } from '../../src/domains/media/media.entity';
+import { MessageMetadata } from '../../src/domains/message/message-metadata.entity';
+import { IdentityModule } from '../../src/domains/identity/identity.module';
+import { HandleModule } from '../../src/domains/handle/handle.module';
+import { MediaService } from '../../src/domains/media/media.service';
+import { IdentityCleanupService } from '../../src/domains/identity/services/identity-cleanup.service';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+// Мокаем MediaService, чтобы не удалять реальные файлы из S3 во время тестов
+const mockMediaService = {
+  deleteFile: jest.fn().mockResolvedValue(undefined),
+};
+
+describe('Identity Lifecycle & Cleanup (Integration)', () => {
+  let app: INestApplication;
+  let identityRepo: Repository<Identity>;
+  let handleRepo: Repository<Handle>;
+  let channelRepo: Repository<Channel>;
+  let teamRepo: Repository<Team>;
+  let mediaRepo: Repository<Media>;
+  let messageRepo: Repository<MessageMetadata>;
+  let cleanupService: IdentityCleanupService;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        TypeOrmModule.forRoot({
+          type: 'postgres',
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          username: process.env.DB_USER || 'postgres',
+          password: process.env.DB_PASSWORD || 'postgres',
+          database: process.env.DB_NAME_TEST || 'besafechat_test', // Используйте отдельную тестовую БД!
+          entities: [
+            Identity,
+            Handle,
+            Profile,
+            Channel,
+            Team,
+            Media,
+            MessageMetadata,
+            // Добавьте другие сущности если нужно
+          ],
+          synchronize: true, // Только для тестов!
+          dropSchema: true, // Очищать схему перед каждым запуском тестов
+        }),
+        IdentityModule,
+        HandleModule,
+        // Переопределяем провайдер MediaService на мок
+        TypeOrmModule.forFeature([Media]),
+      ],
+    })
+      .overrideProvider(MediaService)
+      .useValue(mockMediaService)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    dataSource = moduleFixture.get(DataSource);
+    identityRepo = dataSource.getRepository(Identity);
+    handleRepo = dataSource.getRepository(Handle);
+    channelRepo = dataSource.getRepository(Channel);
+    teamRepo = dataSource.getRepository(Team);
+    mediaRepo = dataSource.getRepository(Media);
+    messageRepo = dataSource.getRepository(MessageMetadata);
+    cleanupService = moduleFixture.get(IdentityCleanupService);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    // Очистка мок-вызовов перед каждым тестом
+    jest.clearAllMocks();
+    // synchronize: true и dropSchema: true в конфиге сделают грязную работу,
+    // но можно явно очистить таблицы если нужно
+    await dataSource.query('TRUNCATE TABLE "media" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "message_metadata" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "channels" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "teams" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "profiles" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "handles" CASCADE');
+    await dataSource.query('TRUNCATE TABLE "identities" CASCADE');
+  });
+
+  it('should soft delete identity and allow recovery within 90 days', async () => {
+    // 1. Создаем идентичность
+    const identity = identityRepo.create({
+      masterPublicKey: Buffer.from('test_public_key_32_bytes_long!!', 'utf-8'),
+    });
+    await identityRepo.save(identity);
+
+    // 2. Имитируем Soft Delete (в реальности это делает другой сервис/триггер)
+    const now = new Date();
+    identity.deletedAt = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000); // 10 дней назад
+    await identityRepo.save(identity);
+
+    // 3. Проверяем, что при поиске активного она не находится
+    const active = await identityRepo.findOne({ where: { id: identity.id } });
+    expect(active).toBeNull();
+
+    // 4. Проверяем, что при поиске с deleted она находится
+    const deleted = await identityRepo.findOne({ withDeleted: true, where: { id: identity.id } });
+    expect(deleted).toBeDefined();
+    expect(deleted!.deletedAt).toBeDefined();
+
+    // 5. Запускаем восстановление (эмуляция того, что делает AuthService)
+    // В реальном коде это делает identityService.recoverIdentity
+    await dataSource.manager.restore(Identity, { id: identity.id });
+
+    const restored = await identityRepo.findOne({ where: { id: identity.id } });
+    expect(restored).toBeDefined();
+    expect(restored!.deletedAt).toBeNull();
+  });
+
+  it('should HARD DELETE identity and all related data after 90 days', async () => {
+    // 1. Создаем полную цепочку данных
+    const identity = identityRepo.create({
+      masterPublicKey: Buffer.from('cleanup_test_key_32_bytes!!!!', 'utf-8'),
+    });
+    await identityRepo.save(identity);
+
+    const handle = handleRepo.create({
+      value: 'test_user_cleanup',
+      ownerIdentityId: identity.id,
+      isPrimary: true,
+      isSearchable: true,
+      type: 'account',
+    });
+    await handleRepo.save(handle);
+
+    const channel = channelRepo.create({
+      handleId: handle.id,
+      handle: handle,
+      ownerIdentityId: identity.id,
+      ownerIdentity: identity,
+      isPublic: true,
+      settings: {},
+    });
+    await channelRepo.save(channel);
+
+    const team = teamRepo.create({
+      handleId: handle.id,
+      handle: handle,
+      name: 'Test Team',
+      slug: 'test-team-cleanup',
+      ownerIdentityId: identity.id,
+      ownerIdentity: identity,
+      namingPolicy: { pattern: '.*', required: false },
+      settings: {},
+    });
+    await teamRepo.save(team);
+
+    const media = mediaRepo.create({
+      storageKey: 's3-key-to-delete-123',
+      mimeType: 'image/png',
+      size: 1024,
+      uploaderIdentityId: identity.id,
+      status: 'uploaded',
+      metadata: {},
+    });
+    await mediaRepo.save(media);
+
+    const message = messageRepo.create({
+      chatId: channel.id,
+      senderHandleId: handle.id,
+      type: 'text',
+      text: 'Hello World',
+      timestamp: new Date(),
+    });
+    await messageRepo.save(message);
+
+    // 2. Имитируем истечение срока (91 день назад)
+    const expiredDate = new Date();
+    expiredDate.setDate(expiredDate.getDate() - 91);
+
+    identity.deletedAt = expiredDate;
+    await identityRepo.save(identity);
+
+    // 3. Запускаем процесс очистки (вызываем приватный метод через cast или публичный крон)
+    // Так как крон зависит от времени, вызовем внутреннюю логику напрямую для теста
+    await (cleanupService as any).deleteIdentityCascade(identity.id);
+
+    // 4. ПРОВЕРКИ: Всё должно быть удалено
+
+    // Identity удален
+    const foundIdentity = await identityRepo.findOne({
+      withDeleted: true,
+      where: { id: identity.id },
+    });
+    expect(foundIdentity).toBeNull();
+
+    // Handle удален (каскад или явное удаление)
+    const foundHandle = await handleRepo.findOne({
+      withDeleted: true,
+      where: { ownerIdentityId: identity.id },
+    });
+    expect(foundHandle).toBeNull();
+
+    // Channel удален
+    const foundChannel = await channelRepo.findOne({
+      withDeleted: true,
+      where: { ownerIdentityId: identity.id },
+    });
+    expect(foundChannel).toBeNull();
+
+    // Team удален
+    const foundTeam = await teamRepo.findOne({
+      withDeleted: true,
+      where: { ownerIdentityId: identity.id },
+    });
+    expect(foundTeam).toBeNull();
+
+    // Message удален (каскад от Handle или явный)
+    const foundMessage = await messageRepo.findOne({
+      withDeleted: true,
+      where: { senderHandleId: handle.id },
+    });
+    expect(foundMessage).toBeNull();
+
+    // Media удален из БД
+    const foundMedia = await mediaRepo.findOne({
+      withDeleted: true,
+      where: { uploaderIdentityId: identity.id },
+    });
+    expect(foundMedia).toBeNull();
+
+    // ВАЖНО: Проверить, что был вызван метод удаления из S3
+    expect(mockMediaService.deleteFile).toHaveBeenCalledWith('s3-key-to-delete-123');
+  });
+});

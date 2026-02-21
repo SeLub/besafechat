@@ -1,28 +1,25 @@
 module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testMatch: [
     '**/tests/**/*.spec.ts',
     '**/__tests__/**/*.spec.ts',
-    '**/?(*.)+(spec|test).ts',
   ],
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
-  },
-  testEnvironment: 'node',
-  collectCoverageFrom: ['**/src/**/*.(t|j)s'],
-  coverageDirectory: './coverage',
-  // Handle ESM modules - skip transforming node_modules that have ESM issues
-  moduleNameMapper: {
-    '^uuid$': require.resolve('uuid'),
-  },
-  globals: {
-    'ts-jest': {
+    '^.+\\.ts$': ['ts-jest', {
       tsconfig: {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
+        module: 'commonjs',
         types: ['jest', 'node'],
       },
-    },
+    }],
   },
+  moduleNameMapper: {
+    '^uuid$': require.resolve('uuid'),
+  },
+  collectCoverageFrom: ['**/src/**/*.(t|j)s'],
+  coverageDirectory: './coverage',
 };

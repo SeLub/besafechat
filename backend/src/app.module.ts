@@ -1,7 +1,8 @@
-///home/selub/Documents/progs/besafechat/backend/src/app.module.ts
+// /home/selub/Documents/progs/besafechat/backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule'; // <-- Импорт
 import { DatabaseModule } from './db/database.module';
 import { AuthModule } from './domains/auth/auth.module';
 import { ChatModule } from './domains/chat/chat.module';
@@ -21,6 +22,7 @@ import { getCorsConfig } from './common/config/cors-origins';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(), // <-- Включение планировщика
     DatabaseModule,
     RedisModule,
     AuthModule,

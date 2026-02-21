@@ -38,7 +38,7 @@ export class TeamMembership {
   @Column({ type: 'uuid', nullable: true })
   invitedByHandleId?: string;
 
-  @ManyToOne(() => Handle, { nullable: true })
+  @ManyToOne(() => Handle, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'invitedByHandleId' })
   invitedByHandle?: Handle;
 
