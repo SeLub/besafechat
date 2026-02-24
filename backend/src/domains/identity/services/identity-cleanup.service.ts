@@ -1,5 +1,5 @@
 // /home/selub/Documents/progs/besafechat/backend/src/domains/identity/services/identity-cleanup.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In, DataSource } from 'typeorm';
@@ -38,6 +38,7 @@ export class IdentityCleanupService {
     private messageRepo: Repository<MessageMetadata>,
     @InjectRepository(Team)
     private teamRepo: Repository<Team>,
+    @Inject(forwardRef(() => MediaService))
     private mediaService: MediaService, // Для удаления файлов из S3
     private dataSource: DataSource
   ) {}
