@@ -3,6 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { apiRequest } from '@/services/api-utils';
+import { useProfileSettings } from '@/hooks/use-profile-settings';
 import {
   Bell,
   Briefcase,
@@ -56,21 +57,24 @@ interface HamburgerMenuProps {
 }
 
 export function HamburgerMenu({
-   userProfile,
-   onProfileClick,
-   onContactsClick,
-   onSettingsClick,
-   onNotificationsClick,
- }: HamburgerMenuProps) {
+    userProfile,
+    onProfileClick,
+    onContactsClick,
+    onSettingsClick,
+    onNotificationsClick,
+  }: HamburgerMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [handleProfilesOpen, setHandleProfilesOpen] = useState(false);
   const [handleSwitcherOpen, setHandleSwitcherOpen] = useState(false);
   const [userHandles, setUserHandles] = useState<Handle[]>([]);
   const [loadingHandles, setLoadingHandles] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { counts, clearNotifications } = useNotifications();
   const { unreadCount } = useNotificationHistory();
   const { user, switchToHandle } = useAuth();
+  const { settings, updateSettings } = useProfileSettings();
+
+  const isDarkMode = settings.ui.mode === 'dark';
 
   const totalNotifications = counts.newRequests + counts.newAccepted;
 
@@ -94,9 +98,28 @@ export function HamburgerMenu({
     }
   }, [handleSwitcherOpen]);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark');
+  const toggleDarkMode = async () => {
+    setIsLoading(true);
+    try {
+      const newMode = isDarkMode ? 'light' : 'dark';
+      await updateSettings({
+        ui: {
+          theme: settings.ui.theme,
+          language: settings.ui.language,
+          mode: newMode,
+        },
+      });
+      // Update DOM based on mode
+      if (newMode === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (error) {
+      console.error('Failed to update night mode:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -223,7 +246,11 @@ export function HamburgerMenu({
                     </div>
                     <span className="text-sm font-bold text-foreground/80">Night Mode</span>
                   </div>
-                  <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
+                  <Switch 
+                    checked={isDarkMode} 
+                    onCheckedChange={toggleDarkMode}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
             </div>

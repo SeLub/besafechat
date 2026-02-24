@@ -21,8 +21,8 @@ export const API_ENDPOINTS = {
 
   // Profile endpoints
   PROFILE: {
-    DISPLAY_NAME: `${API_CONFIG.BASE_URL}/profile/display-name`,
-    SETTINGS: `${API_CONFIG.BASE_URL}/profile/settings`,
+    DISPLAY_NAME: `${API_CONFIG.BASE_URL}/profiles/display-name`,
+    SETTINGS: `${API_CONFIG.BASE_URL}/profiles/settings`,
   },
 
   // Contacts endpoints
@@ -58,6 +58,14 @@ export const API_ENDPOINTS = {
   PROFILES: {
     UPDATE_BY_HANDLE: (handleId: string) => `/profiles/${handleId}`,
     GET_BY_HANDLE: (handleId: string) => `/profiles/${handleId}`,
+  },
+
+  // Notifications endpoints
+  NOTIFICATIONS: {
+    GET_ALL: `${API_CONFIG.BASE_URL}/notifications`,
+    GET_UNREAD_COUNT: `${API_CONFIG.BASE_URL}/notifications/unread-count`,
+    MARK_READ: (notificationId: string) => `${API_CONFIG.BASE_URL}/notifications/${notificationId}/read`,
+    MARK_ALL_READ: `${API_CONFIG.BASE_URL}/notifications/read-all`,
   },
 
   // WebSocket endpoints

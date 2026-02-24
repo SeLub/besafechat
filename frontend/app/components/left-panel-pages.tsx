@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
 import { useAuth } from '~/hooks/use-auth-context';
 import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { useProfileSettings } from '@/hooks/use-profile-settings';
 import {
   ArrowLeft,
   AtSign,
@@ -32,7 +33,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { UserService } from '~/services';
 import { IdentityService } from '~/services/identity.service';
@@ -70,6 +71,7 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const { logout, checkAuth, refreshUser } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } =
     useNotificationHistory();
+  const { settings, updateSettings } = useProfileSettings();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
@@ -80,6 +82,45 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
   const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+  const [isUpdatingSound, setIsUpdatingSound] = useState(false);
+
+  // Define all hooks before any conditional returns
+  const handleNotificationsChange = useCallback(
+    async (checked: boolean) => {
+      setIsUpdatingNotifications(true);
+      try {
+        await updateSettings({
+          notifications: checked,
+        });
+        toast.success(checked ? 'Notifications enabled' : 'Notifications disabled');
+      } catch (error) {
+        console.error('Failed to update notifications:', error);
+        toast.error('Failed to update notifications');
+      } finally {
+        setIsUpdatingNotifications(false);
+      }
+    },
+    [updateSettings]
+  );
+
+  const handleSoundChange = useCallback(
+    async (checked: boolean) => {
+      setIsUpdatingSound(true);
+      try {
+        await updateSettings({
+          sound: checked,
+        });
+        toast.success(checked ? 'Sound effects enabled' : 'Sound effects disabled');
+      } catch (error) {
+        console.error('Failed to update sound:', error);
+        toast.error('Failed to update sound');
+      } finally {
+        setIsUpdatingSound(false);
+      }
+    },
+    [updateSettings]
+  );
 
   if (!page) return null;
 
@@ -295,13 +336,17 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
                 icon={<Bell className="h-4 w-4" />}
                 label="Message Notifications"
                 hasSwitch
-                defaultChecked
+                checked={settings.notifications}
+                onChange={handleNotificationsChange}
+                isLoading={isUpdatingNotifications}
               />
               <SettingsItem
-                icon={<Volume2 className="h-4 w-4" />} // Добавь импорт Volume2 из lucide-react
+                icon={<Volume2 className="h-4 w-4" />}
                 label="Sound Effects"
                 hasSwitch
-                defaultChecked
+                checked={settings.sound}
+                onChange={handleSoundChange}
+                isLoading={isUpdatingSound}
               />
             </SettingsSection>
 
@@ -459,11 +504,25 @@ interface SettingsItemProps {
   icon: ReactNode;
   label: string;
   hasSwitch?: boolean;
-  defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+  isLoading?: boolean;
   onClick?: () => void;
 }
 
-function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: SettingsItemProps) {
+function SettingsItem({
+  icon,
+  label,
+  hasSwitch,
+  checked,
+  onChange,
+  isLoading,
+  onClick,
+}: SettingsItemProps) {
+  const handleSwitchChange = (value: boolean) => {
+    onChange?.(value);
+  };
+
   return (
     <div
       className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-colors cursor-pointer group border-b border-primary/5 last:border-0"
@@ -485,10 +544,15 @@ function SettingsItem({ icon, label, hasSwitch, defaultChecked, onClick }: Setti
         </span>
       </div>
       {hasSwitch ? (
-        <Switch defaultChecked={defaultChecked} className="data-[state=checked]:bg-primary" />
+        <Switch
+          checked={checked}
+          onCheckedChange={handleSwitchChange}
+          disabled={isLoading}
+          className="data-[state=checked]:bg-primary"
+        />
       ) : (
         <div className="text-primary/20 group-hover:text-primary/60 transition-colors">
-          <ChevronRight size={16} /> {/* Добавь импорт ChevronRight */}
+          <ChevronRight size={16} />
         </div>
       )}
     </div>

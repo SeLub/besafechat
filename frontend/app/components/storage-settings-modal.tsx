@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { type MessageRetentionPeriod } from '@/lib/db/schema';
 import { StorageService } from '@/services/storage.service';
+import { useProfileSettings, type RetentionPeriod } from '@/hooks/use-profile-settings';
 import { Database, Trash2, Clock, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { ResponsiveModal } from './ui/responsive-modal';
@@ -12,8 +13,9 @@ interface StorageSettingsModalProps {
 }
 
 export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalProps) {
+  const { settings, updateSettings } = useProfileSettings();
   const [retention, setRetention] = useState<MessageRetentionPeriod>(
-    StorageService.getRetentionPeriod()
+    (settings.storage.messageRetentionDays as MessageRetentionPeriod) || 'forever'
   );
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -21,7 +23,14 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
   const handleSave = async () => {
     setLoading(true);
     try {
-      StorageService.setRetentionPeriod(retention);
+      // Update settings on server
+      await updateSettings({
+        storage: {
+          messageRetentionDays: retention,
+        },
+      });
+
+      // Clean up old messages locally if needed
       const deleted = await StorageService.cleanupOldMessagesWithSettings();
 
       if (deleted > 0) {
@@ -30,8 +39,9 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
         toast.success('Storage settings updated');
       }
       onClose();
-    } catch {
+    } catch (error) {
       toast.error('Failed to update storage settings');
+      console.error(error);
     } finally {
       setLoading(false);
     }

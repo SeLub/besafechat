@@ -52,9 +52,16 @@ export class Profile {
 
   @Column({ type: 'jsonb', default: {} })
   settings!: {
-    showEmail?: boolean;
-    showPhone?: boolean;
-    showPresence?: boolean;
+    ui?: {
+      theme?: string;
+      language?: string;
+      mode?: 'light' | 'dark'; // light or dark mode within the theme
+    };
+    storage?: {
+      messageRetentionDays?: string;
+    };
+    notifications?: boolean;
+    sound?: boolean;
     [key: string]: any;
   };
 

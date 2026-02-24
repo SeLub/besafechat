@@ -42,6 +42,20 @@ export class ProfileService {
       throw new BadRequestException('Profile already exists for this handle');
     }
 
+    // Default settings for new profiles
+    const defaultSettings = {
+      ui: {
+        theme: 'besafe',
+        language: 'en',
+        mode: 'dark',
+      },
+      storage: {
+        messageRetentionDays: 'forever',
+      },
+      notifications: true,
+      sound: true,
+    };
+
     // Создаем Profile
     const profile = this.profileRepository.create({
       handleId: data.handleId,
@@ -51,7 +65,7 @@ export class ProfileService {
       email: data.email,
       phone: data.phone,
       bio: data.bio,
-      settings: data.settings || {},
+      settings: data.settings || defaultSettings,
     });
 
     // Сохраняем Profile
@@ -168,28 +182,44 @@ export class ProfileService {
       createdAt: profile.createdAt,
     };
 
-    if (profile.settings.showEmail && profile.email) {
-      publicProfile.email = profile.email;
-    }
-
-    if (profile.settings.showPhone && profile.phone) {
-      publicProfile.phone = profile.phone;
-    }
-
-    if (profile.settings.showLastSeen && profile.metadata?.lastActive) {
-      publicProfile.lastActive = profile.metadata.lastActive;
-    }
+    // Privacy settings (showEmail, showPhone, etc.) removed - not used in new settings structure
 
     return publicProfile;
   }
 
-  async updateSettings(handleId: string, settings: Record<string, any>): Promise<Profile> {
+  async updateSettings(handleId: string, updates: Record<string, any>): Promise<Profile> {
     const profile = await this.getProfileByHandle(handleId);
 
-    // Обновляем только settings
-    profile.settings = { ...profile.settings, ...settings };
-    profile.updatedAt = new Date();
+    // Deep merge new settings with existing ones
+    profile.settings = {
+      ...profile.settings,
 
+      // Merge ui settings (nested object)
+      ...(updates.ui && {
+        ui: {
+          ...(profile.settings.ui || {}),
+          ...updates.ui,
+        },
+      }),
+
+      // Merge storage settings (nested object)
+      ...(updates.storage && {
+        storage: {
+          ...(profile.settings.storage || {}),
+          ...updates.storage,
+        },
+      }),
+
+      // Simple boolean fields
+      ...(updates.notifications !== undefined && {
+        notifications: updates.notifications,
+      }),
+      ...(updates.sound !== undefined && {
+        sound: updates.sound,
+      }),
+    };
+
+    profile.updatedAt = new Date();
     return this.profileRepository.save(profile);
   }
 

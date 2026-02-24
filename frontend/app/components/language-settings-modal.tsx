@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Globe2 } from 'lucide-react';
 import { ResponsiveModal } from './ui/responsive-modal';
 import { toast } from 'sonner';
+import { useProfileSettings, type Language } from '@/hooks/use-profile-settings';
 
 interface LanguageSettingsModalProps {
   isOpen: boolean;
@@ -9,21 +10,40 @@ interface LanguageSettingsModalProps {
 }
 
 export function LanguageSettingsModal({ isOpen, onClose }: LanguageSettingsModalProps) {
-  // В реальном приложении здесь должен быть ваш i18n hook (например, useTranslation)
-  const [currentLang, setCurrentLang] = useState('en');
+  const { settings, updateSettings } = useProfileSettings();
+  const [currentLang, setCurrentLang] = useState<Language>(settings.ui.language);
+  const [loading, setLoading] = useState(false);
 
   const languages = [
     { code: 'en', name: 'English', native: 'English' },
     { code: 'ru', name: 'Russian', native: 'Русский' },
     { code: 'de', name: 'German', native: 'Deutsch' },
     { code: 'fr', name: 'French', native: 'Français' },
-  ];
+  ] as const;
 
-  const handleSelect = (code: string) => {
-    setCurrentLang(code);
-    toast.success(`Language changed to ${languages.find(l => l.code === code)?.name}`);
-    // Здесь логика смены языка через i18next или другой либ
-    setTimeout(onClose, 300);
+  const handleSelect = async (code: string) => {
+    const langCode = code as Language;
+    setCurrentLang(langCode);
+    setLoading(true);
+
+    try {
+      await updateSettings({
+        ui: {
+          theme: settings.ui.theme,
+          language: langCode,
+        },
+      });
+
+      const langName = languages.find((l) => l.code === code)?.name;
+      toast.success(`Language changed to ${langName}`);
+      setTimeout(onClose, 300);
+    } catch (error) {
+      toast.error('Failed to update language');
+      // Revert on error
+      setCurrentLang(settings.ui.language);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,9 +65,10 @@ export function LanguageSettingsModal({ isOpen, onClose }: LanguageSettingsModal
               <button
                 key={lang.code}
                 onClick={() => handleSelect(lang.code)}
+                disabled={loading}
                 className={`
                   flex items-center justify-between p-5 rounded-[2rem] 
-                  border transition-all duration-300 outline-none
+                  border transition-all duration-300 outline-none disabled:opacity-50
                   ${
                     isActive
                       ? 'border-primary bg-primary/[0.03] translate-x-1'

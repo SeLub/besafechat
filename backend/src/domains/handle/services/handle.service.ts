@@ -257,6 +257,21 @@ export class HandleService {
       // Автоматическое создание профиля для account-типов
       if (data.type === 'account') {
         const profileData = data.profileData || {};
+        
+        // Default settings for new profiles
+        const defaultSettings = {
+          ui: {
+            theme: 'besafe',
+            language: 'en',
+            mode: 'dark',
+          },
+          storage: {
+            messageRetentionDays: 'forever',
+          },
+          notifications: true,
+          sound: true,
+        };
+        
         const profile = manager.create(Profile, {
           handleId: savedHandle.id,
           displayName: profileData.displayName || 'Anonym User',
@@ -265,7 +280,7 @@ export class HandleService {
           email: profileData.email,
           phone: profileData.phone,
           bio: profileData.bio,
-          settings: profileData.settings || {},
+          settings: profileData.settings || defaultSettings,
         });
 
         const savedProfile = await manager.save(profile);

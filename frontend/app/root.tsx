@@ -28,8 +28,8 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body>
-        <ThemeProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <ThemeProvider>
             <NotificationProvider>
               <AvatarUpdateProvider>
                 <OnlineStatusProvider>
@@ -38,8 +38,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 </OnlineStatusProvider>
               </AvatarUpdateProvider>
             </NotificationProvider>
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </AuthProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

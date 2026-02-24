@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from './use-auth-context';
 import { NotificationContext, type NotificationCounts } from './notification-context';
+import { API_ENDPOINTS } from '@/services/api-gateway';
+import { handleApiResponse } from '@/services/api-utils';
+
+const NOTIFICATION_SYNC_INTERVAL = 30000; // 30 seconds
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<NotificationCounts>({
@@ -10,26 +14,40 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   });
   const { user } = useAuth();
 
-  // Load persisted counts on mount
-  useEffect(() => {
-    if (user) {
-      const stored = localStorage.getItem(`notifications_${user.identity.id}`);
-      if (stored) {
-        try {
-          setCounts(JSON.parse(stored));
-        } catch (error) {
-          console.error('Failed to parse stored notifications:', error);
-        }
-      }
-    }
-  }, [user]);
+  // Fetch unread notification counts from server
+  const fetchNotificationCounts = async () => {
+    if (!user?.identity?.id) return;
 
-  // Persist counts to localStorage
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(`notifications_${user.identity.id}`, JSON.stringify(counts));
+    try {
+      const response = await fetch(API_ENDPOINTS.NOTIFICATIONS.GET_UNREAD_COUNT, {
+        credentials: 'include',
+      });
+
+      const data = await handleApiResponse<{ count: number }>(response);
+
+      // Server returns { count: number }
+      setCounts({
+        newRequests: data.count || 0,
+        newAccepted: 0,
+      });
+    } catch (error) {
+      console.error('Error fetching notification counts:', error);
+      // Silently fail - will retry in 30 seconds
     }
-  }, [counts, user]);
+  };
+
+  // Load counts from server on mount and user change
+  useEffect(() => {
+    if (user?.identity?.id) {
+      // Fetch immediately
+      fetchNotificationCounts();
+
+      // Set up periodic refresh (every 30 seconds)
+      const interval = setInterval(fetchNotificationCounts, NOTIFICATION_SYNC_INTERVAL);
+
+      return () => clearInterval(interval);
+    }
+  }, [user?.identity?.id]);
 
   const clearNotifications = () => {
     setCounts({ newRequests: 0, newAccepted: 0 });

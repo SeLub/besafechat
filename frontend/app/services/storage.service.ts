@@ -99,7 +99,7 @@ export interface LocalBackup {
 // ============================================================================
 
 export class StorageService {
-  private static readonly RETENTION_KEY = 'message_retention_days';
+  // RETENTION_KEY removed - retention period is now in profile.settings
   private static readonly DEFAULT_KDF_ITERATIONS = 210000;
   private static readonly AES_KEY_LENGTH = 256;
 
@@ -662,16 +662,26 @@ export class StorageService {
   /**
    * Получение настроек периода хранения
    */
+  /**
+   * @deprecated Use useProfileSettings hook instead
+   * Retention period is now stored in profile.settings.storage.messageRetentionDays
+   */
   static getRetentionPeriod(): MessageRetentionPeriod {
-    return (localStorage.getItem(StorageService.RETENTION_KEY) as MessageRetentionPeriod) || '90';
+    console.warn(
+      'StorageService.getRetentionPeriod() is deprecated. Use useProfileSettings hook instead.'
+    );
+    return 'forever'; // Default fallback
   }
 
   /**
-   * Установка настроек периода хранения
+   * @deprecated Use useProfileSettings hook instead
+   * Retention period is now stored in profile.settings.storage.messageRetentionDays
    */
   static setRetentionPeriod(period: MessageRetentionPeriod): void {
-    localStorage.setItem(StorageService.RETENTION_KEY, period);
-    console.log(`Retention period set to: ${period}`);
+    console.warn(
+      'StorageService.setRetentionPeriod() is deprecated. Use useProfileSettings hook instead.'
+    );
+    // No-op, kept for backwards compatibility
   }
 
   /**
@@ -971,7 +981,7 @@ export class StorageService {
       await getDb().messages.clear();
       await getDb().contacts.clear();
       await getDb().publicKey.clear();
-      localStorage.removeItem(StorageService.RETENTION_KEY);
+      // Note: Retention settings are now in profile.settings, not localStorage
       console.log('All storage data cleared');
     } catch (error) {
       console.error('Error clearing storage data:', error);

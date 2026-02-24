@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger
 import { JwtSessionGuard } from '../../session/guards/jwt-session.guard';
 import { CurrentHandle } from '../../session/decorators/current-user.decorator';
 import { NotificationService } from '../services/notification.service';
+import { ApiResponseDto } from '../../../common/dto/api-response.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -33,7 +34,7 @@ export class NotificationController {
       limit,
       offset
     );
-    return { notifications };
+    return new ApiResponseDto(true, { notifications });
   }
 
   @Post(':id/read')
@@ -41,7 +42,7 @@ export class NotificationController {
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
   async markAsRead(@CurrentHandle() handle: any, @Param('id', ParseUUIDPipe) notificationId: string) {
     await this.notificationService.markAsRead(handle.id, notificationId);
-    return { success: true };
+    return new ApiResponseDto(true, { message: 'Notification marked as read' });
   }
 
   @Post('read-all')
@@ -49,7 +50,7 @@ export class NotificationController {
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
   async markAllAsRead(@CurrentHandle() handle: any) {
     await this.notificationService.markAllAsRead(handle.id);
-    return { success: true };
+    return new ApiResponseDto(true, { message: 'All notifications marked as read' });
   }
 
   @Get('unread-count')
@@ -57,6 +58,6 @@ export class NotificationController {
   @ApiResponse({ status: 200, description: 'Unread count retrieved successfully' })
   async getUnreadCount(@CurrentHandle() handle: any) {
     const count = await this.notificationService.getUnreadCount(handle.id);
-    return { count };
+    return new ApiResponseDto(true, { count });
   }
 }
