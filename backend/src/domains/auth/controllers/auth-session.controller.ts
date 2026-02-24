@@ -411,24 +411,25 @@ export class AuthSessionController {
   }
 
   private setAuthCookies(res: ResponseWithCookies, accessToken: string, refreshToken: string) {
-    // In production (HTTPS), use strict. In development (HTTP), use lax for cross-IP access
-    const sameSite = process.env.NODE_ENV === 'production' ? 'strict' : 'lax';
-    const isProduction = process.env.NODE_ENV === 'production';
-
+    // HTTPS requires secure: true and sameSite: 'none' for cross-origin cookies
+    const isHttps = process.env.HTTPS === 'true';
+    
     res.cookie('access_token', accessToken, {
       httpOnly: true,
-      secure: isProduction,
+      secure: isHttps,
       maxAge: 30 * 60 * 1000, // 30 minutes
-      sameSite,
+      sameSite: isHttps ? 'none' : 'lax',
       path: '/',
+      domain: undefined, // Allow all subdomains
     });
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: isProduction,
+      secure: isHttps,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      sameSite,
+      sameSite: isHttps ? 'none' : 'lax',
       path: '/',
+      domain: undefined, // Allow all subdomains
     });
   }
 }

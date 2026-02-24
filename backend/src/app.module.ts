@@ -16,7 +16,7 @@ import { ProfileModule } from './domains/profile/profile.module';
 import { SessionModule } from './domains/session/session.module';
 import { TeamModule } from './domains/team/team.module';
 import { RedisModule } from './domains/redis/redis.module';
-import { getCorsConfig } from './common/config/cors-origins';
+
 
 @Module({
   imports: [
@@ -38,8 +38,4 @@ import { getCorsConfig } from './common/config/cors-origins';
     MediaModule,
   ],
 })
-export class AppModule {
-  static configureCors() {
-    return getCorsConfig();
-  }
-}
+export class AppModule {}

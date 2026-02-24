@@ -53,13 +53,29 @@ async function bootstrap() {
     httpsOptions,
   });
 
+  const configService = app.get(ConfigService);
+
   app.useWebSocketAdapter(new IoAdapter(app));
 
   // Логгер
   app.useLogger(new PinoLogger());
 
-  // CORS из конфига
-  app.enableCors(AppModule.configureCors());
+  // CORS - получаем конфиг после инициализации ConfigModule
+  const corsOrigins = (configService.get('CORS_ORIGINS') || 'https://localhost:5173,https://192.168.100.35:5173')
+    .split(',')
+    .map((origin: string) => origin.trim())
+    .filter((origin: string) => origin.length > 0);
+
+  console.log('CORS Origins configured:', corsOrigins);
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Set-Cookie'],
+    optionsSuccessStatus: 200,
+  });
 
   // Прочее
   app.use(cookieParser());
@@ -68,7 +84,6 @@ async function bootstrap() {
   // Swagger
   await registerSwagger(app);
 
-  const configService = app.get(ConfigService);
   const port = configService.get('PORT', 4000);
 
   // Graceful shutdown handling to prevent port conflicts during restarts
