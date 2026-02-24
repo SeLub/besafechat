@@ -252,10 +252,7 @@ export class ContactRequestController {
   @ApiBadRequestResponse({ description: 'Invalid request data (e.g. invalid UUID format)' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
   @ApiNotFoundResponse({ description: 'Contact request not found' })
-  async acceptRequest(
-    @CurrentHandle() handle: any,
-    @Param('id', ParseUUIDPipe) requestId: string
-  ) {
+  async acceptRequest(@CurrentHandle() handle: any, @Param('id', ParseUUIDPipe) requestId: string) {
     return await this.contactRequestService.acceptRequest(requestId, handle.id);
   }
 
@@ -275,10 +272,7 @@ export class ContactRequestController {
   @ApiBadRequestResponse({ description: 'Invalid request data (e.g. invalid UUID format)' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
   @ApiNotFoundResponse({ description: 'Contact request not found' })
-  async rejectRequest(
-    @CurrentHandle() handle: any,
-    @Param('id', ParseUUIDPipe) requestId: string
-  ) {
+  async rejectRequest(@CurrentHandle() handle: any, @Param('id', ParseUUIDPipe) requestId: string) {
     return await this.contactRequestService.rejectRequest(requestId, handle.id);
   }
 
@@ -357,49 +351,5 @@ export class ContactRequestController {
   async getContacts(@CurrentHandle() handle: any) {
     const contacts = await this.contactRequestService.getAcceptedContacts(handle.id);
     return { contacts };
-  }
-
-  @Post('bulk-online-status')
-  @ApiOperation({
-    summary: 'Get bulk online status for multiple handles',
-    description: 'Retrieves the online status for multiple handles at once.',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        userIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of handle IDs to check online status for',
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns online status for each handle',
-    schema: {
-      type: 'object',
-      properties: {
-        statuses: {
-          type: 'object',
-          additionalProperties: { type: 'boolean' },
-        },
-      },
-    },
-  })
-  async getBulkOnlineStatus(@Body() body: { userIds: string[] }) {
-    const { userIds } = body;
-    const redis = this.redisService.getClient();
-
-    const statuses: Record<string, boolean> = {};
-
-    for (const handleId of userIds) {
-      const status = await redis.get(`online:${handleId}`);
-      statuses[handleId] = status === '1';
-    }
-
-    return { statuses };
   }
 }

@@ -4,17 +4,7 @@ import { QrCode, Smartphone, Monitor, Tablet, ShieldCheck, LogOut } from 'lucide
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { ResponsiveModal } from './ui/responsive-modal'; // Используем нашу новую обертку
-
-interface Session {
-  id: string;
-  deviceId: string;
-  deviceName?: string;
-  deviceType?: string;
-  ipAddress: string;
-  lastActiveAt: string;
-  createdAt: string;
-  current: boolean;
-}
+import { type Session } from '@/types';
 
 interface DevicesSettingsModalProps {
   isOpen: boolean;

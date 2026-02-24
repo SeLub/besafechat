@@ -1,18 +1,16 @@
 export type {
   ApiResponse,
-  HandleCheckResponse,
   // LoginRequest,
   LoginResponse,
   ProfileResponse,
+  ProfileSettings,
+  Theme,
+  Language,
+  RetentionPeriod,
+  Mode,
 } from './api';
 
-export type {
-  OnlineStatusResponse,
-  PublicKeyResponse,
-  RefreshTokenResponse,
-  Session,
-  UpdateDisplayNameRequest,
-} from './account';
+export type { RefreshTokenResponse, Session, UpdateDisplayNameRequest } from './account';
 
 export type {
   // AccountMethod,

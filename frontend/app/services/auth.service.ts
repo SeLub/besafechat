@@ -1,11 +1,6 @@
 import type { ApiResponse, LoginCredentials, LoginResponse, ProfileResponse } from '@/types';
 
-import type {
-  BulkOnlineStatusResponse,
-  OnlineStatusResponse,
-  RefreshTokenResponse,
-  Session,
-} from '@/types/account';
+import type { RefreshTokenResponse, Session } from '@/types/account';
 import type { FullProfile } from '~/types/profile';
 import { UserService } from './user.service';
 import { API_CONFIG } from './api-config';
@@ -57,13 +52,15 @@ export class AuthService {
     // The private key parameter is now passed to login() method directly
     // This should be called during account creation/recovery before the private key is destroyed
     const { signMessageToBase64 } = await import('../lib/crypto/core/signatures');
-    
+
     // Note: The privateKey parameter should be provided by the caller
     // If not available, it means we're trying to login without a proper key derivation
     if (!credentials.privateKey) {
-      throw new Error('Private key not available. Please complete account creation or recovery first.');
+      throw new Error(
+        'Private key not available. Please complete account creation or recovery first.'
+      );
     }
-    
+
     const signature = await signMessageToBase64(credentials.privateKey, challenge);
 
     // Send the signature back to the server to complete authentication
@@ -86,13 +83,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<LoginResponse> = await authRes.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Login failed');
-        }
-        if (!data.data) {
-          throw new Error('Missing data in successful response');
-        }
-        return data.data;
+    if (!data.success) {
+      throw new Error(data.error || 'Login failed');
+    }
+    if (!data.data) {
+      throw new Error('Missing data in successful response');
+    }
+    return data.data;
   }
 
   /**
@@ -219,19 +216,21 @@ export class AuthService {
     }
 
     const data: ApiResponse<RefreshTokenResponse> = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Token refresh failed');
-        }
-        if (!data.data) {
-          throw new Error('Missing data in successful response');
-        }
-        return data.data;
+    if (!data.success) {
+      throw new Error(data.error || 'Token refresh failed');
+    }
+    if (!data.data) {
+      throw new Error('Missing data in successful response');
+    }
+    return data.data;
   }
 
   /**
    * Переключение на другой handle (создание новой сессии)
    */
-  static async switchToHandle(handleId: string): Promise<{ sessionId: string; activeHandleId: string }> {
+  static async switchToHandle(
+    handleId: string
+  ): Promise<{ sessionId: string; activeHandleId: string }> {
     const res = await fetch(`${this.API_BASE}/auth/sessions/create-with-handle/${handleId}`, {
       method: 'POST',
       credentials: 'include',
@@ -242,7 +241,8 @@ export class AuthService {
       throw new Error(`Failed to switch handle: ${error}`);
     }
 
-    const data: ApiResponse<{ sessionId: string; activeHandleId: string; message: string }> = await res.json();
+    const data: ApiResponse<{ sessionId: string; activeHandleId: string; message: string }> =
+      await res.json();
     if (!data.success) {
       throw new Error(data.error || 'Failed to switch handle');
     }
@@ -272,13 +272,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<{ publicKey: string }> = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to get public key');
-        }
-        if (!data.data || !data.data.publicKey) {
-          throw new Error('Missing public key in successful response');
-        }
-        return data.data.publicKey;
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get public key');
+    }
+    if (!data.data || !data.data.publicKey) {
+      throw new Error('Missing public key in successful response');
+    }
+    return data.data.publicKey;
   }
 
   // ==================== Profile Endpoints ====================
@@ -298,13 +298,13 @@ export class AuthService {
     }
 
     const data: ApiResponse<ProfileResponse> = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to get profile');
-        }
-        if (!data.data) {
-          throw new Error('Missing data in successful response');
-        }
-        return data.data;
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get profile');
+    }
+    if (!data.data) {
+      throw new Error('Missing data in successful response');
+    }
+    return data.data;
   }
 
   /**
@@ -335,55 +335,5 @@ export class AuthService {
   static async setUsername(username: string, displayName?: string): Promise<void> {
     // Call UserService to update the username properly via the handles endpoint
     await UserService.setUsername(username, displayName);
-  }
-
-  // ==================== Online Status Endpoints ====================
-
-  /**
-   * Получение онлайн-статуса пользователя
-   */
-  static async getOnlineStatus(userId: string): Promise<OnlineStatusResponse> {
-    const res = await fetch(`${this.API_BASE}/users/online-status/${userId}`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      throw new Error(`Failed to get online status: ${error}`);
-    }
-
-    const data: ApiResponse<OnlineStatusResponse> = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to get online status');
-        }
-        if (!data.data) {
-          throw new Error('Missing data in successful response');
-        }
-        return data.data;
-  }
-
-  /**
-   * Массовое получение онлайн-статусов пользователей
-   */
-  static async getBulkOnlineStatus(userIds: string[]): Promise<BulkOnlineStatusResponse[]> {
-    const res = await fetch(`${this.API_BASE}/users/bulk-online-status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ userIds }),
-    });
-
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      throw new Error(`Failed to get bulk online status: ${error}`);
-    }
-
-    const data: ApiResponse<BulkOnlineStatusResponse[]> = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to get bulk online status');
-    }
-
-    return data.data || [];
   }
 }

@@ -37,16 +37,8 @@ function ChatRouteContent() {
   const socketRef = useRef<Socket | null>(null);
   const { isMobile } = useMediaQuery(); // Add media query hook
   const { user } = useAuth();
-  const {
-    chats,
-    addChat,
-    updateChatLastMessage,
-    updateChatOnlineStatus,
-    getChatById,
-    loadOnlineStatuses,
-  } = useChats();
-  const { updateOnlineStatus: updateContextOnlineStatus, loadInitialStatuses } =
-    useOnlineStatusContext();
+  const { chats, addChat, updateChatLastMessage, updateChatOnlineStatus, getChatById } = useChats();
+  const { updateOnlineStatus: updateContextOnlineStatus } = useOnlineStatusContext();
 
   const handleSendMessage = async (message: string) => {
     const socket = socketRef.current || window.socketInstance;
@@ -194,9 +186,6 @@ function ChatRouteContent() {
           if (isMobile) {
             setCurrentView('chat');
           }
-
-          // Load online status for the newly added chat
-          await loadOnlineStatuses();
         } else {
           // Fallback if API fails
           const newChatId = addChat({ id: chatId });
@@ -221,14 +210,7 @@ function ChatRouteContent() {
       }
       setNewChatModalOpen(false);
     },
-    [
-      user?.identity.id,
-      addChat,
-      setSelectedChatId,
-      setNewChatModalOpen,
-      loadOnlineStatuses,
-      isMobile,
-    ]
+    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, isMobile]
   );
 
   const chatsRef = useRef(chats);
@@ -237,13 +219,13 @@ function ChatRouteContent() {
   }, [chats]);
 
   // Load initial online statuses to context when chats are loaded
-  useEffect(() => {
-    const handleIds = chats.map(chat => chat.handleId).filter(Boolean) as string[];
-    if (handleIds.length > 0) {
-      loadInitialStatuses(handleIds);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chats.length, loadInitialStatuses]);
+  // useEffect(() => {
+  //   const handleIds = chats.map(chat => chat.handleId).filter(Boolean) as string[];
+  //   if (handleIds.length > 0) {
+  //     loadInitialStatuses(handleIds);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [chats.length, loadInitialStatuses]);
 
   const handleMessageReceived = useCallback(
     async (message: any) => {
@@ -536,7 +518,7 @@ function ChatRouteContent() {
 
       <HandleProfilesPanel
         isOpen={handleProfilesOpen}
-        userProfile={user}
+        // userProfile={user}
         onClose={() => setHandleProfilesOpen(false)}
         layout="modal"
       />

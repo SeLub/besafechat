@@ -76,39 +76,6 @@ export function useChats() {
     }
   }, [user, loadChatsFromBackend]);
 
-  const loadOnlineStatuses = useCallback(async () => {
-    const handleIds = chats.map(chat => chat.handleId).filter(Boolean);
-    if (handleIds.length === 0) return;
-
-    try {
-      const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userIds: handleIds }),
-      });
-
-      if (res.ok) {
-        const { statuses } = await res.json();
-        setChats(prev =>
-          prev.map(chat => ({
-            ...chat,
-            isOnline: chat.handleId ? statuses[chat.handleId] || false : false,
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Failed to load online statuses:', error);
-    }
-  }, [chats]);
-
-  // Load online statuses once when chats are loaded (initial sync)
-  useEffect(() => {
-    if (chats.length > 0) {
-      loadOnlineStatuses();
-    }
-  }, [chats.length, loadOnlineStatuses]);
-
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {
       id: newChat.id || newChat.publicKey || Date.now().toString(),
@@ -169,7 +136,6 @@ export function useChats() {
     addChat,
     updateChatLastMessage,
     updateChatOnlineStatus,
-    loadOnlineStatuses,
     getChatById,
   };
 }

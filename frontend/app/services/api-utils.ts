@@ -3,7 +3,7 @@ import { API_CONFIG } from './api-config';
 /**
  * Generic API response handler
  */
-import type { ApiResponse } from '~/types';
+import type { ApiResponse } from '@/types';
 
 /**
  * Unified API response handler for ApiResponse<T> format

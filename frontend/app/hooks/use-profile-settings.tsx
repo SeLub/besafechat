@@ -1,25 +1,14 @@
-import { useAuth } from './use-auth-context';
-import { useCallback } from 'react';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { handleApiResponse } from '@/services/api-utils';
-
-export type Theme = 'besafe' | 'leteem' | 'minimal';
-export type Language = 'en' | 'ru' | 'de' | 'fr';
-export type RetentionPeriod = '7' | '30' | '90' | 'forever';
-export type Mode = 'light' | 'dark';
-
-export interface ProfileSettings {
-  ui: {
-    theme: Theme;
-    language: Language;
-    mode: Mode;
-  };
-  storage: {
-    messageRetentionDays: RetentionPeriod;
-  };
-  notifications: boolean;
-  sound: boolean;
-}
+import {
+  type ProfileSettings,
+  type Language,
+  type Mode,
+  type RetentionPeriod,
+  type Theme,
+} from '@/types';
+import { useCallback } from 'react';
+import { useAuth } from './use-auth-context';
 
 const DEFAULT_SETTINGS: ProfileSettings = {
   ui: {
@@ -62,7 +51,9 @@ export function useProfileSettings() {
           DEFAULT_SETTINGS.storage.messageRetentionDays,
       },
       notifications:
-        userSettings.notifications !== undefined ? userSettings.notifications : DEFAULT_SETTINGS.notifications,
+        userSettings.notifications !== undefined
+          ? userSettings.notifications
+          : DEFAULT_SETTINGS.notifications,
       sound: userSettings.sound !== undefined ? userSettings.sound : DEFAULT_SETTINGS.sound,
     };
   })();
@@ -87,7 +78,7 @@ export function useProfileSettings() {
         });
 
         // Use unified handleApiResponse to parse response
-        const data = await handleApiResponse<{ settings: Record<string, any> }>(response);
+        await handleApiResponse<{ settings: Record<string, any> }>(response);
 
         // Refresh user state to reflect changes from server
         await refreshUser();
