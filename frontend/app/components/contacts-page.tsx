@@ -1,59 +1,12 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/components/contacts-page.tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useContactRequests } from '~/hooks/use-contact-requests';
+import { useContactRequestsStore } from '~/hooks/contact-requests-store-context';
 import { ArrowLeft, ChevronDown, ChevronRight, Clock, MessageCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
-
-interface ContactRequestData {
-  requestId: string;
-  fromHandle: {
-    id: string;
-    value: string;
-    alias: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  message?: string;
-}
-
-interface Contact {
-  id: string;
-  user: {
-    id: string;
-    displayName?: string;
-    handle?: string;
-    avatarUrl?: string;
-    firstName?: string;
-    lastName?: string;
-    bio?: string;
-  };
-  acceptedAt: string;
-}
-
-interface ContactRequest {
-  id: string;
-  from: {
-    id: string; // Handle ID
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-    alias?: string;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
 
 interface ContactsPageProps {
   onBack: () => void;
@@ -61,17 +14,26 @@ interface ContactsPageProps {
 }
 
 export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [sentExpanded, setSentExpanded] = useState(false);
   const { clearRequests } = useContactRequests();
+  const {
+    contacts,
+    incomingRequests,
+    outgoingRequests,
+    setContacts,
+    setIncomingRequests,
+    setOutgoingRequests,
+    removeIncomingRequest,
+    removeContact,
+    addContact,
+  } = useContactRequestsStore();
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -80,86 +42,10 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Real-time WebSocket synchronization for contact requests
-  useEffect(() => {
-    if (!window.socketInstance) return;
-
-    const socket = window.socketInstance;
-
-    // Handle incoming contact request
-    const handleContactRequestReceived = (data: ContactRequestData) => {
-      setIncomingRequests(prev => [
-        {
-          id: data.requestId,
-          from: data.fromHandle,
-          to: { handleId: '' },
-          message: data.message,
-          status: 'PENDING',
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-    };
-
-    // Handle request accepted (move from pending to contacts)
-    const handleContactRequestAccepted = (data: { byHandle: any; chatId?: string }) => {
-      // Remove from incoming requests
-      setIncomingRequests(prev => prev.filter(r => r.from.id !== data.byHandle.id));
-
-      // Add to contacts
-      setContacts(prev => [
-        {
-          id: data.byHandle.id,
-          user: {
-            id: data.byHandle.id,
-            displayName: data.byHandle.displayName,
-            handle: data.byHandle.handle,
-            avatarUrl: data.byHandle.avatarUrl,
-          },
-          acceptedAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-    };
-
-    // Handle request rejected (remove from pending)
-    const handleContactRequestRejected = (data: { byHandle: any }) => {
-      setIncomingRequests(prev => prev.filter(r => r.from.id !== data.byHandle.id));
-    };
-
-    // Handle new chat available (for outgoing requests that were accepted)
-    const handleNewChatAvailable = (data: { fromHandle: any; chatId?: string }) => {
-      // Remove from outgoing requests
-      setOutgoingRequests(prev => prev.filter(r => r.from.id !== data.fromHandle.id));
-
-      // Add to contacts
-      setContacts(prev => [
-        {
-          id: data.fromHandle.id,
-          user: {
-            id: data.fromHandle.id,
-            displayName: data.fromHandle.displayName,
-            handle: data.fromHandle.handle,
-            avatarUrl: data.fromHandle.avatarUrl,
-          },
-          acceptedAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-    };
-
-    socket.on('contact_request_received', handleContactRequestReceived);
-    socket.on('contact_request_accepted', handleContactRequestAccepted);
-    socket.on('contact_request_rejected', handleContactRequestRejected);
-    socket.on('new_chat_available', handleNewChatAvailable);
-
-    return () => {
-      socket.off('contact_request_received', handleContactRequestReceived);
-      socket.off('contact_request_accepted', handleContactRequestAccepted);
-      socket.off('contact_request_rejected', handleContactRequestRejected);
-      socket.off('new_chat_available', handleNewChatAvailable);
-    };
-  }, []);
+  // Note: WebSocket synchronization for contacts is now handled by
+  // useContactRequestsStore which is synced from use-websocket-notifications.tsx
+  // This ensures contacts are synchronized globally, not dependent on
+  // whether this component is mounted or not.
 
   const loadData = async () => {
     setLoading(true);
@@ -172,7 +58,21 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
 
       if (contactsRes.ok) {
         const contactsData = await contactsRes.json();
-        setContacts(contactsData.contacts || []);
+        // Transform contacts data to match our Contact interface
+        const transformedContacts = (contactsData.contacts || []).map((contact: any) => ({
+          id: contact.id || contact.user?.id,
+          user: {
+            id: contact.user?.id,
+            displayName: contact.user?.displayName,
+            handle: contact.user?.handle,
+            avatarUrl: contact.user?.avatarUrl,
+            firstName: contact.user?.firstName,
+            lastName: contact.user?.lastName,
+            bio: contact.user?.bio,
+          },
+          acceptedAt: contact.acceptedAt,
+        }));
+        setContacts(transformedContacts);
       }
 
       if (incomingRes.ok) {
@@ -194,6 +94,11 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);
     try {
+      console.log('🔄 Accepting request:', requestId);
+
+      // Find the request to move it to contacts
+      const request = incomingRequests.find(r => r.id === requestId);
+
       const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
         method: 'POST',
         credentials: 'include',
@@ -201,11 +106,29 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
 
       if (res.ok) {
         toast.success('Request accepted');
-        // UI will update through WebSocket event (contact_request_accepted)
+        console.log('✅ Request accepted');
+
+        // Remove from pending requests
+        removeIncomingRequest(requestId);
+
+        // Add to contacts
+        if (request) {
+          addContact({
+            id: request.from.id,
+            user: {
+              id: request.from.id,
+              displayName: request.from.displayName,
+              handle: request.from.value,
+              avatarUrl: request.from.avatarUrl,
+            },
+            acceptedAt: new Date().toISOString(),
+          });
+        }
       } else {
         toast.error('Failed to accept request');
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Error accepting request:', error);
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -215,6 +138,12 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const handleReject = async (requestId: string) => {
     setActionLoading(requestId);
     try {
+      console.log('🔄 Rejecting request:', requestId);
+
+      // Find the request to get contactId
+      const request = incomingRequests.find(r => r.id === requestId);
+      const contactId = request?.from.id;
+
       const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
         method: 'POST',
         credentials: 'include',
@@ -222,11 +151,20 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
 
       if (res.ok) {
         toast.success('Request rejected');
-        // UI will update through WebSocket event (contact_request_rejected)
+        console.log('✅ Request rejected');
+
+        // Remove from pending requests
+        removeIncomingRequest(requestId);
+
+        // Remove contact since request was rejected
+        if (contactId) {
+          removeContact(contactId);
+        }
       } else {
         toast.error('Failed to reject request');
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Error rejecting request:', error);
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
@@ -311,38 +249,41 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
                 No contacts yet. Start a journey!
               </div>
             ) : (
-              contacts.map(contact => (
-                <div
-                  key={contact.id}
-                  className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-all cursor-pointer group border-b border-primary/5 last:border-0"
-                  onClick={() => onChatSelect(contact.user.id)}
-                  onKeyDown={e =>
-                    (e.key === 'Enter' || e.key === ' ') && onChatSelect(contact.user.id)
-                  }
-                  tabIndex={0}
-                  role="button"
-                >
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-                      <AvatarFallback className="bg-primary text-white font-bold text-xs">
-                        {getInitials(contact.user)}
-                      </AvatarFallback>
-                      {contact.user.avatarUrl && <AvatarImage src={contact.user.avatarUrl} />}
-                    </Avatar>
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm truncate group-hover:text-primary transition-colors">
-                        {contact.user.displayName || 'Anonymous'}
-                      </div>
-                      <div className="text-[10px] font-bold text-primary/30 uppercase tracking-widest truncate">
-                        @{contact.user.handle || 'unknown'}
+              contacts.map(contact => {
+                if (!contact?.user) return null;
+                return (
+                  <div
+                    key={contact.id}
+                    className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-all cursor-pointer group border-b border-primary/5 last:border-0"
+                    onClick={() => onChatSelect(contact.user.handle)}
+                    onKeyDown={e =>
+                      (e.key === 'Enter' || e.key === ' ') && onChatSelect(contact.user.handle)
+                    }
+                    tabIndex={0}
+                    role="button"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
+                        <AvatarFallback className="bg-primary text-white font-bold text-xs">
+                          {getInitials(contact.user)}
+                        </AvatarFallback>
+                        {contact.user.avatarUrl && <AvatarImage src={contact.user.avatarUrl} />}
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm truncate group-hover:text-primary transition-colors">
+                          {contact.user.displayName || 'Anonymous'}
+                        </div>
+                        <div className="text-[10px] font-bold text-primary/30 uppercase tracking-widest truncate">
+                          @{contact.user.handle || 'unknown'}
+                        </div>
                       </div>
                     </div>
+                    <div className="text-primary/10 group-hover:text-primary/40 transition-colors">
+                      <MessageCircle className="h-5 w-5" />
+                    </div>
                   </div>
-                  <div className="text-primary/10 group-hover:text-primary/40 transition-colors">
-                    <MessageCircle className="h-5 w-5" />
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

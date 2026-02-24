@@ -10,6 +10,8 @@ import { useChats } from '@/hooks/use-chats';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
+import { useContactRequestsSync } from '@/hooks/use-contact-requests-sync';
+import { ContactRequestsStoreProvider } from '@/hooks/contact-requests-store-context';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { StorageService } from '@/services/storage.service';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -159,46 +161,87 @@ function ChatRouteContent() {
   };
 
   const handleChatCreated = useCallback(
-    async (chatId: string) => {
+    async (identifier: string) => {
       try {
-        // Load chat info from backend
-        const res = await fetch(API_ENDPOINTS.CHATS.GET_ONE(chatId), {
-          credentials: 'include',
-        });
-
-        if (res.ok) {
-          const chatData = await res.json();
-          // Find the other user in the chat
-          const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.identity.id);
-
+        // Check if identifier is a handle (contains @) or a chatId
+        const isHandle = !identifier.startsWith('chat_');
+        
+        if (isHandle) {
+          // First, check if a chat already exists with this handle
+          const existingChat = chatsRef.current.find(
+            chat => chat.username === identifier || chat.handleId?.includes(identifier)
+          );
+          
+          if (existingChat) {
+            // Chat exists, just select it
+            console.log('💬 Existing chat found, selecting:', existingChat.id);
+            setSelectedChatId(existingChat.id);
+            if (isMobile) {
+              setCurrentView('chat');
+            }
+            setNewChatModalOpen(false);
+            return;
+          }
+          
+          // No existing chat, need to create one via backend
+          // For now, we'll just notify that we need to create a chat
+          console.log('Creating new chat with handle:', identifier);
+          // This would need a proper API endpoint to create a chat by handle
+          // For now, we'll add a placeholder chat
           const newChatId = addChat({
-            id: chatId,
-            name:
-              otherMember?.user?.displayName ||
-              `@${otherMember?.user?.username?.username}` ||
-              'Unknown User',
-            publicKey: otherMember?.user?.publicKey,
-            handleId: otherMember?.handleId, // Use handleId instead of identityId
+            id: `chat_${identifier}`,
+            name: identifier,
+            username: identifier,
           });
           setSelectedChatId(newChatId);
-
-          // On mobile, switch to chat view
           if (isMobile) {
             setCurrentView('chat');
           }
         } else {
-          // Fallback if API fails
-          const newChatId = addChat({ id: chatId });
-          setSelectedChatId(newChatId);
+          // identifier is a chatId, proceed with normal flow
+          const res = await fetch(API_ENDPOINTS.CHATS.GET_ONE(identifier), {
+            credentials: 'include',
+          });
 
-          // On mobile, switch to chat view
-          if (isMobile) {
-            setCurrentView('chat');
+          if (res.ok) {
+            const chatData = await res.json();
+            // Find the other user in the chat
+            const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.identity.id);
+
+            const newChatId = addChat({
+              id: identifier,
+              name:
+                otherMember?.user?.displayName ||
+                `@${otherMember?.user?.username?.username}` ||
+                'Unknown User',
+              publicKey: otherMember?.user?.publicKey,
+              handleId: otherMember?.handleId, // Use handleId instead of identityId
+              avatarUrl: otherMember?.user?.avatarUrl,
+              bio: otherMember?.user?.bio,
+              firstName: otherMember?.user?.firstName,
+              lastName: otherMember?.user?.lastName,
+              alias: otherMember?.user?.alias,
+            });
+            setSelectedChatId(newChatId);
+
+            // On mobile, switch to chat view
+            if (isMobile) {
+              setCurrentView('chat');
+            }
+          } else {
+            // Fallback if API fails
+            const newChatId = addChat({ id: identifier });
+            setSelectedChatId(newChatId);
+
+            // On mobile, switch to chat view
+            if (isMobile) {
+              setCurrentView('chat');
+            }
           }
         }
       } catch (error) {
         // Fallback if API fails
-        const newChatId = addChat({ id: chatId });
+        const newChatId = addChat({ id: identifier });
         setSelectedChatId(newChatId);
 
         // On mobile, switch to chat view
@@ -377,6 +420,9 @@ function ChatRouteContent() {
     handleOnlineStatusChange
   );
 
+  // Enable contact requests sync (handles WebSocket events for contact requests)
+  useContactRequestsSync();
+
   // Cleanup old messages on app start
   useEffect(() => {
     const cleanup = async () => {
@@ -529,7 +575,9 @@ function ChatRouteContent() {
 export default function ChatRoute() {
   return (
     <AuthGuard>
-      <ChatRouteContent />
+      <ContactRequestsStoreProvider>
+        <ChatRouteContent />
+      </ContactRequestsStoreProvider>
     </AuthGuard>
   );
 }

@@ -181,8 +181,6 @@ export function useNotifications() {
     socket.on('notification:all-read', handleAllRead);
     socket.on('notifications:sync', handleNotificationsSync);
 
-    socket.emit('notifications:request-sync');
-
     return () => {
       socket.off('notification:created', handleNotificationCreated);
       socket.off('notification:read', handleNotificationRead);

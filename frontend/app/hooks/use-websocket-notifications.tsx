@@ -65,18 +65,12 @@ export function useWebSocketNotifications(
     // Store socket globally for message sending
     window.socketInstance = socket;
 
-    // Contact request received
+    // Contact request received - show modal with notification
     socket.on('contact_request_received', data => {
-      console.log('Contact request received:', data);
+      console.log('🔔 contact_request_received - showing modal:', data);
       const { requestId, fromHandle, message } = data;
 
-      console.log('Triggering modal with data:', {
-        requestId,
-        fromHandle,
-        message,
-      });
-
-      // Trigger modal callback
+      // Show modal through callback
       callbacksRef.current.onContactRequest?.({
         requestId,
         fromHandle: {
@@ -95,10 +89,12 @@ export function useWebSocketNotifications(
       incrementPending();
     });
 
-    // Contact request accepted
+    // Contact request accepted - show notification
     socket.on('contact_request_accepted', data => {
       const { byHandle, chatId } = data;
       const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
+
+      console.log('✅ contact_request_accepted - showing notification:', data);
 
       toast.success(`${displayName} accepted your request`, {
         description: 'You can now start chatting',
@@ -112,18 +108,21 @@ export function useWebSocketNotifications(
       }
     });
 
-    // Contact request rejected
+    // Contact request rejected - show notification
     socket.on('contact_request_rejected', data => {
       const { byHandle } = data;
       const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
 
+      console.log('❌ contact_request_rejected - showing notification:', data);
       toast.error(`${displayName} declined your request`);
     });
 
-    // New chat available (when user accepts a contact request)
+    // New chat available - show notification
     socket.on('new_chat_available', data => {
       const { fromHandle, chatId } = data;
       const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
+
+      console.log('💬 new_chat_available - showing notification:', data);
 
       toast.success(`Chat available with ${displayName}`, {
         description: 'You can now start messaging',
@@ -182,7 +181,7 @@ export function useWebSocketNotifications(
       console.log('✅ WebSocket reconnected');
     });
 
-    socket.on('connect_error', (error) => {
+    socket.on('connect_error', error => {
       console.error('❌ WebSocket connection error:', error);
     });
 
