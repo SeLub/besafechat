@@ -1,6 +1,5 @@
 import { useContext, useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API_CONFIG } from '../services/api-config';
 import { OnlineStatusContext } from '../contexts/online-status.context';
 
 interface OnlineStatusProviderProps {
@@ -32,44 +31,20 @@ export function OnlineStatusProvider({ children }: OnlineStatusProviderProps) {
     }));
   }, []);
 
-  const loadInitialStatuses = useCallback(
-    async (handleIds: string[]) => {
-      if (handleIds.length === 0) return;
-
-      try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/contacts/bulk-online-status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ userIds: handleIds }),
-        });
-
-        if (res.ok) {
-          const { statuses } = await res.json();
-          bulkUpdateOnlineStatus(statuses);
-        }
-      } catch (error) {
-        console.error('Failed to load initial online statuses:', error);
-      }
-    },
-    [bulkUpdateOnlineStatus]
-  );
-
   const value = {
-     getOnlineStatus,
-     updateOnlineStatus,
-     bulkUpdateOnlineStatus,
-     loadInitialStatuses,
-   };
+    getOnlineStatus,
+    updateOnlineStatus,
+    bulkUpdateOnlineStatus,
+  };
 
-   return <OnlineStatusContext.Provider value={value}>{children}</OnlineStatusContext.Provider>;
-  }
+  return <OnlineStatusContext.Provider value={value}>{children}</OnlineStatusContext.Provider>;
+}
 
-  // eslint-disable-next-line react-refresh/only-export-components
- export function useOnlineStatusContext() {
-   const context = useContext(OnlineStatusContext);
-   if (context === undefined) {
-     throw new Error('useOnlineStatusContext must be used within OnlineStatusProvider');
-   }
-   return context;
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOnlineStatusContext() {
+  const context = useContext(OnlineStatusContext);
+  if (context === undefined) {
+    throw new Error('useOnlineStatusContext must be used within OnlineStatusProvider');
   }
+  return context;
+}

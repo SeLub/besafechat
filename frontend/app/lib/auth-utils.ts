@@ -1,5 +1,5 @@
 import { API_CONFIG } from '../services/api-config';
-import type { ApiResponse } from '../types/api';
+import type { ApiResponse } from '@/types';
 import type { FullProfile } from '../types/profile';
 
 const API_BASE = API_CONFIG.BASE_URL;
@@ -17,7 +17,7 @@ export async function silentAuthCheck(silent: boolean = false): Promise<FullProf
     });
 
     console.log('[silentAuthCheck] Response status:', res.status);
-    
+
     if (res.ok) {
       const response: ApiResponse<FullProfile> = await res.json();
       console.log('[silentAuthCheck] Got profile:', response.data?.handle?.id);
@@ -32,7 +32,10 @@ export async function silentAuthCheck(silent: boolean = false): Promise<FullProf
     } else {
       // Other errors might indicate actual problems
       const errorText = await res.text();
-      console.error('[silentAuthCheck] Auth check failed:', { status: res.status, error: errorText });
+      console.error('[silentAuthCheck] Auth check failed:', {
+        status: res.status,
+        error: errorText,
+      });
       if (!silent) {
         console.error(`Auth check failed with status: ${res.status}`);
       }
