@@ -15,6 +15,7 @@ interface HandleSwitcherModalProps {
   onClose: () => void;
   onSwitchHandle: (handleId: string) => Promise<void>;
   isLoading?: boolean;
+  onEditHandle?: (handleId: string) => void;
 }
 
 export function HandleSwitcherModal({
@@ -24,6 +25,7 @@ export function HandleSwitcherModal({
   onClose,
   onSwitchHandle,
   isLoading,
+  onEditHandle,
 }: HandleSwitcherModalProps) {
   const { isMobile } = useMediaQuery();
   const [mounted, setMounted] = React.useState(false);
@@ -75,44 +77,58 @@ export function HandleSwitcherModal({
   const content = (
     <div className="space-y-3">
       {handles.map(handle => (
-        <button
-          key={handle.id}
-          onClick={() => handleSwitchClick(handle.id)}
-          disabled={isLoading || switchingHandleId !== null}
-          className={`w-full flex items-center space-x-4 p-4 rounded-[1.5rem] transition-all border-2 ${
-            activeHandleId === handle.id
-              ? 'bg-primary/10 border-primary/30'
-              : 'bg-background border-primary/10 hover:border-primary/20 hover:bg-primary/5'
-          } ${isLoading || switchingHandleId !== null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <Avatar className="h-14 w-14 ring-2 ring-background shadow-md flex-shrink-0">
-            <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white font-bold">
-              {getInitials(handle.profile?.displayName, handle)}
-            </AvatarFallback>
-            {handle.profile?.avatarUrl && (
-              <AvatarImage src={`${handle.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`} />
-            )}
-          </Avatar>
+        <div key={handle.id} className="flex gap-2">
+          <button
+            onClick={() => handleSwitchClick(handle.id)}
+            disabled={isLoading || switchingHandleId !== null}
+            className={`flex-1 flex items-center space-x-4 p-4 rounded-[1.5rem] transition-all border-2 ${
+              activeHandleId === handle.id
+                ? 'bg-primary/10 border-primary/30'
+                : 'bg-background border-primary/10 hover:border-primary/20 hover:bg-primary/5'
+            } ${isLoading || switchingHandleId !== null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <Avatar className="h-14 w-14 ring-2 ring-background shadow-md flex-shrink-0">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white font-bold">
+                {getInitials(handle.profile?.displayName, handle)}
+              </AvatarFallback>
+              {handle.profile?.avatarUrl && (
+                <AvatarImage src={`${handle.profile.avatarUrl}?v=${lastAvatarUpdateTimestamp}`} />
+              )}
+            </Avatar>
 
-          <div className="flex-1 min-w-0 text-left">
-            <div className="font-black text-sm truncate">
-              {handle.profile?.displayName || 'Traveler'}
+            <div className="flex-1 min-w-0 text-left">
+              <div className="font-black text-sm truncate">
+                {handle.profile?.displayName || 'Traveler'}
+              </div>
+              <div className="text-[10px] font-bold text-primary/40 uppercase tracking-widest truncate">
+                @{handle.alias || handle.value}
+              </div>
             </div>
-            <div className="text-[10px] font-bold text-primary/40 uppercase tracking-widest truncate">
-              @{handle.alias || handle.value}
-            </div>
-          </div>
 
-          {switchingHandleId === handle.id ? (
-            <div className="flex-shrink-0">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
-            </div>
-          ) : activeHandleId === handle.id ? (
-            <div className="flex-shrink-0 text-primary">
-              <Check className="h-5 w-5" />
-            </div>
-          ) : null}
-        </button>
+            {switchingHandleId === handle.id ? (
+              <div className="flex-shrink-0">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
+              </div>
+            ) : activeHandleId === handle.id ? (
+              <div className="flex-shrink-0 text-primary">
+                <Check className="h-5 w-5" />
+              </div>
+            ) : null}
+          </button>
+
+          {/* Edit button */}
+          <button
+            onClick={() => {
+              onEditHandle?.(handle.id);
+              onClose();
+            }}
+            disabled={isLoading || switchingHandleId !== null}
+            className="flex-shrink-0 px-4 py-4 rounded-[1.5rem] bg-primary/10 hover:bg-primary/20 border-2 border-primary/20 transition-all disabled:opacity-50"
+            title="Edit handle profile"
+          >
+            <span className="text-sm font-bold">Edit</span>
+          </button>
+        </div>
       ))}
     </div>
   );

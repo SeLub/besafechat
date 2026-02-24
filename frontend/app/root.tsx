@@ -14,7 +14,7 @@ import './app.css';
 
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/hooks/use-auth';
-import { NotificationProvider } from '@/hooks/use-notifications';
+import { ContactRequestsProvider } from '@/hooks/use-contact-requests';
 import { ThemeProvider } from '@/hooks/use-theme';
 import type { ReactNode } from 'react';
 
@@ -30,14 +30,14 @@ export function Layout({ children }: { children: ReactNode }) {
       <body>
         <AuthProvider>
           <ThemeProvider>
-            <NotificationProvider>
+            <ContactRequestsProvider>
               <AvatarUpdateProvider>
                 <OnlineStatusProvider>
                   {children}
                   <Toaster />
                 </OnlineStatusProvider>
               </AvatarUpdateProvider>
-            </NotificationProvider>
+            </ContactRequestsProvider>
           </ThemeProvider>
         </AuthProvider>
         <ScrollRestoration />

@@ -9,12 +9,14 @@ interface HandleProfilesPanelProps {
   isOpen: boolean;
   onClose: () => void;
   layout?: 'modal' | 'drawer';
+  initialSelectedHandleId?: string | null;
 }
 
 export function HandleProfilesPanel({
   isOpen,
   onClose,
   layout = 'modal',
+  initialSelectedHandleId,
 }: HandleProfilesPanelProps) {
   const [handles, setHandles] = useState<Handle[]>([]);
   const [selectedHandleId, setSelectedHandleId] = useState<string | null>(null);
@@ -26,6 +28,13 @@ export function HandleProfilesPanel({
       fetchHandles();
     }
   }, [isOpen]);
+
+  // Set selected handle when initialSelectedHandleId changes
+  useEffect(() => {
+    if (initialSelectedHandleId && handles.length > 0) {
+      setSelectedHandleId(initialSelectedHandleId);
+    }
+  }, [initialSelectedHandleId, handles]);
 
   const fetchHandles = async () => {
     try {

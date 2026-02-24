@@ -536,7 +536,6 @@ function ChatRouteContent() {
 
       <HandleProfilesPanel
         isOpen={handleProfilesOpen}
-        userProfile={user}
         onClose={() => setHandleProfilesOpen(false)}
         layout="modal"
       />

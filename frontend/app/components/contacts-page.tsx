@@ -1,10 +1,25 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '~/hooks/use-notifications-context';
+import { useContactRequests } from '~/hooks/use-contact-requests';
 import { ArrowLeft, ChevronDown, ChevronRight, Clock, MessageCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+
+interface ContactRequestData {
+  requestId: string;
+  fromHandle: {
+    id: string;
+    value: string;
+    alias: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+  message?: string;
+}
 
 interface Contact {
   id: string;
@@ -23,13 +38,14 @@ interface Contact {
 interface ContactRequest {
   id: string;
   from: {
-    handleId: string;
+    id: string; // Handle ID
     value: string;
     displayName: string;
     firstName: string | null;
     lastName: string | null;
     avatarUrl: string | null;
     bio: string | null;
+    alias?: string;
   };
   to: {
     handleId: string;
@@ -52,16 +68,97 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [sentExpanded, setSentExpanded] = useState(false);
-  const { clearNotifications } = useNotifications();
+  const { clearRequests } = useContactRequests();
 
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    // Clear notifications when contacts page is opened
-    clearNotifications();
+    // Clear contact request badge when page is opened
+    clearRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Real-time WebSocket synchronization for contact requests
+  useEffect(() => {
+    if (!window.socketInstance) return;
+
+    const socket = window.socketInstance;
+
+    // Handle incoming contact request
+    const handleContactRequestReceived = (data: ContactRequestData) => {
+      setIncomingRequests(prev => [
+        {
+          id: data.requestId,
+          from: data.fromHandle,
+          to: { handleId: '' },
+          message: data.message,
+          status: 'PENDING',
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    };
+
+    // Handle request accepted (move from pending to contacts)
+    const handleContactRequestAccepted = (data: { byHandle: any; chatId?: string }) => {
+      // Remove from incoming requests
+      setIncomingRequests(prev => prev.filter(r => r.from.id !== data.byHandle.id));
+
+      // Add to contacts
+      setContacts(prev => [
+        {
+          id: data.byHandle.id,
+          user: {
+            id: data.byHandle.id,
+            displayName: data.byHandle.displayName,
+            handle: data.byHandle.handle,
+            avatarUrl: data.byHandle.avatarUrl,
+          },
+          acceptedAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    };
+
+    // Handle request rejected (remove from pending)
+    const handleContactRequestRejected = (data: { byHandle: any }) => {
+      setIncomingRequests(prev => prev.filter(r => r.from.id !== data.byHandle.id));
+    };
+
+    // Handle new chat available (for outgoing requests that were accepted)
+    const handleNewChatAvailable = (data: { fromHandle: any; chatId?: string }) => {
+      // Remove from outgoing requests
+      setOutgoingRequests(prev => prev.filter(r => r.from.id !== data.fromHandle.id));
+
+      // Add to contacts
+      setContacts(prev => [
+        {
+          id: data.fromHandle.id,
+          user: {
+            id: data.fromHandle.id,
+            displayName: data.fromHandle.displayName,
+            handle: data.fromHandle.handle,
+            avatarUrl: data.fromHandle.avatarUrl,
+          },
+          acceptedAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    };
+
+    socket.on('contact_request_received', handleContactRequestReceived);
+    socket.on('contact_request_accepted', handleContactRequestAccepted);
+    socket.on('contact_request_rejected', handleContactRequestRejected);
+    socket.on('new_chat_available', handleNewChatAvailable);
+
+    return () => {
+      socket.off('contact_request_received', handleContactRequestReceived);
+      socket.off('contact_request_accepted', handleContactRequestAccepted);
+      socket.off('contact_request_rejected', handleContactRequestRejected);
+      socket.off('new_chat_available', handleNewChatAvailable);
+    };
   }, []);
 
   const loadData = async () => {
@@ -104,9 +201,7 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
 
       if (res.ok) {
         toast.success('Request accepted');
-        loadData();
-
-        // Handle chat creation
+        // UI will update through WebSocket event (contact_request_accepted)
       } else {
         toast.error('Failed to accept request');
       }
@@ -127,7 +222,7 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
 
       if (res.ok) {
         toast.success('Request rejected');
-        loadData();
+        // UI will update through WebSocket event (contact_request_rejected)
       } else {
         toast.error('Failed to reject request');
       }

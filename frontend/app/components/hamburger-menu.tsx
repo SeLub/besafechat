@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useContactRequests } from '@/hooks/use-contact-requests';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { apiRequest } from '@/services/api-utils';
 import { useProfileSettings } from '@/hooks/use-profile-settings';
@@ -19,7 +20,6 @@ import {
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '~/hooks/use-auth-context';
-import { useNotifications } from '~/hooks/use-notifications-context';
 import type { Handle } from '~/types/handle';
 import { HandleProfilesPanel } from './handle-profiles-panel';
 import { HandleSwitcherModal } from './handle-switcher-modal';
@@ -69,14 +69,17 @@ export function HamburgerMenu({
   const [userHandles, setUserHandles] = useState<Handle[]>([]);
   const [loadingHandles, setLoadingHandles] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { counts, clearNotifications } = useNotifications();
-  const { unreadCount } = useNotificationHistory();
+  const [selectedHandleForEdit, setSelectedHandleForEdit] = useState<string | null>(null);
+  const { counts: contactRequestsCounts, clearRequests } = useContactRequests();
+  const { unreadCount: inboxUnreadCount } = useNotifications();
   const { user, switchToHandle } = useAuth();
   const { settings, updateSettings } = useProfileSettings();
 
   const isDarkMode = settings.ui.mode === 'dark';
 
-  const totalNotifications = counts.newRequests + counts.newAccepted;
+  // Show badge only if notifications are enabled
+  const showContactRequestsBadge = settings.notifications && (contactRequestsCounts.pending + contactRequestsCounts.accepted) > 0;
+  const showInboxBadge = settings.notifications && inboxUnreadCount > 0;
 
   // Fetch handles when switcher modal opens
   useEffect(() => {
@@ -207,7 +210,7 @@ export function HamburgerMenu({
                 <MenuItem
                   icon={<Bell className="h-4 w-4" />}
                   label="Notifications"
-                  badge={unreadCount}
+                  badge={showInboxBadge ? inboxUnreadCount : 0}
                   onClick={() => {
                     setIsOpen(false);
                     onNotificationsClick?.();
@@ -216,10 +219,10 @@ export function HamburgerMenu({
                 <MenuItem
                   icon={<Users className="h-4 w-4" />}
                   label="Contacts"
-                  badge={totalNotifications}
+                  badge={showContactRequestsBadge ? (contactRequestsCounts.pending + contactRequestsCounts.accepted) : 0}
                   onClick={() => {
                     setIsOpen(false);
-                    clearNotifications();
+                    clearRequests();
                     onContactsClick?.();
                   }}
                 />
@@ -273,12 +276,20 @@ export function HamburgerMenu({
         activeHandleId={user?.handle?.id || null}
         onSwitchHandle={switchToHandle}
         isLoading={loadingHandles}
+        onEditHandle={(handleId) => {
+          setSelectedHandleForEdit(handleId);
+          setHandleProfilesOpen(true);
+        }}
       />
 
       {/* Handle Profiles Modal */}
       <HandleProfilesPanel
         isOpen={handleProfilesOpen}
-        onClose={() => setHandleProfilesOpen(false)}
+        onClose={() => {
+          setHandleProfilesOpen(false);
+          setSelectedHandleForEdit(null);
+        }}
+        initialSelectedHandleId={selectedHandleForEdit}
       />
     </>
   );

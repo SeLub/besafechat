@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth-context';
-import { useNotifications } from './use-notifications-context';
+import { useContactRequests } from './use-contact-requests';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 
 interface ContactRequestData {
@@ -29,7 +29,7 @@ export function useWebSocketNotifications(
   onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void
 ) {
   const { user } = useAuth();
-  const { incrementRequests, incrementAccepted } = useNotifications();
+  const { incrementPending, incrementAccepted } = useContactRequests();
 
   const callbacksRef = useRef({
     onChatCreated,
@@ -92,7 +92,7 @@ export function useWebSocketNotifications(
         message,
       });
 
-      incrementRequests();
+      incrementPending();
     });
 
     // Contact request accepted
@@ -200,5 +200,5 @@ export function useWebSocketNotifications(
       socket.disconnect();
       window.socketInstance = null;
     };
-  }, [user, incrementAccepted, incrementRequests]);
+  }, [user, incrementAccepted, incrementPending]);
 }

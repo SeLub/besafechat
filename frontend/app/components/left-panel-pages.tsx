@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { UsernameSetupModal } from '@/components/username-setup-modal';
 import { useAuth } from '~/hooks/use-auth-context';
-import { useNotificationHistory } from '@/hooks/use-notification-history';
+import { useNotifications } from '@/hooks/use-notifications';
 import { useProfileSettings } from '@/hooks/use-profile-settings';
 import {
   ArrowLeft,
@@ -70,7 +70,7 @@ interface LeftPanelPageProps {
 export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: LeftPanelPageProps) {
   const { logout, checkAuth, refreshUser } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } =
-    useNotificationHistory();
+    useNotifications();
   const { settings, updateSettings } = useProfileSettings();
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);

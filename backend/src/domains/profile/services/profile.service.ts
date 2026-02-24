@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { HandleService } from '../../handle/services/handle.service';
 import { MediaService } from '../../media/media.service';
-import { Profile } from '../profile.entity';
+import { Profile, ProfileSettings } from '../profile.entity';
 
 @Injectable()
 export class ProfileService {
@@ -28,7 +28,7 @@ export class ProfileService {
     email?: string;
     phone?: string;
     bio?: string;
-    settings?: Record<string, any>;
+    settings?: ProfileSettings;
   }): Promise<Profile> {
     // Проверяем что Handle существует и имеет тип 'account'
     const handle = await this.handleService.findById(data.handleId);
@@ -43,7 +43,7 @@ export class ProfileService {
     }
 
     // Default settings for new profiles
-    const defaultSettings = {
+    const defaultSettings: ProfileSettings = {
       ui: {
         theme: 'besafe',
         language: 'en',
@@ -65,7 +65,7 @@ export class ProfileService {
       email: data.email,
       phone: data.phone,
       bio: data.bio,
-      settings: data.settings || defaultSettings,
+      settings: (data.settings || defaultSettings) as ProfileSettings,
     });
 
     // Сохраняем Profile
@@ -94,7 +94,7 @@ export class ProfileService {
     return {
       ...profile,
       avatarUrl: avatarUrl,
-    } as any;
+    } as Profile & { avatarUrl: string | null };
   }
 
   async getProfileByHandleValue(handleValue: string): Promise<Profile> {
@@ -156,7 +156,15 @@ export class ProfileService {
       .getMany();
   }
 
-  async getPublicProfile(handleQuery: string): Promise<any> {
+  async getPublicProfile(handleQuery: string): Promise<{
+    handle: { id: string; value: string; alias: string | null | undefined; matchedBy: string };
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null | undefined;
+    createdAt: Date;
+  }> {
     const result = await this.handleService.findByValueOrAlias(handleQuery);
 
     if (!result) {
@@ -167,7 +175,7 @@ export class ProfileService {
     const profile = await this.getProfileByHandle(handle.id);
     const avatarUrl = await this.mediaService.getAvatarUrlIfExists(handle.id);
 
-    const publicProfile: any = {
+    const publicProfile = {
       handle: {
         id: handle.id,
         value: handle.value,
@@ -178,7 +186,7 @@ export class ProfileService {
       firstName: profile.firstName || null,
       lastName: profile.lastName || null,
       avatarUrl,
-      bio: profile.bio,
+      bio: profile.bio || null,
       createdAt: profile.createdAt,
     };
 
@@ -187,7 +195,7 @@ export class ProfileService {
     return publicProfile;
   }
 
-  async updateSettings(handleId: string, updates: Record<string, any>): Promise<Profile> {
+  async updateSettings(handleId: string, updates: Partial<ProfileSettings>): Promise<Profile> {
     const profile = await this.getProfileByHandle(handleId);
 
     // Deep merge new settings with existing ones

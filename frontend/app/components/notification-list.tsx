@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check } from 'lucide-react';
-import { type Notification } from '@/hooks/use-notification-history';
+import { type Notification } from '@/hooks/use-notifications';
 import { formatTime, getInitials } from '~/lib/utils';
 
 interface NotificationListProps {
