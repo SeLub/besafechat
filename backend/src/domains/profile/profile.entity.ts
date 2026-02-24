@@ -14,6 +14,20 @@ import {
 } from 'typeorm';
 import { Handle } from '../handle/handle.entity';
 
+export interface ProfileSettings {
+  ui?: {
+    theme?: string;
+    language?: string;
+    mode?: 'light' | 'dark';
+  };
+  storage?: {
+    messageRetentionDays?: string;
+  };
+  notifications?: boolean;
+  sound?: boolean;
+  [key: string]: unknown;
+}
+
 @Entity('profiles')
 @Index('idx_profiles_handle', ['handleId'])
 export class Profile {
@@ -51,22 +65,10 @@ export class Profile {
   bio?: string;
 
   @Column({ type: 'jsonb', default: {} })
-  settings!: {
-    ui?: {
-      theme?: string;
-      language?: string;
-      mode?: 'light' | 'dark'; // light or dark mode within the theme
-    };
-    storage?: {
-      messageRetentionDays?: string;
-    };
-    notifications?: boolean;
-    sound?: boolean;
-    [key: string]: any;
-  };
+  settings!: ProfileSettings;
 
   @Column({ type: 'jsonb', default: {} })
-  metadata!: Record<string, any>;
+  metadata!: Record<string, unknown>;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

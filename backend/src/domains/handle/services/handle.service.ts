@@ -10,7 +10,7 @@ import { Repository, DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Identity } from '../../identity/identity.entity';
 import { Handle, HandleType } from '../handle.entity';
-import { Profile } from '../../profile/profile.entity';
+import { Profile, ProfileSettings } from '../../profile/profile.entity';
 import { MediaService } from '../../media/media.service';
 
 @Injectable()
@@ -216,7 +216,7 @@ export class HandleService {
       email?: string;
       phone?: string;
       bio?: string;
-      settings?: Record<string, any>;
+      settings?: ProfileSettings;
     };
   }): Promise<Handle> {
     return this.dataSource.transaction(async (manager) => {
@@ -259,7 +259,7 @@ export class HandleService {
         const profileData = data.profileData || {};
         
         // Default settings for new profiles
-        const defaultSettings = {
+        const defaultSettings: ProfileSettings = {
           ui: {
             theme: 'besafe',
             language: 'en',
@@ -280,7 +280,7 @@ export class HandleService {
           email: profileData.email,
           phone: profileData.phone,
           bio: profileData.bio,
-          settings: profileData.settings || defaultSettings,
+          settings: (profileData.settings || defaultSettings) as ProfileSettings,
         });
 
         const savedProfile = await manager.save(profile);

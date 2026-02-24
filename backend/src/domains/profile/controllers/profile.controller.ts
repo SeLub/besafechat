@@ -112,7 +112,7 @@ export class ProfileController {
   @ApiCookieAuth()
   @ApiBody({ type: UpdateSettingsDto })
   async updateSettings(@CurrentHandle() handle: any, @Body() dto: UpdateSettingsDto) {
-    const updatedProfile = await this.profileService.updateSettings(handle.id, dto);
+    const updatedProfile = await this.profileService.updateSettings(handle.id, dto as any);
     return new ApiResponseDto(true, {
       message: 'Settings updated successfully',
       settings: updatedProfile.settings,
