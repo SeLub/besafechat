@@ -4,25 +4,9 @@ import { Check, Clock, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { handleApiResponse } from '@/services/api-utils';
 import { ResponsiveModal } from './ui/responsive-modal';
-interface ContactRequest {
-  id: string;
-  from: {
-    handleId: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
+import { type ContactRequest } from '@/types/api';
 
 interface ContactRequestsProps {
   isOpen: boolean;
@@ -43,25 +27,15 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const [incomingRes, outgoingRes] = await Promise.all([
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, {
-          credentials: 'include',
-        }),
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, {
-          credentials: 'include',
-        }),
-      ]);
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS('both'), {
+        credentials: 'include',
+      });
 
-      if (incomingRes.ok) {
-        const incomingData = await incomingRes.json();
-        setIncomingRequests(incomingData.requests || []);
-      }
-
-      if (outgoingRes.ok) {
-        const outgoingData = await outgoingRes.json();
-        setOutgoingRequests(outgoingData.requests || []);
-      }
-    } catch {
+      const data = await handleApiResponse<any>(res);
+      setIncomingRequests(data?.incoming || []);
+      setOutgoingRequests(data?.outgoing || []);
+    } catch (error) {
+      console.error('Failed to load requests:', error);
       toast.error('Failed to load requests');
     } finally {
       setLoading(false);
@@ -76,14 +50,12 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request accepted');
-        loadRequests();
-        // TODO: Handle chat creation when backend implements it
-      } else {
-        toast.error('Failed to accept request');
-      }
-    } catch {
+      await handleApiResponse<any>(res);
+      toast.success('Request accepted');
+      loadRequests();
+      // TODO: Handle chat creation when backend implements it
+    } catch (error) {
+      console.error('Error accepting request:', error);
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -98,13 +70,11 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request rejected');
-        loadRequests();
-      } else {
-        toast.error('Failed to reject request');
-      }
-    } catch {
+      await handleApiResponse<any>(res);
+      toast.success('Request rejected');
+      loadRequests();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);

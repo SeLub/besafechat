@@ -28,6 +28,9 @@ export const API_ENDPOINTS = {
   // Contacts endpoints
   CONTACTS: {
     GET_ALL: `${API_CONFIG.BASE_URL}/contacts`,
+    REQUESTS: (direction?: 'incoming' | 'outgoing' | 'both') =>
+      `${API_CONFIG.BASE_URL}/contacts/requests${direction ? `?direction=${direction}` : ''}`,
+    // Deprecated - use REQUESTS() instead
     REQUESTS_INCOMING: `${API_CONFIG.BASE_URL}/contacts/requests/incoming`,
     REQUESTS_OUTGOING: `${API_CONFIG.BASE_URL}/contacts/requests/outgoing`,
     REQUESTS_ACCEPT: (requestId: string) => `${API_CONFIG.BASE_URL}/contacts/requests/${requestId}/accept`,

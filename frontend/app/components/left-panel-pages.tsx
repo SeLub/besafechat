@@ -290,7 +290,8 @@ export function LeftPanelPages({ page, onBack, userProfile, onChatCreated }: Lef
       <ContactsPage
         onBack={onBack}
         onChatSelect={userId => {
-          onChatCreated?.(userId);
+          // Chat already added when contact was accepted
+          // Just close the contacts panel
           onBack();
         }}
       />

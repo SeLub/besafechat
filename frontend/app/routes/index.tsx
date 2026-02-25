@@ -1,5 +1,6 @@
 import { AuthGuard } from '@/components/auth-guard';
 import { ContactRequestModal } from '@/components/contact-request-modal';
+import { type ContactRequest } from '@/types/api';
 import { HandleProfilesPanel } from '@/components/handle-profiles-panel';
 import { LeftColumn } from '@/components/left-column';
 import { MiddleColumn } from '@/components/middle-column';
@@ -11,7 +12,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { useOnlineStatusContext } from '@/hooks/use-online-status-context';
 import { useWebSocketNotifications } from '@/hooks/use-websocket-notifications';
 import { useContactRequestsSync } from '@/hooks/use-contact-requests-sync';
-import { ContactRequestsStoreProvider } from '@/hooks/contact-requests-store-context';
+import { ContactRequestsStoreProvider, useContactRequestsStore } from '@/hooks/contact-requests-store-context';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { StorageService } from '@/services/storage.service';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -31,16 +32,28 @@ function ChatRouteContent() {
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const [contactRequestModal, setContactRequestModal] = useState<{
     isOpen: boolean;
-    request: any;
+    request: ContactRequest | null;
   }>({ isOpen: false, request: null });
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [currentView, setCurrentView] = useState<'chats' | 'chat'>('chats'); // For mobile
   const [handleProfilesOpen, setHandleProfilesOpen] = useState(false);
+  const [shownRequestIds, setShownRequestIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<Socket | null>(null);
   const { isMobile } = useMediaQuery(); // Add media query hook
   const { user } = useAuth();
-  const { chats, addChat, updateChatLastMessage, updateChatOnlineStatus, getChatById } = useChats();
+  const { chats, addChat, updateChatLastMessage, updateChatOnlineStatus, getChatById, reloadChats } = useChats();
   const { updateOnlineStatus: updateContextOnlineStatus } = useOnlineStatusContext();
+  const contactStore = useContactRequestsStore();
+  const { addContact } = contactStore;
+
+  // Debug helper - expose store to window for console access
+  useEffect(() => {
+    (window as any).__debugContactStore = {
+      contacts: contactStore.contacts,
+      outgoingRequests: contactStore.outgoingRequests,
+      chats: chats,
+    };
+  }, [contactStore, chats]);
 
   const handleSendMessage = async (message: string) => {
     const socket = socketRef.current || window.socketInstance;
@@ -121,10 +134,22 @@ function ChatRouteContent() {
   };
 
   const handleChatSelect = useCallback(
-    async (chatId: string) => {
+    async (chatIdOrHandleId: string) => {
+      // If it looks like a handleId (UUID format), find the chat by handleId
+      const chat = getChatById(chatIdOrHandleId);
+      const actualChatId = chat?.id || chatIdOrHandleId;
+      
+      // Try to find by handleId if direct lookup fails
+      let targetChat = chat;
+      if (!targetChat) {
+        targetChat = chats.find(c => c.handleId === chatIdOrHandleId);
+      }
+      
+      const finalChatId = targetChat?.id || actualChatId;
+
       // If clicking the same chat that's already loading/loaded, allow reload
       // This handles the case where user goes back and clicks the same chat again
-      setSelectedChatId(chatId);
+      setSelectedChatId(finalChatId);
       setRightPanelOpen(false);
 
       // On mobile, switch to chat view
@@ -133,12 +158,11 @@ function ChatRouteContent() {
       }
 
       // Save to localStorage for persistence
-      localStorage.setItem('selectedChatId', chatId);
+      localStorage.setItem('selectedChatId', finalChatId);
 
       // Get chat to find userId
-      const chat = getChatById(chatId);
       // Use chat ID as the key for loading messages (not userId)
-      const loadKey = chat?.id || (chatId.startsWith('chat_') ? chatId.substring(5) : chatId);
+      const loadKey = targetChat?.id || (finalChatId.startsWith('chat_') ? finalChatId.substring(5) : finalChatId);
 
       console.log('📚 Loading messages for chatId:', loadKey);
       if (!loadKey) {
@@ -153,108 +177,12 @@ function ChatRouteContent() {
       console.log('📚 Loaded', loadedMessages.length, 'messages');
       setMessages(loadedMessages);
     },
-    [setSelectedChatId, setRightPanelOpen, getChatById, setMessages, user, isMobile]
+    [setSelectedChatId, setRightPanelOpen, getChatById, setMessages, user, isMobile, chats]
   );
 
   const handleNewChat = () => {
     setNewChatModalOpen(true);
   };
-
-  const handleChatCreated = useCallback(
-    async (identifier: string) => {
-      try {
-        // Check if identifier is a handle (contains @) or a chatId
-        const isHandle = !identifier.startsWith('chat_');
-        
-        if (isHandle) {
-          // First, check if a chat already exists with this handle
-          const existingChat = chatsRef.current.find(
-            chat => chat.username === identifier || chat.handleId?.includes(identifier)
-          );
-          
-          if (existingChat) {
-            // Chat exists, just select it
-            console.log('💬 Existing chat found, selecting:', existingChat.id);
-            setSelectedChatId(existingChat.id);
-            if (isMobile) {
-              setCurrentView('chat');
-            }
-            setNewChatModalOpen(false);
-            return;
-          }
-          
-          // No existing chat, need to create one via backend
-          // For now, we'll just notify that we need to create a chat
-          console.log('Creating new chat with handle:', identifier);
-          // This would need a proper API endpoint to create a chat by handle
-          // For now, we'll add a placeholder chat
-          const newChatId = addChat({
-            id: `chat_${identifier}`,
-            name: identifier,
-            username: identifier,
-          });
-          setSelectedChatId(newChatId);
-          if (isMobile) {
-            setCurrentView('chat');
-          }
-        } else {
-          // identifier is a chatId, proceed with normal flow
-          const res = await fetch(API_ENDPOINTS.CHATS.GET_ONE(identifier), {
-            credentials: 'include',
-          });
-
-          if (res.ok) {
-            const chatData = await res.json();
-            // Find the other user in the chat
-            const otherMember = chatData.members?.find((m: any) => m.user.id !== user?.identity.id);
-
-            const newChatId = addChat({
-              id: identifier,
-              name:
-                otherMember?.user?.displayName ||
-                `@${otherMember?.user?.username?.username}` ||
-                'Unknown User',
-              publicKey: otherMember?.user?.publicKey,
-              handleId: otherMember?.handleId, // Use handleId instead of identityId
-              avatarUrl: otherMember?.user?.avatarUrl,
-              bio: otherMember?.user?.bio,
-              firstName: otherMember?.user?.firstName,
-              lastName: otherMember?.user?.lastName,
-              alias: otherMember?.user?.alias,
-            });
-            setSelectedChatId(newChatId);
-
-            // On mobile, switch to chat view
-            if (isMobile) {
-              setCurrentView('chat');
-            }
-          } else {
-            // Fallback if API fails
-            const newChatId = addChat({ id: identifier });
-            setSelectedChatId(newChatId);
-
-            // On mobile, switch to chat view
-            if (isMobile) {
-              setCurrentView('chat');
-            }
-          }
-        }
-      } catch (error) {
-        // Fallback if API fails
-        const newChatId = addChat({ id: identifier });
-        setSelectedChatId(newChatId);
-
-        // On mobile, switch to chat view
-        if (isMobile) {
-          setCurrentView('chat');
-        }
-
-        console.log(error);
-      }
-      setNewChatModalOpen(false);
-    },
-    [user?.identity.id, addChat, setSelectedChatId, setNewChatModalOpen, isMobile]
-  );
 
   const chatsRef = useRef(chats);
   useEffect(() => {
@@ -332,30 +260,6 @@ function ChatRouteContent() {
     // No-op: replaced by handleOnlineStatusChange
   }, []);
 
-  const handleContactRequest = useCallback((request: any) => {
-    console.log('handleContactRequest called with:', request);
-    console.log('request.fromHandle:', request.fromHandle);
-
-    // Transform data to match modal expectations
-    const transformedRequest = {
-      id: request.requestId,
-      from: {
-        handleId: request.fromHandle.id,
-        value: request.fromHandle.value,
-        alias: request.fromHandle.alias,
-        displayName: request.fromHandle.displayName,
-        firstName: request.fromHandle.firstName,
-        lastName: request.fromHandle.lastName,
-        avatarUrl: request.fromHandle.avatarUrl,
-        bio: request.fromHandle.bio,
-      },
-      message: request.message,
-    };
-
-    console.log('Transformed request:', transformedRequest);
-    setContactRequestModal({ isOpen: true, request: transformedRequest });
-  }, []);
-
   const handleOnlineStatusChange = useCallback(
     (handleId: string, isOnline: boolean) => {
       updateChatOnlineStatus(handleId, isOnline);
@@ -364,10 +268,10 @@ function ChatRouteContent() {
     [updateChatOnlineStatus, updateContextOnlineStatus]
   );
 
-  const handleAcceptRequest = async (requestId: string) => {
+  const handleAcceptRequest = async (request: ContactRequest) => {
     setRequestActionLoading(true);
     try {
-      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(requestId), {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_ACCEPT(request.id), {
         method: 'POST',
         credentials: 'include',
       });
@@ -376,10 +280,60 @@ function ChatRouteContent() {
         setContactRequestModal({ isOpen: false, request: null });
         toast.success('Request accepted');
 
-        // If chat was created, navigate to it
-        if (result.chatId) {
-          await handleChatCreated(result.chatId);
+        // Use data from API response - it has the authoritative contact info
+        const fromHandle = result.fromHandle;
+        const { chatId } = result;
+
+        console.log('📡 Accept response:', result);
+        console.log('fromHandle:', fromHandle);
+
+        if (!fromHandle || !chatId) {
+          toast.error('Invalid response from server');
+          return;
         }
+
+        // Add contact to store with data from accept response
+        const contactData = {
+          id: fromHandle.id,
+          user: {
+            id: fromHandle.id,
+            displayName: fromHandle.displayName,
+            handle: fromHandle.value,
+            avatarUrl: fromHandle.avatarUrl,
+            firstName: fromHandle.firstName,
+            lastName: fromHandle.lastName,
+            bio: fromHandle.bio,
+          },
+          acceptedAt: new Date().toISOString(),
+        };
+        addContact(contactData);
+
+        // Add chat with contact data from accept response
+        const displayName = fromHandle.firstName && fromHandle.lastName
+          ? `${fromHandle.firstName} ${fromHandle.lastName}`
+          : fromHandle.displayName || `@${fromHandle.value}`;
+
+        const newChatId = addChat({
+          id: chatId,
+          name: displayName,
+          publicKey: undefined,
+          handleId: fromHandle.id,
+          avatarUrl: fromHandle.avatarUrl,
+          bio: fromHandle.bio,
+          firstName: fromHandle.firstName,
+          lastName: fromHandle.lastName,
+          username: fromHandle.value,
+          alias: fromHandle.alias,
+        });
+
+        setSelectedChatId(newChatId);
+        if (isMobile) {
+          setCurrentView('chat');
+        }
+
+        // Reload chats from backend in the background to ensure consistency
+        // Do NOT await this - let it happen asynchronously
+        reloadChats().catch(err => console.error('Error reloading chats:', err));
       } else {
         toast.error('Failed to accept request');
       }
@@ -390,10 +344,10 @@ function ChatRouteContent() {
     }
   };
 
-  const handleRejectRequest = async (requestId: string) => {
+  const handleRejectRequest = async (request: ContactRequest) => {
     setRequestActionLoading(true);
     try {
-      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(requestId), {
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS_REJECT(request.id), {
         method: 'POST',
         credentials: 'include',
       });
@@ -411,17 +365,93 @@ function ChatRouteContent() {
   };
 
   // Enable WebSocket notifications and messaging
+  // WebSocket now acts as trigger only; all chat data comes from REST API
   useWebSocketNotifications(
-    handleChatCreated,
+    undefined,
     handleMessageReceived,
     handleUserOnline,
     handleUserOffline,
-    handleContactRequest,
     handleOnlineStatusChange
   );
 
+  // Callback for when contact request is accepted
+  // Loads chat data from backend and opens it
+  const handleChatAccepted = useCallback(
+    async (chatId: string, otherHandle: any) => {
+      console.log('📞 handleChatAccepted called for chatId:', chatId, 'otherHandle:', otherHandle);
+
+      try {
+        // Build display name
+        const displayName = otherHandle.firstName && otherHandle.lastName
+          ? `${otherHandle.firstName} ${otherHandle.lastName}`
+          : otherHandle.displayName || `@${otherHandle.handle}`;
+
+        // Add chat to list with data from WebSocket (has chatId and otherHandle)
+        const newChatId = addChat({
+          id: chatId,
+          name: displayName,
+          handleId: otherHandle.id,
+          avatarUrl: otherHandle.avatarUrl,
+          bio: otherHandle.bio,
+          firstName: otherHandle.firstName,
+          lastName: otherHandle.lastName,
+          username: otherHandle.handle,
+          alias: otherHandle.alias,
+        });
+
+        // Select the chat (open it)
+        setSelectedChatId(newChatId);
+        console.log('✅ Chat opened:', newChatId);
+
+        // On mobile, switch to chat view
+        if (isMobile) {
+          setCurrentView('chat');
+        }
+
+        // Reload chats in background for consistency
+        reloadChats().catch(err => console.error('Error reloading chats:', err));
+      } catch (error) {
+        console.error('❌ Error handling chat accepted:', error);
+      }
+    },
+    [addChat, isMobile, reloadChats]
+  );
+
+  // Callback for incoming contact request
+  // Shows modal when request is received (only once per session)
+  const handleIncomingRequest = useCallback((data: any) => {
+    // Skip if this request was already shown in this session
+    if (shownRequestIds.has(data.requestId)) {
+      console.log('⏭️ Request already shown in this session, skipping:', data.requestId);
+      return;
+    }
+
+    console.log('📨 Incoming request received, showing modal:', data);
+    const transformedRequest = {
+      id: data.requestId,
+      from: {
+        id: data.fromHandle.id,
+        handleId: data.fromHandle.id,
+        value: data.fromHandle.value,
+        alias: data.fromHandle.alias,
+        displayName: data.fromHandle.displayName,
+        firstName: data.fromHandle.firstName,
+        lastName: data.fromHandle.lastName,
+        avatarUrl: data.fromHandle.avatarUrl,
+        bio: data.fromHandle.bio,
+      },
+      message: data.message,
+    };
+    setContactRequestModal({ isOpen: true, request: transformedRequest });
+    // Mark this request as shown
+    setShownRequestIds(prev => new Set([...prev, data.requestId]));
+  }, [shownRequestIds]);
+
   // Enable contact requests sync (handles WebSocket events for contact requests)
-  useContactRequestsSync();
+  useContactRequestsSync({
+    onIncomingRequest: handleIncomingRequest,
+    onChatAccepted: handleChatAccepted,
+  });
 
   // Cleanup old messages on app start
   useEffect(() => {
@@ -503,7 +533,6 @@ function ChatRouteContent() {
               handleChatSelect(chatId);
             }}
             onNewChat={handleNewChat}
-            onChatCreated={handleChatCreated}
           />
         )}
 
@@ -550,7 +579,10 @@ function ChatRouteContent() {
       <NewChatModal
         isOpen={newChatModalOpen}
         onClose={() => setNewChatModalOpen(false)}
-        onChatCreated={handleChatCreated}
+        onChatCreated={async () => {
+          // Chat will be added through contact accept flow
+          setNewChatModalOpen(false);
+        }}
       />
 
       <ContactRequestModal

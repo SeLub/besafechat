@@ -7,6 +7,8 @@ import { ArrowLeft, ChevronDown, ChevronRight, Clock, MessageCircle } from 'luci
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { handleApiResponse } from '@/services/api-utils';
+import { type ContactRequest } from '@/types/api';
 
 interface ContactsPageProps {
   onBack: () => void;
@@ -21,15 +23,15 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const { clearRequests } = useContactRequests();
   const {
     contacts,
-    incomingRequests,
     outgoingRequests,
     setContacts,
-    setIncomingRequests,
     setOutgoingRequests,
-    removeIncomingRequest,
     removeContact,
     addContact,
   } = useContactRequestsStore();
+
+  // Local state for incoming requests (not in global store)
+  const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
 
   useEffect(() => {
     loadData();
@@ -50,41 +52,34 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [contactsRes, incomingRes, outgoingRes] = await Promise.all([
+      const [contactsRes, requestsRes] = await Promise.all([
         fetch(API_ENDPOINTS.CONTACTS.GET_ALL, { credentials: 'include' }),
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, { credentials: 'include' }),
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, { credentials: 'include' }),
+        fetch(API_ENDPOINTS.CONTACTS.REQUESTS('both'), { credentials: 'include' }),
       ]);
 
-      if (contactsRes.ok) {
-        const contactsData = await contactsRes.json();
-        // Transform contacts data to match our Contact interface
-        const transformedContacts = (contactsData.contacts || []).map((contact: any) => ({
-          id: contact.id || contact.user?.id,
-          user: {
-            id: contact.user?.id,
-            displayName: contact.user?.displayName,
-            handle: contact.user?.handle,
-            avatarUrl: contact.user?.avatarUrl,
-            firstName: contact.user?.firstName,
-            lastName: contact.user?.lastName,
-            bio: contact.user?.bio,
-          },
-          acceptedAt: contact.acceptedAt,
-        }));
-        setContacts(transformedContacts);
-      }
+      const contactsData = await handleApiResponse<any>(contactsRes);
+      const requestsData = await handleApiResponse<any>(requestsRes);
 
-      if (incomingRes.ok) {
-        const incomingData = await incomingRes.json();
-        setIncomingRequests(incomingData.requests || []);
-      }
+      // Transform contacts data to match our Contact interface
+      const transformedContacts = (contactsData?.contacts || []).map((contact: any) => ({
+        id: contact.id || contact.user?.id,
+        user: {
+          id: contact.user?.id,
+          displayName: contact.user?.displayName,
+          handle: contact.user?.handle,
+          avatarUrl: contact.user?.avatarUrl,
+          firstName: contact.user?.firstName,
+          lastName: contact.user?.lastName,
+          bio: contact.user?.bio,
+        },
+        acceptedAt: contact.acceptedAt,
+      }));
+      setContacts(transformedContacts);
 
-      if (outgoingRes.ok) {
-        const outgoingData = await outgoingRes.json();
-        setOutgoingRequests(outgoingData.requests || []);
-      }
-    } catch {
+      setIncomingRequests(requestsData?.incoming || []);
+      setOutgoingRequests(requestsData?.outgoing || []);
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
@@ -104,28 +99,25 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request accepted');
-        console.log('✅ Request accepted');
+      await handleApiResponse<any>(res);
+      toast.success('Request accepted');
+      console.log('✅ Request accepted');
 
-        // Remove from pending requests
-        removeIncomingRequest(requestId);
+      // Remove from local pending requests
+      setIncomingRequests(prev => prev.filter(r => r.id !== requestId));
 
-        // Add to contacts
-        if (request) {
-          addContact({
+      // Add to contacts
+      if (request) {
+        addContact({
+          id: request.from.id,
+          user: {
             id: request.from.id,
-            user: {
-              id: request.from.id,
-              displayName: request.from.displayName,
-              handle: request.from.value,
-              avatarUrl: request.from.avatarUrl,
-            },
-            acceptedAt: new Date().toISOString(),
-          });
-        }
-      } else {
-        toast.error('Failed to accept request');
+            displayName: request.from.displayName,
+            handle: request.from.value,
+            avatarUrl: request.from.avatarUrl,
+          },
+          acceptedAt: new Date().toISOString(),
+        });
       }
     } catch (error) {
       console.error('❌ Error accepting request:', error);
@@ -149,19 +141,16 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request rejected');
-        console.log('✅ Request rejected');
+      await handleApiResponse<any>(res);
+      toast.success('Request rejected');
+      console.log('✅ Request rejected');
 
-        // Remove from pending requests
-        removeIncomingRequest(requestId);
+      // Remove from local pending requests
+      setIncomingRequests(prev => prev.filter(r => r.id !== requestId));
 
-        // Remove contact since request was rejected
-        if (contactId) {
-          removeContact(contactId);
-        }
-      } else {
-        toast.error('Failed to reject request');
+      // Remove contact since request was rejected
+      if (contactId) {
+        removeContact(contactId);
       }
     } catch (error) {
       console.error('❌ Error rejecting request:', error);
@@ -255,9 +244,9 @@ export function ContactsPage({ onBack, onChatSelect }: ContactsPageProps) {
                   <div
                     key={contact.id}
                     className="flex items-center justify-between px-5 py-4 hover:bg-primary/5 transition-all cursor-pointer group border-b border-primary/5 last:border-0"
-                    onClick={() => onChatSelect(contact.user.handle)}
+                    onClick={() => onChatSelect(contact.user.id)}
                     onKeyDown={e =>
-                      (e.key === 'Enter' || e.key === ' ') && onChatSelect(contact.user.handle)
+                      (e.key === 'Enter' || e.key === ' ') && onChatSelect(contact.user.id)
                     }
                     tabIndex={0}
                     role="button"

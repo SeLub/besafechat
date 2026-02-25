@@ -5,38 +5,21 @@ import { useAuth } from './use-auth-context';
 import { useContactRequests } from './use-contact-requests';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 
-interface ContactRequestData {
-  requestId: string;
-  fromHandle: {
-    id: string;
-    value: string;
-    alias: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  message?: string;
-}
-
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
-  onContactRequest?: (request: ContactRequestData) => void,
   onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void
 ) {
   const { user } = useAuth();
-  const { incrementPending, incrementAccepted } = useContactRequests();
+  const { incrementAccepted } = useContactRequests();
 
   const callbacksRef = useRef({
     onChatCreated,
     onMessageReceived,
     onUserOnline,
     onUserOffline,
-    onContactRequest,
     onOnlineStatusChange,
   });
 
@@ -46,7 +29,6 @@ export function useWebSocketNotifications(
       onMessageReceived,
       onUserOnline,
       onUserOffline,
-      onContactRequest,
       onOnlineStatusChange,
     };
   });
@@ -65,74 +47,43 @@ export function useWebSocketNotifications(
     // Store socket globally for message sending
     window.socketInstance = socket;
 
-    // Contact request received - show modal with notification
+    // Contact request received - toast notification only
+    // Actual modal handling is in use-contact-requests-sync
     socket.on('contact_request_received', data => {
-      console.log('🔔 contact_request_received - showing modal:', data);
-      const { requestId, fromHandle, message } = data;
-
-      // Show modal through callback
-      callbacksRef.current.onContactRequest?.({
-        requestId,
-        fromHandle: {
-          id: fromHandle.id,
-          value: fromHandle.value || fromHandle.handle,
-          alias: fromHandle.alias || null,
-          displayName: fromHandle.displayName,
-          firstName: fromHandle.firstName || null,
-          lastName: fromHandle.lastName || null,
-          avatarUrl: fromHandle.avatarUrl || null,
-          bio: fromHandle.bio || null,
-        },
-        message,
-      });
-
-      incrementPending();
+      const { fromHandle } = data;
+      const displayName = fromHandle?.displayName || `@${fromHandle?.value}` || 'Someone';
+      console.log('🔔 contact_request_received - toast feedback:', data);
+      toast.info(`New contact request from ${displayName}`);
     });
 
-    // Contact request accepted - show notification
-    socket.on('contact_request_accepted', data => {
-      const { byHandle, chatId } = data;
-      const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
+    // Contact accepted - WebSocket trigger (real-time notification)
+    // WebSocket is trigger only; actual chat loading handled in use-contact-requests-sync
+    socket.on('contact_accepted', data => {
+      const { otherHandle } = data;
+      const displayName = otherHandle?.displayName || `@${otherHandle?.handle}` || 'Someone';
 
-      console.log('✅ contact_request_accepted - showing notification:', data);
+      console.log('✅ contact_accepted - request was accepted (trigger event):', data);
 
       toast.success(`${displayName} accepted your request`, {
-        description: 'You can now start chatting',
+        description: 'Chat is being loaded...',
       });
 
       incrementAccepted();
-
-      // Handle chat creation
-      if (chatId) {
-        callbacksRef.current.onChatCreated?.(chatId);
-      }
+      // Note: Chat will be automatically loaded and opened by use-contact-requests-sync
     });
 
-    // Contact request rejected - show notification
+    // Contact request rejected - WebSocket trigger
     socket.on('contact_request_rejected', data => {
       const { byHandle } = data;
-      const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
+      const displayName = byHandle?.displayName || `@${byHandle?.handle}` || 'Someone';
 
       console.log('❌ contact_request_rejected - showing notification:', data);
       toast.error(`${displayName} declined your request`);
     });
 
-    // New chat available - show notification
-    socket.on('new_chat_available', data => {
-      const { fromHandle, chatId } = data;
-      const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
-
-      console.log('💬 new_chat_available - showing notification:', data);
-
-      toast.success(`Chat available with ${displayName}`, {
-        description: 'You can now start messaging',
-      });
-
-      // Handle chat creation/selection
-      if (chatId) {
-        callbacksRef.current.onChatCreated?.(chatId);
-      }
-    });
+    // Note: new_chat_available removed
+    // Acceptor gets chat data from REST response, not WebSocket
+    // Sender gets notification from Redis (persistent)
 
     // Message received
     socket.on('message:new', (payload: any) => {
@@ -188,7 +139,7 @@ export function useWebSocketNotifications(
     return () => {
       clearInterval(heartbeatInterval);
       socket.off('contact_request_received');
-      socket.off('contact_request_accepted');
+      socket.off('contact_accepted');
       socket.off('contact_request_rejected');
       socket.off('message:new');
       socket.off('user_online');
@@ -199,5 +150,5 @@ export function useWebSocketNotifications(
       socket.disconnect();
       window.socketInstance = null;
     };
-  }, [user, incrementAccepted, incrementPending]);
+  }, [user, incrementAccepted]);
 }
