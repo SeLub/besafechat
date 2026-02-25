@@ -35,11 +35,19 @@ export interface PublicKey {
 
 export type MessageRetentionPeriod = '7' | '30' | '90' | 'forever';
 
+// 🔐 Новый интерфейс для хранения CryptoKey
+export interface CryptoKeyRecord {
+  identityId: string; // Primary key: привязка к пользователю
+  encryptionKey: CryptoKey; // Сам ключ (неэкспортируемый)
+  createdAt: number; // Метаданные для отладки/очистки
+}
+
 // Dexie схема
 export const SCHEMA = {
   messages: 'id, chatId, timestamp',
   contacts: '++contactId, handleId',
   publicKey: 'id',
+  cryptoKeys: 'identityId', // 🔐 Добавляем store для ключей
 };
 
 export type MigrationStep = {

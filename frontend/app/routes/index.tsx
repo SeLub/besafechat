@@ -137,7 +137,8 @@ function ChatRouteContent() {
       message,
       user.handle.id, // Use handle ID for encryption instead of identity ID
       true,
-      messageId
+      undefined, // messageId
+      user.identity.id // ← identityId из контекста
     );
 
     // Update chat last message
@@ -185,7 +186,7 @@ function ChatRouteContent() {
       }
       // Load messages from IndexedDB
       const loadedMessages = user
-        ? await StorageService.loadDecryptedMessages(loadKey, user.handle.id)
+        ? await StorageService.loadDecryptedMessages(loadKey, user.handle.id, user.identity.id)
         : [];
       console.log('📚 Loaded', loadedMessages.length, 'messages');
       setMessages(loadedMessages);
@@ -197,19 +198,13 @@ function ChatRouteContent() {
     setNewChatModalOpen(true);
   };
 
+  // 🔁 Keep chatsRef synced with latest chats array
+  // This allows handleMessageReceived to access fresh chats
+  // WITHOUT adding 'chats' to useCallback dependencies (prevents WebSocket re-subscription)
   const chatsRef = useRef(chats);
   useEffect(() => {
     chatsRef.current = chats;
   }, [chats]);
-
-  // Load initial online statuses to context when chats are loaded
-  // useEffect(() => {
-  //   const handleIds = chats.map(chat => chat.handleId).filter(Boolean) as string[];
-  //   if (handleIds.length > 0) {
-  //     loadInitialStatuses(handleIds);
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [chats.length, loadInitialStatuses]);
 
   const handleMessageReceived = useCallback(
     async (message: any) => {
@@ -239,7 +234,7 @@ function ChatRouteContent() {
       }
 
       // Always save to IndexedDB using chatId (not senderId) as chatId
-      if (message.chatId && user) {
+      if (message.chatId && user?.identity?.id) {
         console.log('💾 Saving received message with chatId:', message.chatId);
         try {
           // Generate a fallback ID if the message doesn't have one
@@ -251,13 +246,14 @@ function ChatRouteContent() {
             message.text,
             user.handle.id,
             false,
-            messageId
+            messageId,
+            user.identity.id // ← identityId из контекста
           );
         } catch (error) {
           console.error('❌ Error saving received message:', error);
         }
       } else {
-        console.warn('⚠️ Received message without chatId or user, skipping storage');
+        console.warn('⚠️ Received message without chatId or identity ID, skipping storage');
       }
     },
     [selectedChatId, user]

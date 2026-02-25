@@ -376,71 +376,92 @@ export async function decryptSeedFromCloud(
  * // privateKey should be securely cleared
  */
 export async function hashPrivateKey(privateKey: Uint8Array): Promise<Uint8Array> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', privateKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', privateKey as BufferSource);
   return new Uint8Array(hashBuffer);
 }
 
 /**
- * Derive AES-256-GCM encryption key from private key hash
+ * Derive AES-256-GCM encryption key from non-extractable CryptoKey
  *
  * Uses PBKDF2 to derive a cryptographically strong encryption key from:
- * 1. Hash of private key (secret, in-memory only)
+ * 1. Base CryptoKey (non-extractable, stored in IndexedDB or RAM)
  * 2. Handle ID (public, acts as salt for personalization)
  * 3. Purpose string (for key separation across different uses)
  *
  * The derived key is ready to use with Web Crypto API's AES-GCM operations.
  *
+ * ─────────────────────────────────────────────────────────────
+ * Security Architecture
+ * ─────────────────────────────────────────────────────────────
+ *
+ * Key Storage Flow:
+ * 1. Login: privateKey → hashPrivateKey() → importKey(extractable: false) → CryptoKey
+ * 2. Store: CryptoKey saved to IndexedDB (browser-managed secure storage)
+ * 3. Usage: Load CryptoKey → deriveEncryptionKeyFromHash() → AES-GCM operations
+ * 4. Logout: Delete CryptoKey from IndexedDB + clear RAM references
+ *
+ * Why extractable: false?
+ * - CryptoKey cannot be exported/read by JavaScript code
+ * - XSS attacks can use the key but cannot steal its raw bytes
+ * - Key material stays in browser's secure enclave / TPM when available
+ * - Zero-knowledge: server never sees the key, only uses it for auth challenges
+ *
  * Key Derivation Process:
- * - Input material = privateKeyHash || handleId || purpose
- * - PBKDF2(material, salt=handleId, iterations=100000, hash=SHA-256)
- * - Output: 256-bit AES-GCM key
+ * - Input: non-extractable CryptoKey (baseKey)
+ * - Salt: handleId (ensures unique keys per user handle)
+ * - Info: purpose (ensures key separation: messages ≠ files ≠ contacts)
+ * - PBKDF2(baseKey, salt, iterations=100000, hash=SHA-256)
+ * - Output: 256-bit AES-GCM key (also non-extractable)
  *
- * Why 100K iterations instead of 210K?
- * - Private key hash already has high entropy (256 bits)
- * - No need for excessive key stretching
- * - Reduces CPU load on client while maintaining security
+ * Why 100K iterations?
+ * - baseKey already has high entropy (derived from 256-bit private key hash)
+ * - No need for excessive key stretching (unlike password-based KDF)
+ * - Balances security with client-side performance
  *
- * @param privateKeyHash - SHA-256 hash of private key (from hashPrivateKey)
- * @param handleId - User's handle ID (public, but acts as salt)
- * @param purpose - Derivation purpose: 'message', 'file', 'contact', etc.
+ * @param baseKey - Non-extractable CryptoKey (from IndexedDB or session RAM)
+ *                  Must have usages: ['deriveKey'] and algorithm: PBKDF2/HKDF
+ * @param handleId - User's handle ID (public, but acts as salt for uniqueness)
+ * @param purpose - Derivation purpose: 'message', 'file', 'contact', 'metadata'
+ *                  Ensures key separation: same baseKey → different derived keys
  * @returns Ready-to-use CryptoKey for AES-256-GCM encryption/decryption
+ *          (also non-extractable, usages: ['encrypt', 'decrypt'])
  *
  * @example
- * const hash = await hashPrivateKey(rawPrivateKey);
- * const key = await deriveEncryptionKeyFromHash(hash, handleId, 'message');
- * const encrypted = await encryptWithKey(message, key);
+ * // During login:
+ * const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+ * const baseKey = await crypto.subtle.importKey(
+ *   'raw', privateKeyHash, { name: 'PBKDF2', hash: 'SHA-256' },
+ *   false, ['deriveKey'] // 🔑 extractable: false
+ * );
+ * await StorageService.storeEncryptionKey(identityId, baseKey);
+ *
+ * // During encryption:
+ * const baseKey = await StorageService.loadEncryptionKey(identityId);
+ * const encryptionKey = await deriveEncryptionKeyFromHash(baseKey, handleId, 'message');
+ * const encrypted = await encryptWithKey(message, encryptionKey);
+ *
+ * @throws Error if baseKey is invalid, expired, or lacks required usages
  */
 export async function deriveEncryptionKeyFromHash(
-  privateKeyHash: Uint8Array,
+  baseKey: CryptoKey, // ← Changed from privateKeyHash: Uint8Array
   handleId: string,
   purpose: string = 'message'
 ): Promise<CryptoKey> {
-  // Combine all material for key derivation
-  const material = concatUint8Arrays([
-    privateKeyHash,
-    new TextEncoder().encode(handleId),
-    new TextEncoder().encode(purpose),
-  ]);
-
-  // Use handleId as salt for personalization
-  const salt = new TextEncoder().encode(handleId);
-
-  // Import the combined material as PBKDF2 base key
-  const baseKey = await crypto.subtle.importKey('raw', toArrayBuffer(material), 'PBKDF2', false, [
-    'deriveKey',
-  ]);
+  // Use handleId as salt for personalization (unique key per handle)
+  const salt = new TextEncoder().encode(`${handleId}:${purpose}`);
 
   // Derive the final encryption key using PBKDF2
+  // baseKey is non-extractable → derived key is also non-extractable
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: toArrayBuffer(salt),
-      iterations: 100000, // Reduced from 210K (hash is already strong)
+      iterations: 100000, // Balanced for high-entropy input
       hash: 'SHA-256',
     },
-    baseKey,
+    baseKey, // ← Use CryptoKey directly (no importKey needed)
     { name: 'AES-GCM', length: 256 }, // AES-256-GCM
-    false, // Not extractable
+    false, // 🔑 Derived key is also non-extractable
     ['encrypt', 'decrypt'] // Can be used for both operations
   );
 }

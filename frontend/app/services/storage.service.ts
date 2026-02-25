@@ -8,7 +8,11 @@ import {
   uint8ToBase64,
   deriveEncryptionKeyFromHash,
 } from '@/lib/crypto';
-import { getSessionPrivateKeyHash } from './account.service';
+import {
+  getSessionCryptoKey,
+  // getSessionPrivateKeyHash,
+  setSessionCryptoKey,
+} from './account.service';
 import { getDb, initializeDb, closeDb } from '@/lib/db/db';
 import type { Contact, Message, MessageRetentionPeriod, PublicKey } from '@/lib/db/schema';
 // Conversion utilities for IndexedDB storage
@@ -135,6 +139,105 @@ export class StorageService {
     }
   }
 
+  // storage.service.ts
+
+  /**
+   * Get base CryptoKey for encryption operations
+   * Priority: RAM cache → IndexedDB fallback
+   *
+   * @param identityId User's identity ID (from AuthContext)
+   * @returns CryptoKey or throws if not available
+   */
+  private static async getBaseKey(identityId: string): Promise<CryptoKey> {
+    // 1. Try RAM cache first (fastest)
+    const ramKey = getSessionCryptoKey();
+    if (ramKey) {
+      return ramKey;
+    }
+
+    // 2. Fallback: load from IndexedDB (after page refresh)
+    const dbKey = await StorageService.loadEncryptionKey(identityId);
+    if (dbKey) {
+      // Optional: cache in RAM for subsequent calls
+      setSessionCryptoKey(dbKey);
+      return dbKey;
+    }
+
+    // 3. Key not found — user needs to restore access
+    throw new Error('Encryption key not available. Please restore access to enable encryption.');
+  }
+
+  // ==========================================================================
+  // CryptoKey Management (non-extractable keys)
+  // ==========================================================================
+
+  /**
+   * Сохранение non-extractable CryptoKey для шифрования
+   * Ключ нельзя экспортировать — только использовать для операций deriveKey/encrypt/decrypt
+   *
+   * @param identityId ID пользователя (из профиля)
+   * @param key CryptoKey с параметром extractable: false
+   */
+  static async storeEncryptionKey(identityId: string, key: CryptoKey): Promise<void> {
+    try {
+      const db = await getDb();
+
+      await db.cryptoKeys.put({
+        identityId,
+        encryptionKey: key, // Dexie автоматически сериализует CryptoKey
+        createdAt: Date.now(),
+      });
+
+      console.log(`🔐 Encryption key stored for identity: ${identityId}`);
+    } catch (error) {
+      console.error('❌ Error storing encryption key:', error);
+      throw new Error(
+        `Failed to store encryption key: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Загрузка non-extractable CryptoKey из хранилища
+   *
+   * @param identityId ID пользователя
+   * @returns CryptoKey или null, если не найден
+   */
+  static async loadEncryptionKey(identityId: string): Promise<CryptoKey | null> {
+    try {
+      const db = await getDb();
+      const record = await db.cryptoKeys.get(identityId);
+
+      if (!record) {
+        console.log(`🔐 No encryption key found for identity: ${identityId}`);
+        return null;
+      }
+
+      console.log(`🔐 Encryption key loaded for identity: ${identityId}`);
+      return record.encryptionKey;
+    } catch (error) {
+      console.error('❌ Error loading encryption key:', error);
+      return null; // Возвращаем null, чтобы caller мог обработать отсутствие ключа
+    }
+  }
+
+  /**
+   * Удаление ключа при logout
+   *
+   * @param identityId ID пользователя
+   */
+  static async deleteEncryptionKey(identityId: string): Promise<void> {
+    try {
+      const db = await getDb();
+      await db.cryptoKeys.delete(identityId);
+
+      console.log(`🔐 Encryption key deleted for identity: ${identityId}`);
+    } catch (error) {
+      console.error('❌ Error deleting encryption key:', error);
+      // Не выбрасываем ошибку — logout не должен падать из-за проблем с очисткой
+    }
+  }
+
   // ==========================================================================
   // Key Management
   // ==========================================================================
@@ -214,23 +317,21 @@ export class StorageService {
   // ==========================================================================
 
   /**
-   * Шифрование текстовых данных
+   * Шифрование текстовых данных (hash-based, non-extractable CryptoKey)
    */
   static async encryptTextData(
     text: string,
     handleId: string,
-    context: 'message' | 'contact' | 'metadata'
+    context: 'message' | 'contact' | 'metadata',
+    identityId: string // ← Новый параметр
   ): Promise<EncryptedStorage> {
     try {
       const textBytes = new TextEncoder().encode(text);
 
-      const privateKeyHash = getSessionPrivateKeyHash();
-      if (!privateKeyHash) {
-        throw new Error('Session private key hash not available');
-      }
+      // 🔐 Get base key using provided identityId
+      const baseKey = await StorageService.getBaseKey(identityId);
 
-      const encryptionKey = await deriveEncryptionKeyFromHash(privateKeyHash, handleId, context);
-
+      const encryptionKey = await deriveEncryptionKeyFromHash(baseKey, handleId, context);
       const { encrypted: enc, iv } = await encryptWithKey(textBytes, encryptionKey);
 
       return {
@@ -286,20 +387,21 @@ export class StorageService {
   }
 
   /**
-   * Дешифрование данных
+   * Дешифрование данных (hash-based, non-extractable CryptoKey)
    */
   static async decryptData(
     encryptedStorage: EncryptedStorage,
-    handleId: string
+    handleId: string,
+    identityId?: string
   ): Promise<Uint8Array> {
     try {
-      const privateKeyHash = getSessionPrivateKeyHash();
-      if (!privateKeyHash) {
-        throw new Error('Session private key hash not available');
+      if (!identityId) {
+        throw new Error('Identity ID not available');
       }
+      const baseKey = await StorageService.getBaseKey(identityId);
 
       const encryptionKey = await deriveEncryptionKeyFromHash(
-        privateKeyHash,
+        baseKey,
         handleId,
         encryptedStorage.context
       );
@@ -324,9 +426,10 @@ export class StorageService {
    */
   static async decryptTextData(
     encryptedStorage: EncryptedStorage,
-    handleId: string
+    handleId: string,
+    identityId?: string
   ): Promise<string> {
-    const decryptedBytes = await this.decryptData(encryptedStorage, handleId);
+    const decryptedBytes = await this.decryptData(encryptedStorage, handleId, identityId);
     return new TextDecoder().decode(decryptedBytes);
   }
 
@@ -346,7 +449,8 @@ export class StorageService {
     content: string,
     handleId: string,
     isOwn: boolean = false,
-    messageId?: string
+    messageId?: string,
+    identityId?: string
   ): Promise<string> {
     try {
       const id =
@@ -361,19 +465,14 @@ export class StorageService {
 
       const textBytes = new TextEncoder().encode(content);
 
-      // Hash-based encryption (единственная версия)
-      // Внутри saveEncryptedMessage, перед проверкой:
-      console.log('🔐 Debug: getSessionPrivateKeyHash() =', getSessionPrivateKeyHash());
-      console.log('🔐 Debug: handleId =', handleId);
+      // Внутри saveEncryptedMessage, где было получение privateKeyHash:
 
-      const privateKeyHash = getSessionPrivateKeyHash();
-      if (!privateKeyHash) {
-        console.error('❌ CRITICAL: privateKeyHash is missing!');
-        console.trace('Stack trace for missing hash:'); // Покажет, откуда вызвана функция
-        throw new Error('Session private key hash not available');
+      if (!identityId) {
+        throw new Error('Identity ID not available');
       }
+      const baseKey = await StorageService.getBaseKey(identityId);
 
-      const encryptionKey = await deriveEncryptionKeyFromHash(privateKeyHash, handleId, 'message');
+      const encryptionKey = await deriveEncryptionKeyFromHash(baseKey, handleId, 'message');
       const { encrypted: enc, iv: newIv } = await encryptWithKey(textBytes, encryptionKey);
 
       const message: Message = {
@@ -404,7 +503,8 @@ export class StorageService {
    */
   static async loadDecryptedMessages(
     chatId: string,
-    handleId: string
+    handleId: string,
+    identityId?: string
   ): Promise<
     Array<{
       id: string;
@@ -418,9 +518,27 @@ export class StorageService {
       const messages = await getDb().messages.where('chatId').equals(chatId).sortBy('timestamp');
 
       const decryptedMessages = [];
+      // ❌ УДАЛИТЬ: let successfulMessages = 0;
+      // ❌ УДАЛИТЬ: let failedMessages = 0;
 
       for (const msg of messages) {
         try {
+          if (!identityId) {
+            console.warn(`Message ${msg.id}: identity ID not available`);
+            // ❌ УДАЛИТЬ: failedMessages++;
+            // Просто добавляем заглушку и продолжаем
+            decryptedMessages.push({
+              id: msg.id,
+              text: `[⚠️ Identity ID not available]`,
+              isOwn: msg.isOwn,
+              timestamp: msg.timestamp,
+              senderId: msg.senderId,
+            });
+            continue;
+          }
+
+          const baseKey = await StorageService.getBaseKey(identityId);
+
           const encryptedStorage: EncryptedStorage = {
             encrypted: convertArrayBufferToUint8(msg.encryptedContent),
             iv: convertArrayBufferToUint8(msg.iv),
@@ -428,8 +546,15 @@ export class StorageService {
             timestamp: msg.timestamp,
           };
 
-          const text = await this.decryptTextData(encryptedStorage, handleId);
+          const encryptionKey = await deriveEncryptionKeyFromHash(baseKey, handleId, 'message');
+          const decrypted = await decryptWithKey(
+            encryptedStorage.encrypted,
+            encryptionKey,
+            encryptedStorage.iv
+          );
+          const text = new TextDecoder().decode(decrypted);
 
+          // ✅ Успешно расшифровали — добавляем в результат
           decryptedMessages.push({
             id: msg.id,
             text,
@@ -437,17 +562,24 @@ export class StorageService {
             timestamp: msg.timestamp,
             senderId: msg.senderId,
           });
+
+          // ❌ УДАЛИТЬ: successfulMessages++; (не нужно)
         } catch (decryptError) {
           console.error(`Failed to decrypt message ${msg.id}:`, decryptError);
+          // Добавляем заглушку для неудачно расшифрованного сообщения
           decryptedMessages.push({
             id: msg.id,
-            text: `[Сообщение не удалось расшифровать]`,
+            text: `[❌ Сообщение не удалось расшифровать]`,
             isOwn: msg.isOwn,
             timestamp: msg.timestamp,
             senderId: msg.senderId,
           });
+          // ❌ УДАЛИТЬ: failedMessages++; (не нужно)
         }
       }
+
+      // Опционально: залогировать итог
+      console.log(`📚 Loaded ${decryptedMessages.length} messages for chat ${chatId}`);
 
       return decryptedMessages;
     } catch (error) {
@@ -456,48 +588,6 @@ export class StorageService {
         `Failed to load messages: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
-  }
-
-  /**
-   * Временное шифрование приватного ключа для сессии
-   */
-  static async encryptPrivateKeyForSession(
-    privateKey: Uint8Array,
-    handleId: string
-  ): Promise<EncryptedStorage> {
-    try {
-      return await this.encryptTextData(uint8ToBase64(privateKey), handleId, 'metadata');
-    } catch (error) {
-      console.error('Error encrypting private key for session:', error);
-      throw new Error(
-        `Failed to encrypt private key: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * Дешифрование приватного ключа из сессии
-   */
-  static async decryptPrivateKeyFromSession(
-    encryptedStorage: EncryptedStorage,
-    handleId: string
-  ): Promise<Uint8Array> {
-    try {
-      const base64Key = await this.decryptTextData(encryptedStorage, handleId);
-      return base64ToUint8(base64Key);
-    } catch (error) {
-      console.error('Error decrypting private key from session:', error);
-      throw new Error(
-        `Failed to decrypt private key: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * Проверка возможности импорта ключа
-   */
-  static async verifyPrivateKeyImport(privateKey: Uint8Array): Promise<boolean> {
-    return await testKeyImport(privateKey);
   }
 
   // ==========================================================================
@@ -787,8 +877,15 @@ export class StorageService {
 
   /**
    * Проверка целостности зашифрованных данных
+   *
+   * @param handleId User's handle ID (used for key derivation salt)
+   * @param identityId User's identity ID (required for loading encryption key)
+   * @returns Statistics about successful/failed decryption attempts
    */
-  static async verifyEncryptionIntegrity(handleId: string): Promise<{
+  static async verifyEncryptionIntegrity(
+    handleId: string,
+    identityId: string
+  ): Promise<{
     messages: { total: number; successful: number; failed: number };
     contacts: { total: number; successful: number; failed: number };
   }> {
@@ -818,7 +915,8 @@ export class StorageService {
             timestamp: msg.timestamp,
           };
 
-          await this.decryptTextData(encryptedStorage, handleId);
+          // 🔐 decryptTextData сам загрузит ключ через getBaseKey(identityId)
+          await this.decryptTextData(encryptedStorage, handleId, identityId);
           successfulMessages++;
         } catch (error) {
           console.warn(
@@ -851,7 +949,6 @@ export class StorageService {
       );
     }
   }
-
   /**
    * Очистка всех данных
    */

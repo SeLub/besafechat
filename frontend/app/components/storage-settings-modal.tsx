@@ -94,7 +94,10 @@ export function StorageSettingsModal({ isOpen, onClose }: StorageSettingsModalPr
     }
     setVerifying(true);
     try {
-      const result = await StorageService.verifyEncryptionIntegrity(user.handle.id);
+      const result = await StorageService.verifyEncryptionIntegrity(
+        user.handle.id,
+        user.identity.id
+      );
       const { total, successful, failed } = result.messages;
       if (total === 0) toast.info('No messages to verify');
       else if (failed === 0) toast.success(`All ${total} messages verified successfully.`);

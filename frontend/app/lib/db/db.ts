@@ -1,13 +1,15 @@
 import Dexie from 'dexie';
-import { SCHEMA, type Contact, type Message, type PublicKey } from './schema';
+import { SCHEMA, type Contact, type Message, type PublicKey, type CryptoKeyRecord } from './schema';
 
 class BeSafeDB extends Dexie {
   messages!: Dexie.Table<Message, string>;
   contacts!: Dexie.Table<Contact, string>;
   publicKey!: Dexie.Table<PublicKey, string>;
+  cryptoKeys!: Dexie.Table<CryptoKeyRecord, string>; // 🔐 Добавляем таблицу
 
   constructor(dbName: string = 'BeSafeDB') {
     super(dbName);
+    // Dexie автоматически применит новую схему при следующем open()
     this.version(4).stores(SCHEMA);
   }
 }
@@ -34,12 +36,12 @@ export function getDb(): BeSafeDB {
 /**
  * Simple fallback hash function for environments without Web Crypto API
  * Used only for database naming (not encryption), so cryptographic strength not required
- * 
+ *
  * IMPORTANT: This is a graceful fallback for:
  * - Development on HTTP (non-localhost)
  * - Edge cases where crypto.subtle is unavailable
  * - Older browsers or restricted environments
- * 
+ *
  * In production (HTTPS), Web Crypto API should always be available.
  * This fallback ensures the app never crashes due to missing crypto.
  */
@@ -47,7 +49,7 @@ function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(16);
@@ -56,7 +58,7 @@ function simpleHash(str: string): string {
 /**
  * Generate a deterministic database name from identityId
  * Uses SHA-256 hash (Web Crypto API) if available, falls back to simpleHash
- * 
+ *
  * @param identityId User's unique identity ID from server
  * @returns Promise resolving to database name (e.g., "BeSafeDB_a3f5c7e2b1d4...")
  */
@@ -95,12 +97,12 @@ function getDbName(database: BeSafeDB): string {
 /**
  * Initialize the database for a specific user account
  * Creates a unique IndexedDB database based on identityId
- * 
+ *
  * Scenarios:
  * 1. First login: Creates new database, stores reference
  * 2. Same user logs back in: Reuses existing database
  * 3. Different user logs in: Closes old database, creates new one
- * 
+ *
  * @param identityId User's identity from server (from login response)
  * @returns Promise resolving to the initialized BeSafeDB instance
  * @throws Error if database initialization fails
@@ -142,7 +144,7 @@ export async function initializeDb(identityId: string): Promise<BeSafeDB> {
 /**
  * Close the current database connection
  * Safe to call even if no database is open
- * 
+ *
  * Use before:
  * - Logging out
  * - Switching accounts
