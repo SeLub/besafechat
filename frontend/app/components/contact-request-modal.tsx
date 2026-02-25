@@ -1,26 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from './ui/responsive-modal';
+import { type ContactRequest } from '@/types/api';
 
 interface ContactRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  request: {
-    id: string;
-    from: {
-      handleId: string;
-      value: string;
-      alias?: string | null;
-      displayName: string;
-      firstName: string | null;
-      lastName: string | null;
-      avatarUrl: string | null;
-      bio: string | null;
-    };
-    message?: string;
-  } | null;
-  onAccept: (requestId: string) => void;
-  onReject: (requestId: string) => void;
+  request: ContactRequest | null;
+  onAccept: (request: ContactRequest) => void;
+  onReject: (request: ContactRequest) => void;
   loading?: boolean;
 }
 
@@ -113,13 +101,13 @@ export function ContactRequestModal({
       )}
 
       <div className="flex space-x-2 w-full">
-        <Button className="flex-1" onClick={() => onAccept(request.id)} disabled={loading}>
+        <Button className="flex-1" onClick={() => onAccept(request)} disabled={loading}>
           Accept
         </Button>
         <Button
           variant="outline"
           className="flex-1"
-          onClick={() => onReject(request.id)}
+          onClick={() => onReject(request)}
           disabled={loading}
         >
           Reject

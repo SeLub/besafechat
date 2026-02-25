@@ -15,7 +15,7 @@ interface LeftColumnProps {
   onBackToChats: () => void;
   onChatSelect: (chatId: string) => void;
   onNewChat: () => void;
-  onChatCreated: (chatId: string) => void;
+  onChatCreated?: (chatId: string) => Promise<void>;
 }
 
 export function LeftColumn({

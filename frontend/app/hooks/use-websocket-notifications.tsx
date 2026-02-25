@@ -26,7 +26,8 @@ export function useWebSocketNotifications(
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
   onContactRequest?: (request: ContactRequestData) => void,
-  onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void
+  onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void,
+  onNewChatAvailable?: (data: { fromHandle: any; chatId?: string }) => void
 ) {
   const { user } = useAuth();
   const { incrementPending, incrementAccepted } = useContactRequests();
@@ -38,6 +39,7 @@ export function useWebSocketNotifications(
     onUserOffline,
     onContactRequest,
     onOnlineStatusChange,
+    onNewChatAvailable,
   });
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function useWebSocketNotifications(
       onUserOffline,
       onContactRequest,
       onOnlineStatusChange,
+      onNewChatAvailable,
     };
   });
 
@@ -89,12 +92,12 @@ export function useWebSocketNotifications(
       incrementPending();
     });
 
-    // Contact request accepted - show notification
-    socket.on('contact_request_accepted', data => {
-      const { byHandle, chatId } = data;
-      const displayName = byHandle.displayName || `@${byHandle.handle}` || 'Someone';
+    // Contact accepted - unified event with full data
+    socket.on('contact_accepted', data => {
+      const { otherHandle, chatId } = data;
+      const displayName = otherHandle.displayName || `@${otherHandle.handle}` || 'Someone';
 
-      console.log('✅ contact_request_accepted - showing notification:', data);
+      console.log('✅ contact_accepted - request was accepted:', data);
 
       toast.success(`${displayName} accepted your request`, {
         description: 'You can now start chatting',
@@ -102,9 +105,12 @@ export function useWebSocketNotifications(
 
       incrementAccepted();
 
-      // Handle chat creation
-      if (chatId) {
-        callbacksRef.current.onChatCreated?.(chatId);
+      // Handle chat creation with full data from WebSocket
+      if (chatId && otherHandle) {
+        callbacksRef.current.onNewChatAvailable?.({
+          fromHandle: otherHandle,
+          chatId,
+        });
       }
     });
 
@@ -122,16 +128,15 @@ export function useWebSocketNotifications(
       const { fromHandle, chatId } = data;
       const displayName = fromHandle.displayName || `@${fromHandle.handle}` || 'Someone';
 
-      console.log('💬 new_chat_available - showing notification:', data);
+      console.log('🎉 new_chat_available event received:', data);
+      console.log('fromHandle avatarUrl:', fromHandle.avatarUrl);
 
       toast.success(`Chat available with ${displayName}`, {
         description: 'You can now start messaging',
       });
 
-      // Handle chat creation/selection
-      if (chatId) {
-        callbacksRef.current.onChatCreated?.(chatId);
-      }
+      // Call the callback to handle chat creation with proper data
+      callbacksRef.current.onNewChatAvailable?.(data);
     });
 
     // Message received

@@ -63,17 +63,20 @@ export function useContactRequestsSync() {
       });
     };
 
-    // Handle request accepted (recipient accepts our request)
-    const handleRequestAccepted = (data: { byHandle: any; chatId?: string }) => {
-      console.log('✅ contact_request_accepted - adding contact:', data.byHandle);
-      removeOutgoingRequest(data.byHandle.id);
+    // Handle contact accepted (unified event)
+    const handleContactAccepted = (data: { otherHandle: any; chatId?: string }) => {
+      console.log('✅ contact_accepted - adding contact:', data.otherHandle);
+      removeOutgoingRequest(data.otherHandle.id);
       addContact({
-        id: data.byHandle.id,
+        id: data.otherHandle.id,
         user: {
-          id: data.byHandle.id,
-          displayName: data.byHandle.displayName,
-          handle: data.byHandle.handle,
-          avatarUrl: data.byHandle.avatarUrl,
+          id: data.otherHandle.id,
+          displayName: data.otherHandle.displayName,
+          handle: data.otherHandle.handle,
+          avatarUrl: data.otherHandle.avatarUrl,
+          firstName: data.otherHandle.firstName,
+          lastName: data.otherHandle.lastName,
+          bio: data.otherHandle.bio,
         },
         acceptedAt: new Date().toISOString(),
       });
@@ -101,6 +104,9 @@ export function useContactRequestsSync() {
           displayName: data.fromHandle.displayName,
           handle: data.fromHandle.handle,
           avatarUrl: data.fromHandle.avatarUrl,
+          firstName: data.fromHandle.firstName,
+          lastName: data.fromHandle.lastName,
+          bio: data.fromHandle.bio,
         },
         acceptedAt: new Date().toISOString(),
       });
@@ -115,14 +121,14 @@ export function useContactRequestsSync() {
     };
 
     socket.on('contact_request_received', handleContactRequestReceived);
-    socket.on('contact_request_accepted', handleRequestAccepted);
+    socket.on('contact_accepted', handleContactAccepted);
     socket.on('contact_request_rejected', handleRequestRejected);
     socket.on('new_chat_available', handleNewChatAvailable);
 
     return () => {
       console.log('🔌 Cleaning up contact requests sync');
       socket.off('contact_request_received', handleContactRequestReceived);
-      socket.off('contact_request_accepted', handleRequestAccepted);
+      socket.off('contact_accepted', handleContactAccepted);
       socket.off('contact_request_rejected', handleRequestRejected);
       socket.off('new_chat_available', handleNewChatAvailable);
     };

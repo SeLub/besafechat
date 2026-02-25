@@ -13,6 +13,7 @@ import { NotificationService } from '../../notification/services/notification.se
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
+import { MediaService } from '../../media/media.service';
 import { getCorsConfig } from '../../../common/config/cors-origins';
 
 @WebSocketGateway({
@@ -28,7 +29,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private redisService: RedisService,
     private messageMetadataService: MessageMetadataService,
     private chatRoomService: ChatRoomService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private mediaService: MediaService
   ) {}
 
   async handleConnection(client: Socket) {
@@ -196,26 +198,47 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_accepted', {
-      fromHandle: {
-        id: byHandle.id,
-        value: byHandle.value,
-        displayName: byHandle.profile?.displayName,
-      },
-      chatId,
-    });
+  async notifyContactAccepted(toHandleId: string, otherHandle: any, chatId?: string) {
+    // Load avatar URL if it exists
+    const avatarUrl = otherHandle.id
+      ? await this.mediaService.getAvatarUrlIfExists(otherHandle.id)
+      : null;
 
+    // Create notification in DB
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_accepted',
+      {
+        fromHandle: {
+          id: otherHandle.id,
+          value: otherHandle.value,
+          displayName: otherHandle.profile?.displayName,
+        },
+        chatId,
+      }
+    );
+
+    // Single unified event with all necessary data
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
-    this.server.to(`user:${toHandleId}`).emit('contact_request_accepted', {
-      byHandle: {
-        id: byHandle.id,
-        displayName: byHandle.profile?.displayName,
-        handle: byHandle.value,
+    this.server.to(`user:${toHandleId}`).emit('contact_accepted', {
+      otherHandle: {
+        id: otherHandle.id,
+        displayName: otherHandle.profile?.displayName,
+        handle: otherHandle.value,
+        firstName: otherHandle.profile?.firstName || null,
+        lastName: otherHandle.profile?.lastName || null,
+        avatarUrl,
+        bio: otherHandle.profile?.bio || null,
+        alias: otherHandle.alias || null,
       },
       chatId,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  // Deprecated: Use notifyContactAccepted instead
+  async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
+    return this.notifyContactAccepted(toHandleId, byHandle, chatId);
   }
 
   async notifyRequestRejected(toHandleId: string, byHandle: any) {
@@ -239,6 +262,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async notifyNewChatAvailable(toHandleId: string, fromHandle: any, chatId?: string) {
+    // Load avatar URL if it exists
+    const avatarUrl = fromHandle.id
+      ? await this.mediaService.getAvatarUrlIfExists(fromHandle.id)
+      : null;
+
     const notification = await this.notificationService.createNotification(toHandleId, 'new_chat', {
       fromHandle: {
         id: fromHandle.id,
@@ -254,6 +282,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         id: fromHandle.id,
         displayName: fromHandle.profile?.displayName,
         handle: fromHandle.value,
+        firstName: fromHandle.profile?.firstName || null,
+        lastName: fromHandle.profile?.lastName || null,
+        avatarUrl,
+        bio: fromHandle.profile?.bio || null,
+        alias: fromHandle.alias || null,
       },
       chatId,
       timestamp: new Date().toISOString(),

@@ -1,26 +1,7 @@
 // /home/selub/Documents/progs/besafechat/frontend/app/hooks/contact-requests-store-context.tsx
 import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
-
-interface ContactRequest {
-  id: string;
-  from: {
-    id: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-    alias?: string;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
+import { type ContactRequest } from '@/types/api';
 
 interface Contact {
   id: string;

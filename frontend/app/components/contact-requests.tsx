@@ -5,24 +5,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { ResponsiveModal } from './ui/responsive-modal';
-interface ContactRequest {
-  id: string;
-  from: {
-    handleId: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
+import { type ContactRequest } from '@/types/api';
 
 interface ContactRequestsProps {
   isOpen: boolean;

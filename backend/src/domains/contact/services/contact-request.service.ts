@@ -116,21 +116,38 @@ export class ContactRequestService {
       request.toHandleId
     );
 
-    // Send WebSocket notification to request sender (they now have a chat available with accepter)
-    await this.messagesGateway.notifyRequestAccepted(
-      request.fromHandleId, // Use handle ID instead of identity ID
-      request.toHandle,
+    // Notify sender: their request was accepted and chat is ready
+    // Single unified event replaces old contact_request_accepted + new_chat_available
+    await this.messagesGateway.notifyContactAccepted(
+      request.fromHandleId, // Notify the sender (who sent the request)
+      request.toHandle,     // Data about the accepter
       chat.id
     );
 
-    // Also notify the user who accepted the request that a new chat is available
+    // Notify accepter: new chat is available with the request sender
     await this.messagesGateway.notifyNewChatAvailable(
-      request.toHandleId, // Notify the accepter
-      request.fromHandle,
+      request.toHandleId,   // Notify the accepter
+      request.fromHandle,   // Data about the sender
       chat.id
     );
 
-    return { success: true, chatId: chat.id };
+    // Get avatar URL for the sender
+    const fromHandleAvatarUrl = await this.mediaService.getAvatarUrlIfExists(request.fromHandle.id);
+
+    return {
+      success: true,
+      chatId: chat.id,
+      fromHandle: {
+        id: request.fromHandle.id,
+        value: request.fromHandle.value,
+        displayName: request.fromHandle.profile?.displayName,
+        firstName: request.fromHandle.profile?.firstName,
+        lastName: request.fromHandle.profile?.lastName,
+        avatarUrl: fromHandleAvatarUrl,
+        bio: request.fromHandle.profile?.bio,
+        alias: request.fromHandle.alias,
+      },
+    };
   }
 
   async rejectRequest(requestId: string, handleId: string) {
