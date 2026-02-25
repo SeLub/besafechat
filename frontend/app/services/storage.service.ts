@@ -1,10 +1,7 @@
 import {
   base64ToUint8,
-  decryptWithPassphrase,
-  encryptWithPassphrase,
   encryptWithKey,
   decryptWithKey,
-  generateSalt,
   randomBytes,
   testKeyImport,
   toArrayBuffer,
@@ -39,10 +36,8 @@ const convertArrayBufferToUint8 = (buffer: ArrayBuffer | SharedArrayBuffer): Uin
 
 export interface EncryptedStorage {
   encrypted: Uint8Array;
-  salt: Uint8Array;
   iv: Uint8Array;
   authTag?: Uint8Array;
-  version: number;
   context: 'message' | 'contact' | 'metadata' | 'file';
   timestamp: number;
 }
@@ -65,6 +60,8 @@ export interface StorageInfo {
     keySize?: number;
   };
   quota: {
+    isCritical: any;
+    isLow: any;
     usage: number;
     limit: number;
     percentage: number;
@@ -110,7 +107,7 @@ export class StorageService {
   /**
    * Initialize database for a specific user account
    * Must be called after successful login, before any storage operations
-   * 
+   *
    * @param identityId User's identity from server (from login response)
    * @throws Error if database initialization fails
    */
@@ -227,46 +224,18 @@ export class StorageService {
     try {
       const textBytes = new TextEncoder().encode(text);
 
-      // Try new method first (hash-based encryption)
       const privateKeyHash = getSessionPrivateKeyHash();
-      if (privateKeyHash) {
-        try {
-          const encryptionKey = await deriveEncryptionKeyFromHash(
-            privateKeyHash,
-            handleId,
-            context
-          );
-
-          const { encrypted: enc, iv } = await encryptWithKey(textBytes, encryptionKey);
-
-          return {
-            encrypted: enc,
-            salt: new Uint8Array(0), // Not used with hash-based approach
-            iv,
-            version: 2, // Version 2 = hash-based
-            context,
-            timestamp: Date.now(),
-          };
-        } catch (newMethodError) {
-          console.warn(
-            `Hash-based encryption failed for ${context}, falling back to legacy method:`,
-            newMethodError
-          );
-        }
+      if (!privateKeyHash) {
+        throw new Error('Session private key hash not available');
       }
 
-      // Fallback to old method (passphrase-based) for backward compatibility
-      const { encrypted: encBytes, salt, iv, version } = await encryptWithPassphrase(
-        textBytes,
-        handleId,
-        this.DEFAULT_KDF_ITERATIONS
-      );
+      const encryptionKey = await deriveEncryptionKeyFromHash(privateKeyHash, handleId, context);
+
+      const { encrypted: enc, iv } = await encryptWithKey(textBytes, encryptionKey);
 
       return {
-        encrypted: encBytes,
-        salt,
+        encrypted: enc,
         iv,
-        version,
         context,
         timestamp: Date.now(),
       };
@@ -303,10 +272,8 @@ export class StorageService {
 
       return {
         encrypted: ciphertext,
-        salt,
         iv,
         authTag,
-        version: 2,
         context,
         timestamp: Date.now(),
       };
@@ -326,71 +293,24 @@ export class StorageService {
     handleId: string
   ): Promise<Uint8Array> {
     try {
-      if (encryptedStorage.version === 1) {
-        return await decryptWithPassphrase(
-          {
-            encrypted: encryptedStorage.encrypted,
-            salt: encryptedStorage.salt,
-            iv: encryptedStorage.iv,
-            version: 1,
-          },
-          handleId,
-          this.DEFAULT_KDF_ITERATIONS
-        );
+      const privateKeyHash = getSessionPrivateKeyHash();
+      if (!privateKeyHash) {
+        throw new Error('Session private key hash not available');
       }
 
-      // Version 2 can be either:
-      // - Hash-based encryption (new method, no salt needed, salt.length === 0)
-      // - File-based with auth tag (old method)
+      const encryptionKey = await deriveEncryptionKeyFromHash(
+        privateKeyHash,
+        handleId,
+        encryptedStorage.context
+      );
 
-      if (encryptedStorage.version === 2) {
-        // Try hash-based decryption first (new method)
-        if (encryptedStorage.salt.length === 0) {
-          try {
-            const privateKeyHash = getSessionPrivateKeyHash();
-            if (privateKeyHash) {
-              const encryptionKey = await deriveEncryptionKeyFromHash(
-                privateKeyHash,
-                handleId,
-                encryptedStorage.context
-              );
+      const decrypted = await decryptWithKey(
+        encryptedStorage.encrypted,
+        encryptionKey,
+        encryptedStorage.iv
+      );
 
-              const decrypted = await decryptWithKey(
-                encryptedStorage.encrypted,
-                encryptionKey,
-                encryptedStorage.iv
-              );
-
-              return new Uint8Array(decrypted);
-            }
-          } catch (hashMethodError) {
-            console.warn(
-              'Hash-based decryption failed, trying file-based method:',
-              hashMethodError
-            );
-          }
-        }
-
-        // Fall back to file-based decryption (old method)
-        if (encryptedStorage.authTag) {
-          const key = await this.deriveFileKey(handleId, encryptedStorage.salt);
-
-          const combined = new Uint8Array([
-            ...encryptedStorage.encrypted,
-            ...encryptedStorage.authTag,
-          ]);
-
-          const decrypted = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: toArrayBuffer(encryptedStorage.iv) },
-            key,
-            toArrayBuffer(combined)
-          );
-
-          return new Uint8Array(decrypted);
-        }
-      }
-
-      throw new Error(`Unsupported encryption version: ${encryptedStorage.version}`);
+      return new Uint8Array(decrypted);
     } catch (error) {
       console.error('Error decrypting data:', error);
       throw new Error(
@@ -441,76 +361,31 @@ export class StorageService {
 
       const textBytes = new TextEncoder().encode(content);
 
-      let encryptedContent: ArrayBuffer;
-      let salt: ArrayBuffer;
-      let iv: Uint8Array;
-      let authTag: ArrayBuffer | undefined;
+      // Hash-based encryption (единственная версия)
+      // Внутри saveEncryptedMessage, перед проверкой:
+      console.log('🔐 Debug: getSessionPrivateKeyHash() =', getSessionPrivateKeyHash());
+      console.log('🔐 Debug: handleId =', handleId);
 
-      // Try hash-based encryption first
       const privateKeyHash = getSessionPrivateKeyHash();
-      if (privateKeyHash) {
-        try {
-          const encryptionKey = await deriveEncryptionKeyFromHash(
-            privateKeyHash,
-            handleId,
-            'message'
-          );
-
-          const { encrypted: enc, iv: newIv } = await encryptWithKey(textBytes, encryptionKey);
-
-          encryptedContent = convertUint8ToArrayBuffer(enc);
-          salt = convertUint8ToArrayBuffer(new Uint8Array(0)); // No salt needed
-          iv = newIv;
-          // authTag is undefined (not used in hash-based)
-        } catch (hashError) {
-          console.warn('Hash-based message encryption failed, using legacy method:', hashError);
-
-          // Fall back to passphrase-based
-          const encrypted = await encryptWithPassphrase(
-            textBytes,
-            handleId,
-            this.DEFAULT_KDF_ITERATIONS
-          );
-
-          const encryptedArray = new Uint8Array(encrypted.encrypted);
-          const ciphertext = encryptedArray.slice(0, -16);
-          const tag = encryptedArray.slice(-16);
-
-          encryptedContent = convertUint8ToArrayBuffer(ciphertext);
-          salt = convertUint8ToArrayBuffer(encrypted.salt);
-          iv = encrypted.iv;
-          authTag = convertUint8ToArrayBuffer(tag);
-        }
-      } else {
-        // No hash available, use legacy method
-        const encrypted = await encryptWithPassphrase(
-          textBytes,
-          handleId,
-          this.DEFAULT_KDF_ITERATIONS
-        );
-
-        const encryptedArray = new Uint8Array(encrypted.encrypted);
-        const ciphertext = encryptedArray.slice(0, -16);
-        const tag = encryptedArray.slice(-16);
-
-        encryptedContent = convertUint8ToArrayBuffer(ciphertext);
-        salt = convertUint8ToArrayBuffer(encrypted.salt);
-        iv = encrypted.iv;
-        authTag = convertUint8ToArrayBuffer(tag);
+      if (!privateKeyHash) {
+        console.error('❌ CRITICAL: privateKeyHash is missing!');
+        console.trace('Stack trace for missing hash:'); // Покажет, откуда вызвана функция
+        throw new Error('Session private key hash not available');
       }
+
+      const encryptionKey = await deriveEncryptionKeyFromHash(privateKeyHash, handleId, 'message');
+      const { encrypted: enc, iv: newIv } = await encryptWithKey(textBytes, encryptionKey);
 
       const message: Message = {
         id,
         chatId,
         senderId,
         contentType: 'text',
-        encryptedContent,
-        salt,
-        iv: toArrayBuffer(iv),
+        encryptedContent: convertUint8ToArrayBuffer(enc),
+        iv: toArrayBuffer(newIv),
         timestamp: Date.now(),
         isOwn,
         status: 'sent',
-        authTag,
       };
 
       await getDb().messages.put(message);
@@ -546,24 +421,14 @@ export class StorageService {
 
       for (const msg of messages) {
         try {
-          const encryptedContent = convertArrayBufferToUint8(msg.encryptedContent);
-          const salt = convertArrayBufferToUint8(msg.salt);
-          const iv = convertArrayBufferToUint8(msg.iv);
-          const authTag = msg.authTag ? convertArrayBufferToUint8(msg.authTag) : undefined;
+          const encryptedStorage: EncryptedStorage = {
+            encrypted: convertArrayBufferToUint8(msg.encryptedContent),
+            iv: convertArrayBufferToUint8(msg.iv),
+            context: 'message',
+            timestamp: msg.timestamp,
+          };
 
-          const decrypted = await decryptWithPassphrase(
-            {
-              encrypted: encryptedContent,
-              salt,
-              iv,
-              authTag,
-              version: 1,
-            },
-            handleId,
-            this.DEFAULT_KDF_ITERATIONS
-          );
-
-          const text = new TextDecoder().decode(decrypted);
+          const text = await this.decryptTextData(encryptedStorage, handleId);
 
           decryptedMessages.push({
             id: msg.id,
@@ -851,7 +716,11 @@ export class StorageService {
 
       const messages = await getDb().messages.orderBy('timestamp').limit(1).toArray();
 
-      const newestMessages = await getDb().messages.orderBy('timestamp').reverse().limit(1).toArray();
+      const newestMessages = await getDb()
+        .messages.orderBy('timestamp')
+        .reverse()
+        .limit(1)
+        .toArray();
 
       return {
         totalSize,
@@ -932,19 +801,29 @@ export class StorageService {
 
       for (const msg of messages) {
         try {
+          // Skip messages with invalid/empty encrypted content
+          const encryptedData = convertArrayBufferToUint8(msg.encryptedContent);
+          if (!encryptedData || encryptedData.length < 16) {
+            console.warn(
+              `Message ${msg.id}: encrypted content too small (${encryptedData?.length || 0} bytes)`
+            );
+            failedMessages++;
+            continue;
+          }
+
           const encryptedStorage: EncryptedStorage = {
-            encrypted: convertArrayBufferToUint8(msg.encryptedContent),
-            salt: msg.salt ? convertArrayBufferToUint8(msg.salt) : generateSalt(32),
+            encrypted: encryptedData,
             iv: convertArrayBufferToUint8(msg.iv),
-            authTag: msg.authTag ? convertArrayBufferToUint8(msg.authTag) : undefined,
-            version: 1,
             context: 'message',
             timestamp: msg.timestamp,
           };
 
           await this.decryptTextData(encryptedStorage, handleId);
           successfulMessages++;
-        } catch {
+        } catch (error) {
+          console.warn(
+            `Message ${msg.id}: decryption failed - ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
           failedMessages++;
         }
       }
@@ -1040,8 +919,8 @@ export class StorageService {
 
   private static async enforceMessageLimit(chatId: string, limit: number): Promise<void> {
     try {
-      const messages = await getDb().messages
-        .where('chatId')
+      const messages = await getDb()
+        .messages.where('chatId')
         .equals(chatId)
         .reverse()
         .sortBy('timestamp');

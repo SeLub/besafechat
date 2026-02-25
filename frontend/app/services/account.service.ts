@@ -11,7 +11,7 @@ import { CloudBackupService } from './cloud-backup.service';
 import { DeviceService } from './device.service';
 import { PasswordRecoveryService } from './password-recovery.service';
 import { StorageService } from './storage.service';
-
+console.log('📦 account.service.ts initialized');
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
 
@@ -27,6 +27,11 @@ let sessionPrivateKeyHash: Uint8Array | null = null;
  * CRITICAL: Never store full private key, only its hash
  */
 export function setSessionPrivateKeyHash(privateKeyHash: Uint8Array): void {
+  console.log('🔐 [SET] sessionPrivateKeyHash:', {
+    length: privateKeyHash?.length,
+    firstBytes: privateKeyHash?.slice(0, 8),
+    timestamp: Date.now(),
+  });
   sessionPrivateKeyHash = privateKeyHash;
 }
 
@@ -43,8 +48,7 @@ export function getSessionPrivateKeyHash(): Uint8Array | null {
  */
 export function clearSessionPrivateKeyHash(): void {
   if (sessionPrivateKeyHash) {
-    // Secure deletion: overwrite with random data before clearing
-    crypto.getRandomValues(sessionPrivateKeyHash);
+    crypto.getRandomValues(sessionPrivateKeyHash as Uint8Array<ArrayBuffer>);
     sessionPrivateKeyHash = null;
   }
 }
@@ -54,7 +58,9 @@ export function clearSessionPrivateKeyHash(): void {
  * Overwrites with random data before clearing (defense against memory dumps)
  */
 function secureClearUint8Array(data: Uint8Array): void {
-  crypto.getRandomValues(data);
+  // Создаём новую view с явным ArrayBuffer
+  const buffer = new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
+  crypto.getRandomValues(buffer);
 }
 
 export class AccountService {
@@ -113,7 +119,7 @@ export class AccountService {
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const encrypted = await encryptSeedForCloud(seed, password, result.identityId);
+    const encrypted = await encryptSeedForCloud(seed, password);
 
     // 8. Claim the password hash before backup
     const claimResult = await PasswordRecoveryService.claimPasswordWithRetry(password);

@@ -8,7 +8,6 @@ export interface Message {
 
   // Шифрованные данные
   encryptedContent: ArrayBuffer; // Зашифрованное содержимое (ArrayBuffer для IndexedDB)
-  salt: ArrayBuffer; // Соль для деривации ключа
   iv: ArrayBuffer; // Вектор инициализации
 
   // Метаданные
@@ -16,7 +15,6 @@ export interface Message {
   isOwn: boolean;
 
   // Опциональные поля
-  authTag?: ArrayBuffer; // Тег аутентификации (для AES-GCM)
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   editedAt?: number;
   replyToId?: string;
