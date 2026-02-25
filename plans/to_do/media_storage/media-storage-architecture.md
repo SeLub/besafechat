@@ -1,837 +1,698 @@
-# Multi-Media Storage Architecture for E2EE Messenger
+# 📋 План реализации мультимедиа-хранилища для BeSafeChat
 
-## Problem Statement
-
-Currently, BeSafeChat supports only text messages stored locally in IndexedDB (encrypted). The system needs to extend to support:
-- **Text**: Currently handled (IndexedDB)
-- **Images**: New requirement
-- **Video**: New requirement  
-- **Audio**: New requirement
-- **Documents**: New requirement
-
-### The Dilemma
-
-**Current Proposal**: 
-- Store encrypted files in S3
-- Store file references/links in IndexedDB messages
-
-**Problem**: This creates a fragmented data model:
-- Message metadata (text) lives locally (IndexedDB)
-- File references live locally (IndexedDB)
-- Actual files live remotely (S3)
-- Three different access patterns, consistency risks, potential for orphaned files
-
-**Question**: Should we consolidate all storage into one unified system?
+**Версия**: 2.0  
+**Дата обновления**: Февраль 2026  
+**Статус**: ✅ Актуально (соответствует реализованной CryptoKey-архитектуре)  
+**Язык**: Русский
 
 ---
 
-## Analysis of Your Options
+## 🎯 Краткое резюме
 
-### Option 1: Local Device Storage Only (FDE-based)
-```
-User A (Device 1)
-├── IndexedDB
-│   ├── Text messages (encrypted)
-│   └── File metadata (encrypted)
-└── Local filesystem
-    ├── image_uuid.jpg (encrypted)
-    ├── video_uuid.mp4 (encrypted)
-    ├── audio_uuid.m4a (encrypted)
-    └── document_uuid.pdf (encrypted)
-```
+BeSafeChat переходит от поддержки только текстовых сообщений к полноценной мультимедиа-платформе с сохранением принципов сквозного шифрования (E2EE).
 
-**Pros:**
-- ✅ Simplest architecture
-- ✅ No server infrastructure needed for files
-- ✅ Complete user control (data never leaves device)
-- ✅ Works offline completely
-- ✅ Zero server-side compromise risk
-- ✅ Device-level FDE handles encryption (transparent)
-- ✅ Lowest latency (local I/O)
-- ✅ Unlimited storage (limited by device)
+**Рекомендуемая архитектура**: **Гибридная модель (Option 4)**
 
-**Cons:**
-- ❌ No cross-device sync
-- ❌ Files lost if device is lost
-- ❌ No backup mechanism
-- ❌ Not suitable for shared team files
-- ❌ Mobile devices limited storage
-- ❌ Cannot share files with multiple users
+- ✅ Небольшие файлы и превью хранятся локально в IndexedDB
+- ✅ Крупные файлы загружаются в S3 (Tebi) в зашифрованном виде
+- ✅ Все криптографические операции выполняются на клиенте
+- ✅ Ключи шифрования — неэкспортируемые `CryptoKey`, хранятся в IndexedDB
 
-**Suitable for:**
-- Personal/private chats only
-- Single-device users
-- Privacy-paranoid users
+**Оценка усилий**: 2-3 недели (2 разработчика)  
+**Приоритет**: Высокий (необходимо для конкурентоспособности продукта)
 
 ---
 
-### Option 2: IndexedDB Only
-```
-User A
-└── IndexedDB (Dexie)
-    ├── messages table
-    │   ├── id
-    │   ├── text (encrypted)
-    │   ├── type: 'image' | 'video' | 'audio' | 'file'
-    │   └── binaryContent (encrypted ArrayBuffer - images/videos/audio/PDFs)
-    └── metadata
-```
+## 📊 Сравнение архитектурных опций
 
-**Pros:**
-- ✅ Unified storage model
-- ✅ ACID transactions
-- ✅ Same encryption for all content
-- ✅ Cross-tab synchronization
-- ✅ Offline-first architecture
-- ✅ No server dependency
-- ✅ Consistent backup/restore
+| Критерий                       | Local Only | IndexedDB Only | S3 Only | **Hybrid ⭐** | Multi-S3 |
+| ------------------------------ | ---------- | -------------- | ------- | ------------- | -------- |
+| **Конфиденциальность**         | 🟢🟢🟢     | 🟢🟢           | ⚠️      | 🟢🟢🟢        | 🟢🟢     |
+| **Кросс-девайс синхронизация** | ❌         | ❌             | 🟢🟢🟢  | 🟢🟢🟢        | 🟢🟢🟢   |
+| **Неограниченное хранилище**   | ❌         | ❌             | 🟢🟢🟢  | 🟢🟢🟢        | 🟢🟢🟢   |
+| **Работа оффлайн**             | 🟢🟢🟢     | 🟢🟢🟢         | ❌      | 🟢🟢          | ❌       |
+| **Простота реализации**        | 🟢🟢🟢     | 🟢🟢           | 🟢🟢    | ⚠️            | ❌       |
+| **Стоимость инфраструктуры**   | $0         | $0             | $$      | $             | $$$      |
+| **Защита от XSS**              | 🟢         | 🟢             | ⚠️      | 🟢🟢          | 🟢🟢     |
+| **Соответствие E2EE**          | ✅         | ✅             | ⚠️      | ✅✅          | ✅       |
 
-**Cons:**
-- ❌ **Browser storage quota limits** (typically 50GB-100GB, but varies)
-- ❌ Large files (HD video) quickly exceed quota
-- ❌ No cross-device sync
-- ❌ No server-side backup
-- ❌ Memory intensive for large files
-- ❌ Browser can clear IndexedDB (user's browser settings)
-- ❌ Not suitable for heavy media users
-- ❌ Performance degrades with large blobs
+### 🟢 РЕКОМЕНДАЦИЯ: Hybrid Model (Option 4)
 
-**Browser Quotas (approximate):**
-- Chrome: 50GB (6% of disk space)
-- Firefox: 10GB (default, user-configurable)
-- Safari: 50GB
-- Edge: 50GB
+**Почему именно эта модель**:
 
-**Suitable for:**
-- Text-heavy messaging (few images)
-- Mobile apps (offline-first)
-- Privacy-critical use (no server access)
+- Баланс приватности и функциональности
+- Индустриальный стандарт (Signal, Wire, Telegram)
+- Работает оффлайн для последних сообщений
+- Масштабируется до неограниченного объёма через S3
+- Управляемая сложность реализации
 
 ---
 
-### Option 3: S3 Only (Tebi)
+## 🔐 Криптографическая архитектура (актуализировано)
+
+### Алгоритмы шифрования
+
+| Компонент                     | Значение                          | Комментарий                                                           |
+| ----------------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| **Алгоритм**                  | AES-GCM-256                       | Конфиденциальность + аутентичность                                    |
+| **Вектор инициализации (IV)** | 12 байт                           | Генерируется криптографически случайным образом для каждого сообщения |
+| **KDF**                       | PBKDF2 + SHA-256                  | 100 000 итераций (оптимизировано для high-entropy input)              |
+| **Соль для KDF**              | `${handleId}:${purpose}`          | Обеспечивает уникальность и разделение ключей                         |
+| **Тип ключа**                 | `CryptoKey`, `extractable: false` | Невозможно экспортировать через JavaScript                            |
+
+### Поток работы с ключом
+
 ```
-Server                          S3 (Tebi)
-├── MessageMetadata (DB)        ├── /images/user_abc/img_1.jpg (encrypted)
-│   ├── id                       ├── /videos/user_abc/vid_1.mp4 (encrypted)
-│   ├── type: 'image'            ├── /audio/user_abc/aud_1.m4a (encrypted)
-│   ├── mediaUrl: "s3://..."     └── /documents/user_abc/doc_1.pdf (encrypted)
-│   └── encrypted metadata
-└── Media table (tracking)
-    └── storageKey, fileHash, etc.
+[Логин / Восстановление аккаунта]
+  ↓
+Приватный ключ → hashPrivateKey() → importKey(extractable: false) → CryptoKey
+  ↓
+Сохранение в IndexedDB: StorageService.storeEncryptionKey(identityId, baseKey)
+  ↓
+Сохранение ссылки в RAM: setSessionCryptoKey(baseKey) [опционально]
+  ↓
+[Отправка / Получение сообщения]
+  ↓
+getBaseKey(identityId): RAM → IndexedDB fallback
+  ↓
+deriveEncryptionKeyFromHash(baseKey, handleId, purpose) → AES-GCM ключ
+  ↓
+Шифрование / Расшифровка
+  ↓
+[Перезагрузка страницы]
+  ↓
+getBaseKey() загружает CryptoKey из IndexedDB → работа продолжается бесшовно
+  ↓
+[Logout]
+  ↓
+StorageService.deleteEncryptionKey(identityId) + clearSessionCryptoKey()
 ```
 
-**Pros:**
-- ✅ Unlimited storage
-- ✅ Server-side backup
-- ✅ Cross-device sync
-- ✅ Shareable files
-- ✅ Centralized media management
-- ✅ Deduplication possible (file hashes)
-- ✅ Works on weak mobile networks
-- ✅ Server can generate thumbnails
+### Защита от XSS-атак
 
-**Cons:**
-- ❌ Server sees ALL files (unless client-side encrypted)
-- ❌ Files must be encrypted on client before upload
-- ❌ Decryption required for display
-- ❌ Network latency for access
-- ❌ Costs scale with storage volume
-- ❌ Lost if S3 provider shut down
-- ❌ Cannot verify server isn't reading files
-- ❌ Privacy issue: server can see file metadata (MIME type, size, upload time)
-
-**Suitable for:**
-- Collaborative/team messaging
-- Backup/archive storage
-- Cloud-synced messaging apps
+| Угроза                              | Мера защиты                         | Результат                               |
+| ----------------------------------- | ----------------------------------- | --------------------------------------- |
+| Кража ключа через `exportKey()`     | `extractable: false`                | Ключ нельзя экспортировать              |
+| Чтение ключа из памяти              | Ключ управляется браузером          | Не доступен как `Uint8Array`            |
+| Использование ключа злоумышленником | Контекст вкладки + nonce на сервере | Только в рамках активной сессии         |
+| Компрометация сервера               | Zero-knowledge архитектура          | Сервер видит только зашифрованные blobs |
 
 ---
 
-### Option 4: Hybrid (IndexedDB + S3)
-```
-Local Device (Browser)          Server
-├── IndexedDB                    ├── Message metadata (encrypted)
-│   ├── messages                 ├── File references
-│   │   ├── small files          └── S3 URLs
-│   │   └── thumbnails
-│   └── recent media cache
-│
-└── Device Storage
-    └── Local cache (temp)
+## 🗄️ Структура данных
 
-                                 S3 (Tebi)
-                                 ├── Full resolution images
-                                 ├── Videos
-                                 ├── Audio
-                                 └── Documents
-```
+### EncryptedStorage (для шифрования)
 
-**Pros:**
-- ✅ Best of both worlds
-- ✅ Small content cached locally (fast access)
-- ✅ Large files stored remotely (scalable)
-- ✅ Works offline for recent messages
-- ✅ Server-side backup
-- ✅ Cross-device sync
-- ✅ Reasonable storage costs
-- ✅ Reduces browser quota pressure
-
-**Cons:**
-- ❌ Complex implementation
-- ❌ Cache invalidation challenges
-- ❌ Sync logic needed
-- ❌ Multiple storage layers to maintain
-- ❌ Server still sees file metadata
-- ❌ Requires sync service
-
-**Storage Strategy:**
-```
-IndexedDB (cache):
-  - Text messages (always)
-  - Image thumbnails (120x120px)
-  - Last 30 days of recent files
-  - Audio waveforms (metadata)
-
-S3 (primary):
-  - Full resolution images
-  - All video files
-  - Audio files (>5MB)
-  - Documents
-  - Full resolution versions
-```
-
-**Suitable for:**
-- General-purpose messaging (most apps use this)
-- Cross-device sync needed
-- Balance of privacy and functionality
-
----
-
-### Option 5: Dedicated Media Servers (Multiple S3-like)
-```
-Frontend ──→ API Gateway
-            ├─→ MediaService (coordinator)
-            │   ├─→ S3 Images    (images only)
-            │   ├─→ S3 Videos    (videos only)
-            │   ├─→ S3 Audio     (audio only)
-            │   └─→ S3 Documents (documents only)
-            └─→ Message metadata
-```
-
-**Pros:**
-- ✅ Separation of concerns
-- ✅ Type-specific optimizations
-- ✅ Breach of one doesn't compromise others
-- ✅ Load balancing per type
-- ✅ Can use different encryption per type
-- ✅ Independent scaling
-- ✅ Media theft requires 4+ breach operations
-
-**Cons:**
-- ❌ **Overkill for most use cases**
-- ❌ 4x infrastructure cost
-- ❌ 4x attack surface (4 separate services)
-- ❌ Complexity of orchestration
-- ❌ Harder to maintain
-- ❌ Still have server-side metadata
-- ❌ False sense of security (metadata leaks file type anyway)
-- ❌ All still vulnerable to same threat model (server breach)
-
-**Security Reality:**
-- If server is breached → attacker has ALL file references
-- Breaking one S3 → attacker only gets that media type
-- But E2EE means server never stores unencrypted content anyway
-- Multiple buckets provide "defense in depth" but limited practical benefit
-
-**Suitable for:**
-- Military/intelligence agencies
-- Extreme paranoia
-- Regulatory compliance requiring data separation
-- **NOT suitable for commercial messenger**
-
----
-
-## My Recommendation: Hybrid Model (Option 4)
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     BeSafeChat User                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  IndexedDB (Local - Per-Account Database)           │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │  1. Text Messages (all)                             │   │
-│  │     - encryptedContent (encrypted)                  │   │
-│  │     - salt, iv, authTag                             │   │
-│  │                                                     │   │
-│  │  2. Media Metadata (all types)                      │   │
-│  │     - id, type, mimeType, size                      │   │
-│  │     - remoteStorageKey (reference to S3)            │   │
-│  │     - localCachePath (if cached)                    │   │
-│  │     - checksum                                      │   │
-│  │                                                     │   │
-│  │  3. Small File Cache (<5MB)                         │   │
-│  │     - encryptedContent (ArrayBuffer)                │   │
-│  │     - Used for offline access                       │   │
-│  │     - Auto-expires after 30 days                    │   │
-│  │                                                     │   │
-│  │  4. Thumbnails (all images)                         │   │
-│  │     - 200x200px, encrypted                          │   │
-│  │     - Always cached locally                         │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Device Storage (Browser Cache)                     │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │  - Temporary download cache                         │   │
-│  │  - In-memory decryption buffers                     │   │
-│  │  - Cleared on logout                                │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-            ┌──────────────────────────────┐
-            │  BeSafeChat Backend (Server) │
-            ├──────────────────────────────┤
-            │  1. Message Metadata (DB)    │
-            │     - chatId, senderId       │
-            │     - timestamp, reactions   │
-            │     - encrypted content      │
-            │                              │
-            │  2. Media Tracking (DB)      │
-            │     - storageKey (S3 path)   │
-            │     - fileHash               │
-            │     - metadata               │
-            │     - messageId (reference)  │
-            │                              │
-            │  3. API for:                 │
-            │     - Presigned URLs         │
-            │     - File metadata fetch    │
-            │     - Deduplication check    │
-            └──────────────────────────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │  S3 (Tebi Storage)   │
-                 ├──────────────────────┤
-                 │  All media files:    │
-                 │  - /images/*         │
-                 │  - /videos/*         │
-                 │  - /audio/*          │
-                 │  - /documents/*      │
-                 │  (All encrypted)     │
-                 └──────────────────────┘
-```
-
-### Storage Decisions
-
-**What goes in IndexedDB:**
-```
-Message {
-  id: UUID
-  chatId: UUID
-  type: 'text' | 'image' | 'video' | 'audio' | 'file'
-  
-  // Text messages
-  encryptedContent: ArrayBuffer (text encrypted with handleId)
-  
-  // Media messages
-  media: {
-    id: UUID                          (unique media ID)
-    mimeType: 'image/jpeg' | etc.     (what type)
-    size: number                      (bytes)
-    checksum: string                  (SHA-256 of plaintext)
-    remoteStorageKey: string          (S3 path)
-    
-    // Cached locally if <5MB or image
-    cachedLocally: boolean
-    encryptedLocalContent?: ArrayBuffer (if cached)
-    
-    // Thumbnail (always cached for images)
-    thumbnail?: {
-      encryptedContent: ArrayBuffer (200x200)
-      width: number
-      height: number
-    }
-    
-    // Metadata
-    duration?: number                 (for audio/video)
-    width?: number, height?: number   (for images/video)
-    fileName?: string                 (for documents)
-  }
-  
-  // Encryption
-  salt: ArrayBuffer
-  iv: ArrayBuffer
-  authTag: ArrayBuffer
-  
-  // Standard
-  timestamp: number
-  isOwn: boolean
-  status: 'sending' | 'sent' | 'delivered' | 'read'
-}
-```
-
-**What stays on Server (PostgreSQL):**
-```
-MessageMetadata {
-  id: UUID
-  chatId: UUID
-  senderHandleId: UUID
-  type: 'text' | 'image' | 'video' | 'audio' | 'file'
-  text?: string                  (encrypted text for search?)
-  
-  mediaId?: UUID                 (reference to Media table if has file)
-  encryptedKey?: Buffer          (if server-side key management)
-  
-  timestamp: Date
-  reactions: []
-  metadata: { ... }
-}
-
-Media {
-  id: UUID
-  storageKey: string             (S3 path: /media/hash/uuid)
-  originalFilename?: string
-  mimeType: string
-  size: bigint
-  fileHash: string               (SHA-256 of encrypted content)
-  uploaderIdentityId: UUID
-  messageId: UUID                (references MessageMetadata)
-  
-  width?, height?                (for images)
-  duration?                      (for audio/video)
-  
-  status: 'uploading' | 'uploaded' | 'error'
-  variants: []                   (thumbnails, different qualities)
-  
-  uploadedAt: Date
-  metadata: { ... }
-}
-```
-
-**What goes to S3:**
-```
-S3 Structure:
-  /besafe/media/{mediaId}
-    ├── original.{ext}            (encrypted full file)
-    ├── thumbnail.jpg             (encrypted thumbnail)
-    └── metadata.json             (encrypted metadata)
-```
-
-### Encryption Strategy
-
-**Client-Side (Before upload to S3):**
-```
-1. User selects file
-2. Generate: salt, IV, key from handleId
-3. Encrypt file: AES-256-GCM(file, handleId-derived-key, salt, IV)
-4. Calculate: SHA-256 hash of encrypted content
-5. Generate thumbnails (encrypted)
-6. Store locally in IndexedDB:
-   - encrypted file (if <5MB)
-   - encrypted thumbnail
-   - media metadata
-7. Upload encrypted file to S3
-8. Create message in DB with media reference
-```
-
-**No Server-Side Decryption:**
-- Server never has plaintext
-- Server only stores encrypted blobs
-- Server only knows: MIME type, size, filename (metadata)
-- All decryption happens client-side on download
-
----
-
-## Why NOT Option 5 (Multiple Buckets)?
-
-### The Reality of E2EE
-
-In a true E2EE system:
-- **Everything** on the server is encrypted
-- **Server compromise** = attacker sees all encrypted files anyway
-- Splitting into 4 buckets doesn't change this
-
-### Attack Scenarios
-
-**Scenario 1: Single S3 Bucket**
-```
-Attacker breaches S3:
-  ✓ Gets all encrypted images, videos, audio, documents
-  ✗ Cannot decrypt (no keys on server)
-  Result: Encrypted blobs, unusable
-```
-
-**Scenario 2: Four Separate S3 Buckets**
-```
-Attacker breaches all 4 buckets:
-  ✓ Gets all encrypted images, videos, audio, documents  
-  ✗ Still cannot decrypt (no keys on server)
-  Result: Same as scenario 1
-```
-
-**Scenario 3: Server DB Compromise**
-```
-Attacker gets PostgreSQL:
-  ✓ Knows which user has which messages
-  ✓ Knows file types, sizes, timestamps
-  ✓ Can correlate metadata (4 buckets don't help)
-  ✗ Still can't decrypt files
-  Result: Metadata leak, not content leak
-```
-
-**Scenario 4: Attacker gets BOTH server DB + S3 keys**
-```
-Single bucket:  Gets all media (4 buckets pointless - they have all 4 keys)
-Four buckets:   Same result - attacker has all bucket keys
-Result:        Multiplied 4x infrastructure = same security as 1x
-```
-
-### Conclusion on Option 5
-- ❌ **Does NOT improve security** in E2EE model
-- ❌ **Increases complexity** by 4x
-- ❌ **Increases costs** by 4x
-- ❌ **Increases attack surface** (4 services instead of 1)
-- ❌ **False sense of security** (defense in depth is wrong here)
-
-**Use Option 5 only if:**
-- Regulatory requirement mandates physical separation
-- Compliance needs to show "separation of concerns"
-- You need to restrict which teams can access which media types
-- NOT for security reasons in E2EE model
-
----
-
-## Implementation Plan (Hybrid Model)
-
-### Phase 1: Backend Changes (Week 1)
-
-**1. Extend MessageMetadata**
 ```typescript
-// Add to MessageMetadata
-@Column({ type: 'uuid', nullable: true })
-mediaId?: string;  // Reference to Media table
-
-@Column({ type: 'bytea', nullable: true })
-encryptedKey?: Buffer;  // Optional: server-side key management
+interface EncryptedStorage {
+  encrypted: Uint8Array; // Шифротекст (ciphertext)
+  iv: Uint8Array; // 12-байтный вектор инициализации
+  context: 'message' | 'contact' | 'metadata' | 'file'; // Контекст использования
+  timestamp: number; // Время шифрования
+  // ❌ version: удалено (одна версия)
+  // ❌ salt: удалено (уникальность через handleId в KDF)
+  // ❌ authTag: не хранится отдельно (встроен в AES-GCM)
+}
 ```
 
-**2. Update Media Entity** (already has good structure)
-- Already supports: storageKey, fileHash, variants, metadata
-- Add: messageId (foreign key to MessageMetadata)
+### Message (в IndexedDB)
 
-**3. API Endpoints**
-```
-POST   /media/upload/{type}              (type: image|video|audio|file)
-GET    /media/{mediaId}                  (get metadata)
-GET    /media/{mediaId}/presigned-url    (S3 presigned URL)
-DELETE /media/{mediaId}                  (mark as deleted)
-```
-
-### Phase 2: Frontend Schema Updates (Week 1)
-
-**Update Dexie Schema**
 ```typescript
-export interface Message {
+interface Message {
   id: string;
   chatId: string;
   senderId: string;
-  type: 'text' | 'image' | 'video' | 'audio' | 'file';
-  
-  // Text
-  encryptedContent?: ArrayBuffer;
-  
-  // Media
+  contentType: 'text' | 'image' | 'video' | 'audio' | 'file';
+
+  // Шифрованные данные
+  encryptedContent: ArrayBuffer; // Зашифрованное содержимое
+  iv: ArrayBuffer; // Вектор инициализации
+
+  // Метаданные
+  timestamp: number;
+  isOwn: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  editedAt?: number;
+  replyToId?: string;
+  metadata?: Record<string, any>;
+
+  // Медиа-данные (для не-текстовых сообщений)
   media?: {
-    id: string;
-    mimeType: string;
-    size: number;
-    remoteStorageKey: string;
-    
-    // Cache
-    cachedLocally?: boolean;
-    encryptedLocalContent?: ArrayBuffer;
-    
-    // Thumbnail
+    id: string; // Уникальный ID медиа
+    mimeType: string; // 'image/jpeg', 'video/mp4', etc.
+    size: number; // Размер в байтах
+    fileName?: string; // Оригинальное имя файла
+    duration?: number; // Для audio/video
+    width?: number;
+    height?: number;
+
+    // Хранение
+    remoteStorageKey?: string; // Путь в S3 (для файлов ≥5MB)
+    cachedLocally?: boolean; // Закеширован ли локально
+    encryptedLocalContent?: ArrayBuffer; // Если cachedLocally=true
+
+    // Превью (всегда для изображений)
     thumbnail?: {
       encryptedContent: ArrayBuffer;
       width: number;
       height: number;
     };
-    
-    // Metadata
-    duration?: number;
-    width?: number;
-    height?: number;
-    fileName?: string;
   };
-  
-  salt: ArrayBuffer;
-  iv: ArrayBuffer;
-  authTag: ArrayBuffer;
-  timestamp: number;
-  isOwn: boolean;
 }
 ```
 
-### Phase 3: Upload Flow (Week 2)
+### CryptoKeyRecord (в IndexedDB)
 
 ```typescript
-async function uploadMediaMessage(
-  chatId: string,
+interface CryptoKeyRecord {
+  identityId: string; // Primary key: привязка к пользователю
+  encryptionKey: CryptoKey; // Неэкспортируемый ключ (управляется браузером)
+  createdAt: number; // Метаданные для отладки
+}
+```
+
+---
+
+## 🔄 Потоки данных
+
+### 📤 Отправка текстового сообщения
+
+```
+1. Пользователь вводит текст → нажимает "Отправить"
+2. handleSendMessage (index.tsx):
+   ├─ Проверяет наличие user.identity.id
+   ├─ Вызывает StorageService.saveEncryptedMessage(
+   │    chatId, senderId, text, handleId, isOwn, messageId, identityId
+   │  )
+3. StorageService.saveEncryptedMessage:
+   ├─ getBaseKey(identityId) → CryptoKey (RAM → IndexedDB fallback)
+   ├─ deriveEncryptionKeyFromHash(baseKey, handleId, 'message')
+   ├─ encryptWithKey(textBytes, encryptionKey) → {encrypted, iv}
+   ├─ Сохраняет в IndexedDB: {encryptedContent, iv, context, timestamp}
+4. Отправляет зашифрованный контент через WebSocket
+5. Обновляет UI: добавляет сообщение в список
+```
+
+### 📥 Получение сообщения (через WebSocket)
+
+```
+1. handleMessageReceived (index.tsx):
+   ├─ Проверяет: это не своё сообщение?
+   ├─ Проверяет: есть ли user.identity.id?
+   ├─ Вызывает StorageService.saveEncryptedMessage(..., identityId)
+2. StorageService:
+   ├─ Шифрует и сохраняет в IndexedDB (аналогично отправке)
+3. Если чат открыт:
+   ├─ Добавляет сообщение в UI (расшифровка при отображении)
+```
+
+### 🖼️ Отправка медиа-файла (гибридная модель)
+
+```
+1. Пользователь выбирает файл (изображение/видео/аудио/документ)
+2. Чтение файла → ArrayBuffer
+3. Генерация параметров шифрования:
+   ├─ salt = randomBytes(32)  [только для файлов, не для сообщений]
+   ├─ iv = randomBytes(12)
+   ├─ baseKey = getBaseKey(identityId)
+   ├─ encryptionKey = deriveEncryptionKeyFromHash(baseKey, handleId, 'file')
+4. Шифрование файла:
+   ├─ encryptedFile = encryptWithKey(fileBytes, encryptionKey, iv)
+5. Генерация превью (для изображений):
+   ├─ thumbnail = resize(image, 200x200)
+   ├─ encryptedThumbnail = encryptWithKey(thumbnail, encryptionKey, iv)
+6. Решение о хранении:
+   ├─ Если encryptedFile.size < 5MB:
+   │  ├─ Сохранить encryptedFile локально в IndexedDB
+   │  └─ remoteStorageKey = null
+   ├─ Если encryptedFile.size ≥ 5MB:
+   │  ├─ Запросить presigned URL у бэкенда: POST /s3/upload
+   │  ├─ Загрузить encryptedFile в S3 через PUT presigned URL
+   │  └─ remoteStorageKey = s3Key
+7. Сохранение метаданных в IndexedDB:
+   ├─ Message {
+   │    contentType: 'image' | 'video' | ...,
+   │    media: {
+   │      id, mimeType, size, fileName,
+   │      remoteStorageKey, cachedLocally,
+   │      thumbnail: { encryptedContent, width, height }
+   │    },
+   │    encryptedContent: (пусто или превью),
+   │    iv, timestamp, ...
+   │  }
+8. Отправка сообщения через WebSocket (только метаданные + ссылка)
+```
+
+### 📥 Загрузка и отображение медиа
+
+```
+1. Пользователь открывает чат → loadDecryptedMessages(chatId, handleId, identityId)
+2. Для каждого сообщения:
+   ├─ Если contentType === 'text':
+   │  ├─ Расшифровать encryptedContent → текст
+   ├─ Если contentType !== 'text':
+   │  ├─ Если media.cachedLocally === true:
+   │  │  ├─ Расшифровать encryptedLocalContent → файл в памяти
+   │  │  ├─ Расшифровать thumbnail → показать превью
+   │  ├─ Если media.cachedLocally === false:
+   │  │  ├─ Запросить presigned URL: GET /s3/download/{remoteStorageKey}
+   │  │  ├─ Скачать encryptedFile через fetch(presignedUrl)
+   │  │  ├─ Расшифровать файл → показать / сохранить в кэш если <5MB
+   │  │  ├─ Расшифровать thumbnail (всегда в IndexedDB) → показать сразу
+3. Отображение в UI:
+   ├─ Текст: обычный bubble
+   ├─ Изображение: превью → клик → полноэкранный просмотр
+   ├─ Видео/Аудио: плеер с controls
+   ├─ Документ: иконка + имя файла + кнопка скачивания
+```
+
+---
+
+## 🗂️ Структура хранилищ
+
+### IndexedDB (локально, на устройстве)
+
+```
+BeSafeDB_<hash(identityId)>
+├─ messages (table)
+│  ├─ id: string (PK)
+│  ├─ chatId: string (index)
+│  ├─ contentType: 'text' | 'image' | 'video' | 'audio' | 'file'
+│  ├─ encryptedContent: ArrayBuffer
+│  ├─ iv: ArrayBuffer
+│  ├─ media?: { ... }  // см. интерфейс выше
+│  ├─ timestamp: number (index)
+│  ├─ isOwn: boolean
+│  └─ ... остальные поля
+│
+├─ cryptoKeys (table)
+│  ├─ identityId: string (PK)
+│  ├─ encryptionKey: CryptoKey (неэкспортируемый)
+│  └─ createdAt: number
+│
+├─ contacts (table)
+│  └─ ... (без изменений)
+│
+└─ publicKey (table)
+   └─ ... (без изменений)
+```
+
+### S3 (Tebi, облачное хранилище)
+
+```
+s3://besafe.backet/
+└── users/
+    └── {identityId}/
+        ├── avatar.{png|jpg|webp}           # Аватар профиля
+        ├── media/
+        │   ├── {mediaId}-original.{ext}    # Полноразмерный зашифрованный файл
+        │   ├── {mediaId}-thumbnail.jpg     # Зашифрованное превью (для изображений)
+        │   └── {mediaId}-metadata.json     # Зашифрованные метаданные (опционально)
+        └── documents/
+            └── {mediaId}-original.pdf      # Зашифрованные документы
+```
+
+**Важно**: Все файлы в S3 хранятся **только в зашифрованном виде**. Сервер не имеет доступа к ключам расшифровки.
+
+---
+
+## 🔧 API эндпоинты (бэкенд)
+
+### Работа с файлами (S3)
+
+| Метод    | Эндпоинт            | Описание                              | Аутентификация       |
+| -------- | ------------------- | ------------------------------------- | -------------------- |
+| `POST`   | `/s3/upload`        | Получить presigned URL для загрузки   | Cookies + identityId |
+| `GET`    | `/s3/download/:key` | Получить presigned URL для скачивания | Cookies + identityId |
+| `DELETE` | `/s3/:key`          | Удалить файл (только свой)            | Cookies + identityId |
+
+**Пример запроса на загрузку**:
+
+```typescript
+// Получение presigned URL
+const response = await fetch('/s3/upload', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify({
+    fileType: 'image', // 'image' | 'video' | 'audio' | 'document'
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg', // опционально, для метаданных
+  }),
+});
+
+const { uploadUrl, fileKey } = await response.json();
+
+// Загрузка зашифрованного файла в S3
+await fetch(uploadUrl, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'image/jpeg' },
+  body: encryptedFile, // ArrayBuffer
+});
+```
+
+### Профиль и метаданные
+
+| Метод   | Эндпоинт                | Описание                                                     |
+| ------- | ----------------------- | ------------------------------------------------------------ |
+| `GET`   | `/auth/profile`         | Получить профиль (аватар определяется по наличию файла в S3) |
+| `PATCH` | `/profile/display-name` | Обновить отображаемое имя                                    |
+
+---
+
+## 📦 Расчёт использования хранилища
+
+### На одного активного пользователя (30 дней)
+
+#### IndexedDB (локальный кэш)
+
+| Тип данных                    | Объём       | Комментарий                              |
+| ----------------------------- | ----------- | ---------------------------------------- |
+| Текстовые сообщения (1000 шт) | ~500 KB     | ~500 байт на сообщение                   |
+| Превью изображений (200 шт)   | ~50 MB      | 200x200px, зашифрованные                 |
+| Малые файлы <5MB (50 шт)      | ~100 MB     | В среднем 2 MB на файл                   |
+| Метаданные и индексы          | ~10 MB      | Служебные данные Dexie                   |
+| **ИТОГО**                     | **~160 MB** | ✅ В пределах квоты браузера (50-100 GB) |
+
+#### S3 (облачное хранилище)
+
+| Тип данных                          | Объём       | Комментарий                     |
+| ----------------------------------- | ----------- | ------------------------------- |
+| Полноразмерные изображения (200 шт) | ~600 MB     | ~3 MB на изображение            |
+| Видео (20 шт)                       | ~2 GB       | ~100 MB на видео                |
+| Аудио (50 шт)                       | ~500 MB     | ~10 MB на аудио                 |
+| Документы (100 шт)                  | ~100 MB     | ~1 MB на документ               |
+| **ИТОГО**                           | **~3.2 GB** | ✅ Масштабируется неограниченно |
+
+### Квоты браузеров для IndexedDB
+
+| Браузер | Примерная квота      | Примечание                  |
+| ------- | -------------------- | --------------------------- |
+| Chrome  | 50 GB (6% от диска)  | Может запрашивать больше    |
+| Firefox | 10 GB (по умолчанию) | Настраивается пользователем |
+| Safari  | 50 GB                | Ограничения на iOS          |
+| Edge    | 50 GB                | Аналогично Chrome           |
+
+**Вывод**: Локальный кэш ~160 MB на пользователя — безопасно и устойчиво.
+
+---
+
+## 🛡️ Чек-лист безопасности
+
+- [ ] Все файлы шифруются на клиенте **до** загрузки в S3
+- [ ] Ключи шифрования — `CryptoKey` с `extractable: false`
+- [ ] Ключи хранятся в IndexedDB, привязаны к `identityId`
+- [ ] Presigned URLs имеют короткий срок жизни (15 минут)
+- [ ] Сервер не имеет доступа к приватным ключам или хэшам
+- [ ] После расшифровки файл проверяется по checksum (SHA-256)
+- [ ] Орфанные файлы в S3 удаляются (нет ссылки в Message)
+- [ ] Пользователь может удалить только свои файлы
+- [ ] Дедупликация по хэшу **зашифрованного** контента (не раскрывает наличие файла)
+- [ ] При logout: ключ удаляется из IndexedDB и RAM, сессия закрывается
+
+---
+
+## 🗓️ План реализации по фазам
+
+### Фаза 1: Подготовка бэкенда (Неделя 1)
+
+**Задачи**:
+
+- [ ] Расширить `MessageMetadata` entity: добавить `mediaId`, `contentType`
+- [ ] Создать/обновить `Media` entity: `storageKey`, `fileHash`, `variants`, `messageId`
+- [ ] Реализовать эндпоинты S3: `/s3/upload`, `/s3/download/:key`, `/s3/:key`
+- [ ] Добавить валидацию: пользователь может работать только со своими файлами
+- [ ] Реализовать генерацию presigned URLs с TTL 15 минут
+- [ ] Добавить эндпоинт проверки дедупликации по `fileHash`
+
+**Результат**: Готовый бэкенд для приёма и отдачи зашифрованных файлов.
+
+---
+
+### Фаза 2: Обновление фронтенд-схемы (Неделя 1)
+
+**Задачи**:
+
+- [ ] Обновить интерфейс `Message` в `@/lib/db/schema.ts` (добавить `media?`)
+- [ ] Обновить Dexie схему в `@/lib/db/db.ts` (проверить миграцию)
+- [ ] Расширить `StorageService`:
+  - [ ] `encryptBinaryData()` / `decryptBinaryData()` — проверить сигнатуры
+  - [ ] Методы для работы с превью: `generateThumbnail()`, `encryptThumbnail()`
+- [ ] Добавить утилиты для расчёта размера файла и проверки квоты IndexedDB
+
+**Результат**: Фронтенд готов к работе с медиа-сообщениями.
+
+---
+
+### Фаза 3: Реализация потоков загрузки/скачивания (Неделя 2)
+
+**Задачи**:
+
+- [ ] Реализовать `uploadMediaMessage()`:
+  - [ ] Чтение файла → ArrayBuffer
+  - [ ] Шифрование с `deriveEncryptionKeyFromHash(baseKey, handleId, 'file')`
+  - [ ] Генерация превью для изображений
+  - [ ] Решение: локально или S3 (порог 5MB)
+  - [ ] Загрузка в S3 при необходимости
+  - [ ] Сохранение метаданных в IndexedDB
+- [ ] Реализовать `loadMediaMessage()`:
+  - [ ] Проверка локального кэша
+  - [ ] Загрузка из S3 при необходимости
+  - [ ] Расшифровка и отображение
+  - [ ] Кэширование малых файлов
+- [ ] Интеграция с UI:
+  - [ ] Компонент для отображения изображений (превью + лайтбокс)
+  - [ ] Плеер для видео/аудио
+  - [ ] Карточка для документов (иконка + скачивание)
+  - [ ] Индикаторы загрузки и ошибок
+
+**Результат**: Полный цикл отправки и получения медиа-сообщений.
+
+---
+
+### Фаза 4: Оптимизация и тестирование (Неделя 3)
+
+**Задачи**:
+
+- [ ] Тестирование всех типов файлов (изображения, видео, аудио, документы)
+- [ ] Проверка дедупликации: одинаковые файлы не загружаются повторно
+- [ ] Тестирование кэширования: малые файлы сохраняются локально
+- [ ] Проверка очистки кэша: старые файлы удаляются при нехватке места
+- [ ] Тестирование кросс-девайс синхронизации (метаданные + ссылки)
+- [ ] Нагрузочное тестирование: медленные сети, большие файлы
+- [ ] Мониторинг квоты IndexedDB: предупреждение пользователя при 80% заполнения
+- [ ] Security audit: проверка, что ключи не утекают, сервер не видит plaintext
+
+**Результат**: Готовый к продакшену функционал мультимедиа.
+
+---
+
+## ⚠️ Что НЕ делать
+
+```
+❌ НЕ хранить приватные ключи или их хэши в localStorage
+❌ НЕ шифровать файлы на сервере (только клиентское шифрование)
+❌ НЕ передавать ключи шифрования через сеть
+❌ НЕ смешивать зашифрованные и незашифрованные данные в одном хранилище
+❌ НЕ забывать очищать кэш IndexedDB при нехватке места
+❌ НЕ использовать Option 5 (Multi-S3) без регуляторного требования
+❌ НЕ хранить authTag/salt/version отдельно (они устарели)
+```
+
+---
+
+## ✅ Что ОБЯЗАТЕЛЬНО делать
+
+```
+✅ Шифровать все файлы на клиенте перед загрузкой в S3
+✅ Использовать CryptoKey с extractable: false для всех операций
+✅ Передавать identityId и handleId явно из React-контекста в сервисы
+✅ Проверять checksum файла после расшифровки
+✅ Реализовать дедупликацию по хэшу зашифрованного контента
+✅ Очищать орфанные файлы в S3 (нет ссылки в Message)
+✅ Мониторить квоту IndexedDB и предупреждать пользователя
+✅ Кэшировать превью изображений всегда, малые файлы (<5MB) — опционально
+✅ Использовать presigned URLs с TTL 15 минут
+✅ Удалять ключи из IndexedDB и RAM при logout
+```
+
+---
+
+## 🧪 План тестирования
+
+### Функциональные тесты
+
+| Сценарий                      | Ожидаемый результат                                                      |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| Отправка текстового сообщения | Сохраняется в IndexedDB, отображается, расшифровывается после рефреша    |
+| Отправка изображения <5MB     | Сохраняется локально, превью отображается сразу, полный размер по клику  |
+| Отправка изображения ≥5MB     | Загружается в S3, превью локально, полный размер скачивается по запросу  |
+| Отправка видео                | Превью/постер локально, видео стримится/скачивается из S3                |
+| Получение сообщения оффлайн   | Если файл в кэше — отображается, если нет — показывается заглушка        |
+| Перезагрузка страницы         | Все сообщения загружаются и расшифровываются автоматически               |
+| Logout                        | Ключ удаляется, сообщения остаются зашифрованными, недоступны для чтения |
+| Вход на другом устройстве     | Метаданные синхронизируются, файлы скачиваются из S3 по запросу          |
+
+### Security-тесты
+
+| Сценарий                           | Проверка                                                              |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| Попытка `exportKey()` на CryptoKey | Выбрасывается `InvalidAccessError`                                    |
+| XSS-инъекция в чат                 | Не может прочитать ключи, только использовать в контексте вкладки     |
+| Перехват presigned URL             | URL истекает через 15 минут, повторное использование невозможно       |
+| Компрометация сервера              | Злоумышленник видит только зашифрованные blobs, не может расшифровать |
+| Доступ к IndexedDB через DevTools  | Видны только зашифрованные ArrayBuffer, ключи неэкспортируемы         |
+
+### Нагрузочные тесты
+
+| Параметр                                       | Целевое значение                                                 |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| Время шифрования файла 10MB                    | < 2 секунды на среднем устройстве                                |
+| Время загрузки превью изображения              | < 500ms (из локального кэша)                                     |
+| Время скачивания файла 100MB из S3             | Зависит от сети, но с прогресс-баром                             |
+| Потребление памяти при расшифровке             | Не более 2x от размера файла (освобождается после использования) |
+| Квота IndexedDB при 1000 сообщений + 200 медиа | < 200 MB                                                         |
+
+---
+
+## 🔮 Возможные улучшения в будущем
+
+### Краткосрочные (1-3 месяца)
+
+- [ ] Поддержка голосовых сообщений с waveform-визуализацией
+- [ ] Автоматическое сжатие изображений перед шифрованием (настраиваемое качество)
+- [ ] Пакетная загрузка нескольких файлов в одном сообщении
+- [ ] Предпросмотр документов (PDF, DOCX) без скачивания
+
+### Среднесрочные (3-6 месяцев)
+
+- [ ] End-to-end шифрование для групповых чатов (расширение ключевой модели)
+- [ ] Синхронизация ключей между устройствами через зашифрованный канал (опционально)
+- [ ] Поддержка потокового шифрования для очень больших файлов (>1GB)
+
+### Долгосрочные (6+ месяцев)
+
+- [ ] Интеграция с аппаратными ключами (Secure Enclave, TPM) для хранения CryptoKey
+- [ ] Поддержка постквантовой криптографии (алгоритмы, устойчивые к квантовым атакам)
+- [ ] Децентрализованное хранилище (IPFS, Filecoin) как альтернатива S3
+
+---
+
+## 📎 Приложения
+
+### A. Пример миграции БД
+
+```sql
+-- Удаление устаревших полей из таблицы messages
+ALTER TABLE messages
+  DROP COLUMN IF EXISTS "salt",
+  DROP COLUMN IF EXISTS "version",
+  DROP COLUMN IF EXISTS "authTag";
+
+-- Добавление новых полей для медиа (если используется SQL-бэкенд для метаданных)
+ALTER TABLE messages
+  ADD COLUMN IF NOT EXISTS "media" JSONB,
+  ADD COLUMN IF NOT EXISTS "content_type" VARCHAR(20) DEFAULT 'text';
+
+-- Индексы для производительности
+CREATE INDEX IF NOT EXISTS idx_messages_chatid_timestamp ON messages(chat_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_messages_content_type ON messages(content_type);
+```
+
+### B. Пример кода: шифрование файла
+
+```typescript
+import { deriveEncryptionKeyFromHash } from '@/lib/crypto';
+import { StorageService } from '@/services/storage.service';
+
+async function encryptFileForUpload(
   file: File,
-  type: 'image' | 'video' | 'audio' | 'file'
-) {
-  // 1. Read file
-  const fileData = await file.arrayBuffer();
-  
-  // 2. Generate encryption key from handleId
-  const salt = randomBytes(32);
-  const iv = randomBytes(12);
-  const key = deriveKey(user.handle.id, salt);
-  
-  // 3. Encrypt file
-  const encryptedFile = await encryptAES256GCM(
-    new Uint8Array(fileData),
-    key,
-    iv
+  handleId: string,
+  identityId: string
+): Promise<{
+  encrypted: Uint8Array;
+  iv: Uint8Array;
+  checksum: string;
+}> {
+  // 1. Чтение файла
+  const fileBuffer = await file.arrayBuffer();
+  const fileBytes = new Uint8Array(fileBuffer);
+
+  // 2. Получение базового ключа
+  const baseKey = await StorageService.getBaseKey(identityId);
+
+  // 3. Деривация контекстного ключа
+  const encryptionKey = await deriveEncryptionKeyFromHash(
+    baseKey,
+    handleId,
+    'file' // purpose для разделения ключей
   );
-  
-  // 4. Generate thumbnail (for images)
-  if (type === 'image') {
-    const thumbnail = await generateThumbnail(file, 200);
-    const encryptedThumbnail = await encryptAES256GCM(
-      thumbnail,
-      key,
-      iv
-    );
-  }
-  
-  // 5. Calculate checksum (for deduplication)
-  const checksum = SHA256(encryptedFile);
-  
-  // 6. Check deduplication
-  const existingMedia = await checkMediaDeduplication(checksum);
-  if (existingMedia) {
-    // Reuse existing file, just create new message
-    await createMessage({
-      chatId,
-      type,
-      mediaId: existingMedia.id,
-      // Don't re-upload
-    });
-    return;
-  }
-  
-  // 7. Store locally in IndexedDB (if <5MB)
-  if (encryptedFile.byteLength < 5 * 1024 * 1024) {
-    await StorageService.saveMessage({
-      chatId,
-      type,
-      media: {
-        encryptedLocalContent: encryptedFile,
-        cachedLocally: true,
-        ...metadata
-      }
-    });
-  }
-  
-  // 8. Upload to S3
-  const s3Key = generateS3Key(type, chatId);
-  const presignedUrl = await getPresignedUrl(s3Key);
-  
-  await uploadToS3(presignedUrl, encryptedFile);
-  
-  // 9. Create message metadata on server
-  const message = await createMessage({
-    chatId,
-    type,
-    mediaId: newMediaId,
-    salt: base64(salt),
-    iv: base64(iv),
-    // ... other metadata
-  });
-  
-  // 10. Save to IndexedDB (reference only, if >5MB)
-  if (encryptedFile.byteLength >= 5 * 1024 * 1024) {
-    await StorageService.saveMessage({
-      chatId,
-      type,
-      media: {
-        id: mediaId,
-        remoteStorageKey: s3Key,
-        cachedLocally: false,
-        ...metadata
-      }
-    });
-  }
+
+  // 4. Генерация IV
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // 5. Шифрование
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, encryptionKey, fileBytes);
+
+  // 6. Расчёт checksum для дедупликации
+  const checksumBuffer = await crypto.subtle.digest('SHA-256', encrypted);
+  const checksum = Array.from(new Uint8Array(checksumBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return {
+    encrypted: new Uint8Array(encrypted),
+    iv,
+    checksum,
+  };
 }
 ```
 
-### Phase 4: Download Flow (Week 2)
+### C. Пример кода: загрузка в S3
 
 ```typescript
-async function loadMessage(messageId: string) {
-  const message = await StorageService.getMessage(messageId);
-  
-  if (message.type === 'text') {
-    // Already decrypted and stored
-    return message.text;
-  }
-  
-  if (message.type !== 'text') {
-    // Check if cached locally
-    if (message.media?.cachedLocally && message.media?.encryptedLocalContent) {
-      // Decrypt from local cache
-      const decrypted = await decryptAES256GCM(
-        message.media.encryptedLocalContent,
-        deriveKey(user.handle.id, message.salt),
-        message.iv
-      );
-      return decrypted;
-    }
-    
-    // Not cached, fetch from S3
-    const presignedUrl = await getPresignedUrl(message.media.remoteStorageKey);
-    const encryptedFile = await fetch(presignedUrl).then(r => r.arrayBuffer());
-    
-    // Decrypt
-    const decrypted = await decryptAES256GCM(
-      new Uint8Array(encryptedFile),
-      deriveKey(user.handle.id, message.salt),
-      message.iv
-    );
-    
-    // Cache if small enough
-    if (decrypted.byteLength < 5 * 1024 * 1024) {
-      await updateMessageCache(messageId, encryptedFile);
-    }
-    
-    return decrypted;
+async function uploadToS3(
+  encryptedFile: Uint8Array,
+  presignedUrl: string,
+  contentType: string
+): Promise<void> {
+  const response = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': encryptedFile.length.toString(),
+    },
+    body: encryptedFile,
+  });
+
+  if (!response.ok) {
+    throw new Error(`S3 upload failed: ${response.status} ${response.statusText}`);
   }
 }
 ```
 
-### Phase 5: Testing & Optimization (Week 3)
+---
 
-- Test upload of all file types
-- Test download and decryption
-- Test deduplication
-- Test cache expiration
-- Test cross-device sync (message references only)
-- Performance testing on slow networks
-- Storage quota monitoring
+## 🎯 Заключение
+
+Реализация гибридной модели мультимедиа-хранилища для BeSafeChat:
+
+- 🔐 **Сохраняет принципы E2EE**: все данные шифруются на клиенте, ключи не покидают устройство
+- ⚡ **Обеспечивает отличный UX**: оффлайн-доступ к последним сообщениям, мгновенное отображение превью
+- 📦 **Масштабируется**: от личных чатов до корпоративных решений с терабайтами данных
+- 🛡️ **Защищена от современных угроз**: XSS, компрометация сервера, утечки ключей
+- 🧩 **Имеет чистую архитектуру**: явные зависимости, тестируемость, возможность эволюции
+
+**Следующий шаг**: Приступить к реализации Фазы 1 (бэкенд) и параллельно подготовить фронтенд-схему.
 
 ---
 
-## Storage Calculations
+> 📄 **История версий**  
+> **v2.0** (Февраль 2026): Полная актуализация под CryptoKey-архитектуру, удаление устаревших полей, явная передача identityId, рекомендации по гибридному хранению.  
+> **v1.0** (Исходная версия): Базовый план с сравнением опций хранения.
 
-### IndexedDB Usage Per User
-
-**Scenario: Active user, 30 days of messages**
-
-```
-1. Text messages: 1000 messages
-   - Per message: ~500 bytes (encrypted text + metadata)
-   - Total: ~500 KB
-
-2. Image messages: 200 messages
-   - Per message: ~250 KB (encrypted thumbnail 200x200)
-   - Total: ~50 MB
-
-3. Small files (<5MB): 50 messages
-   - Per message: avg 2 MB (encrypted)
-   - Total: ~100 MB
-
-4. Overhead (indexes, metadata): ~10 MB
-
-TOTAL per user: ~160 MB (well within browser quota)
-```
-
-**S3 Usage Per User**
-
-```
-1. Full resolution images: 200 files
-   - Average: 3 MB per image
-   - Total: ~600 MB
-
-2. Videos: 20 files
-   - Average: 100 MB per video
-   - Total: ~2 GB
-
-3. Audio: 50 files
-   - Average: 10 MB per audio
-   - Total: ~500 MB
-
-4. Documents: 100 files
-   - Average: 1 MB per document
-   - Total: ~100 MB
-
-TOTAL per active user: ~3.2 GB
-(Typical cloud messenger user)
-```
-
----
-
-## Security Checklist
-
-- [ ] All files encrypted client-side before S3 upload
-- [ ] File hashes stored (for deduplication check)
-- [ ] Thumbnails encrypted
-- [ ] Database does NOT store unencrypted file content
-- [ ] S3 access requires authentication (presigned URLs)
-- [ ] File URLs are temporary (5-15 minute expiry)
-- [ ] Server cannot access file content
-- [ ] Client verifies file checksum after download
-- [ ] Orphaned files cleaned up (file without message reference)
-- [ ] User cannot access other users' files
-- [ ] Deduplication doesn't leak file existence
-
----
-
-## Recommendation Summary
-
-| Aspect | Option 1 | Option 2 | Option 3 | Option 4 | Option 5 |
-|--------|----------|----------|----------|----------|----------|
-| **Local Only** | ✅ | ✅ | ❌ | ✅ | ❌ |
-| **Server Backup** | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Cross-Device** | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Unlimited Storage** | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Privacy** | ✅✅✅ | ✅✅ | ⚠️ | ✅✅ | ✅ |
-| **Simplicity** | ✅✅ | ✅ | ✅ | ⚠️ | ❌❌ |
-| **Cost** | Free | Free | $ | $ | $$$ |
-| **For E2EE** | Best | Good | Good | **Best** | Unnecessary |
-
-### 🟢 **RECOMMENDATION: Option 4 (Hybrid)**
-
-**Why:**
-- Balances privacy (client-side encryption) with functionality (cloud backup)
-- Works offline for recent messages
-- Scales to unlimited files on S3
-- Minimal extra complexity (manageable)
-- Most users expect cross-device sync
-- Industry standard (Signal, Wire, Telegram all use this)
-
-**Implementation Priority:**
-1. Phase 1-2: Backend schema + frontend schema
-2. Phase 3-4: Upload/download flows  
-3. Phase 5: Testing + optimization
-4. Estimated: 3 weeks for 2 developers
-
----
-
-## Conclusion
-
-For an E2EE messenger:
-- **Option 5** (multiple servers) provides zero additional security benefit over **Option 4**
-- **Option 4** (hybrid) is the sweet spot: privacy + functionality + scalability
-- Implement with proper cache management and quota monitoring
-- All encryption happens client-side, server is just a blob store
-
-**Start with Option 4. You can always optimize later if needed.**
+> 🗑️ **Устаревшие документы**:
+>
+> - `media-storage-architecture.md` → заменён этим документом
+> - `media-storage-comparison.md` → заменён этим документом  
+>   _(Архивные версии сохранены в `plans/archive/`)_
