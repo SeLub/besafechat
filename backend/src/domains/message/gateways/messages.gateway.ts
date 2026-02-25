@@ -89,7 +89,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
         // 6. Уведомляем контакты о том, что пользователь онлайн
         await this.notifyContactsUserOnline(session.activeHandleId);
-        
+
         // 7. Синхронизация уведомлений при подключении
         await this.syncNotifications(client, session.activeHandleId);
       }
@@ -169,15 +169,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     requestId: string,
     message?: string
   ) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_request', {
-      fromHandle: {
-        id: fromHandle.id,
-        value: fromHandle.value,
-        displayName: fromHandle.profile?.displayName,
-      },
-      requestId,
-      message,
-    });
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_request',
+      {
+        fromHandle: {
+          id: fromHandle.id,
+          value: fromHandle.value,
+          displayName: fromHandle.profile?.displayName,
+        },
+        requestId,
+        message,
+      }
+    );
 
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_received', {
@@ -204,8 +208,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       ? await this.mediaService.getAvatarUrlIfExists(otherHandle.id)
       : null;
 
-    // Create persistent notification in Redis (30-day TTL)
-    // Ensures sender (toHandleId) receives notification even if offline
+    // Create persistent notification (Redis/DB depending on config)
+    // Ensures delivery to offline users via TTL or DB persistence
     const notification = await this.notificationService.createNotification(
       toHandleId,
       'contact_accepted',
@@ -219,10 +223,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
     );
 
-    // WebSocket events act as real-time triggers
-    // - notification:created for sync with connected clients
-    // - contact_accepted for UI toast/toast feedback
-    // Data in these events is optional; true source of truth is REST API
+    // WebSocket events act as real-time triggers:
+    // - notification:created: for client sync with notification history
+    // - contact_accepted: for immediate UI feedback (toast, contact list update)
+    // Event payload is denormalized for UX; REST API remains source of truth for mutations
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_accepted', {
       otherHandle: {
@@ -246,13 +250,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async notifyRequestRejected(toHandleId: string, byHandle: any) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_rejected', {
-      fromHandle: {
-        id: byHandle.id,
-        value: byHandle.value,
-        displayName: byHandle.profile?.displayName,
-      },
-    });
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_rejected',
+      {
+        fromHandle: {
+          id: byHandle.id,
+          value: byHandle.value,
+          displayName: byHandle.profile?.displayName,
+        },
+      }
+    );
 
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_rejected', {
@@ -312,13 +320,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const notifications = await this.notificationService.getUnreadNotifications(handleId);
       const unreadCount = await this.notificationService.getUnreadCount(handleId);
-      
+
       client.emit('notifications:sync', {
         notifications,
         unreadCount,
         timestamp: new Date().toISOString(),
       });
-      
+
       console.log(`🔔 Synced ${notifications.length} notifications for handle: ${handleId}`);
     } catch (error) {
       console.error('❌ Error syncing notifications:', error);
@@ -337,7 +345,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (client.data?.activeHandleId) {
       await this.notificationService.markAsRead(client.data.activeHandleId, payload.notificationId);
       const unreadCount = await this.notificationService.getUnreadCount(client.data.activeHandleId);
-      
+
       // Уведомляем все устройства пользователя
       this.server.to(`user:${client.data.activeHandleId}`).emit('notification:read', {
         notificationId: payload.notificationId,
@@ -350,7 +358,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleMarkAllAsRead(client: Socket) {
     if (client.data?.activeHandleId) {
       await this.notificationService.markAllAsRead(client.data.activeHandleId);
-      
+
       // Уведомляем все устройства пользователя
       this.server.to(`user:${client.data.activeHandleId}`).emit('notification:all-read', {
         unreadCount: 0,

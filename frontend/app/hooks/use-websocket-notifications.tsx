@@ -10,7 +10,8 @@ export function useWebSocketNotifications(
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
-  onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void
+  onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void,
+  onNewChatAvailable?: (data: { fromHandle: any; chatId?: string }) => void
 ) {
   const { user } = useAuth();
   const { incrementAccepted } = useContactRequests();
@@ -21,6 +22,7 @@ export function useWebSocketNotifications(
     onUserOnline,
     onUserOffline,
     onOnlineStatusChange,
+    onNewChatAvailable,
   });
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export function useWebSocketNotifications(
       onUserOnline,
       onUserOffline,
       onOnlineStatusChange,
+      onNewChatAvailable,
     };
   });
 

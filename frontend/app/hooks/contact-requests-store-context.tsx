@@ -18,6 +18,7 @@ interface Contact {
 }
 
 interface ContactRequestsStoreContextType {
+  [x: string]: any;
   contacts: Contact[];
   outgoingRequests: ContactRequest[];
   setContacts: (contacts: Contact[]) => void;

@@ -32,8 +32,8 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
       });
 
       const data = await handleApiResponse<any>(res);
-      setIncomingRequests(data?.incoming || []);
-      setOutgoingRequests(data?.outgoing || []);
+      setIncomingRequests(data.incoming || []);
+      setOutgoingRequests(data.outgoing || []);
     } catch (error) {
       console.error('Failed to load requests:', error);
       toast.error('Failed to load requests');
@@ -119,19 +119,21 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
       <div className="flex border-b border-border -mx-6 px-6 mb-4">
         <button
           onClick={() => setActiveTab('incoming')}
-          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'incoming'
+          className={`flex-1 p-3 text-sm font-medium ${
+            activeTab === 'incoming'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-            }`}
+          }`}
         >
           Incoming ({incomingRequests.length})
         </button>
         <button
           onClick={() => setActiveTab('outgoing')}
-          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'outgoing'
+          className={`flex-1 p-3 text-sm font-medium ${
+            activeTab === 'outgoing'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-            }`}
+          }`}
         >
           Sent ({outgoingRequests.length})
         </button>
@@ -224,12 +226,13 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div
-                            className={`text-xs px-2 py-1 rounded-full ${request.status === 'pending'
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              request.status === 'pending'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : request.status === 'accepted'
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
-                              }`}
+                            }`}
                           >
                             {request.status === 'pending' && (
                               <Clock className="h-3 w-3 inline mr-1" />

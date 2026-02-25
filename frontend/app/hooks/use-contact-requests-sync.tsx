@@ -27,10 +27,7 @@ interface UseContactRequestsSyncOptions {
  * Слушает события и обновляет глобальное состояние через useContactRequestsStore
  */
 export function useContactRequestsSync(options?: UseContactRequestsSyncOptions) {
-  const {
-    removeOutgoingRequest,
-    removeContact,
-  } = useContactRequestsStore();
+  const { removeOutgoingRequest, removeContact } = useContactRequestsStore();
 
   useEffect(() => {
     if (!window.socketInstance) {
@@ -55,7 +52,10 @@ export function useContactRequestsSync(options?: UseContactRequestsSyncOptions) 
     // Handle contact accepted (WebSocket trigger only)
     // Contact data comes from REST response, not WebSocket
     const handleContactAccepted = (data: { otherHandle: any; chatId?: string }) => {
-      console.log('✅ contact_accepted - removing from outgoing, triggering chat load:', data.otherHandle.id);
+      console.log(
+        '✅ contact_accepted - removing from outgoing, triggering chat load:',
+        data.otherHandle.id
+      );
       removeOutgoingRequest(data.otherHandle.id);
       // Note: addContact NOT called here - data comes from REST response instead
       // WebSocket is trigger only, not data source

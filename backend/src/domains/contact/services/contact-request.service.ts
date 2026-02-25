@@ -27,7 +27,10 @@ export class ContactRequestService {
   async sendRequest(fromHandleId: string, toHandleId: string, message?: string) {
     // Check if handles exist
     const [fromHandle, toHandle] = await Promise.all([
-      this.handleRepository.findOne({ where: { id: fromHandleId }, relations: ['ownerIdentity', 'profile'] }),
+      this.handleRepository.findOne({
+        where: { id: fromHandleId },
+        relations: ['ownerIdentity', 'profile'],
+      }),
       this.handleRepository.findOne({ where: { id: toHandleId }, relations: ['ownerIdentity'] }),
     ]);
 
@@ -153,12 +156,18 @@ export class ContactRequestService {
       request.toHandleId
     );
 
-    // Notify sender: their request was accepted
-    // WebSocket acts as trigger; persistent notification stored in Redis
-    // Acceptor (User B) gets data from REST response, not WebSocket
+    // Notify sender: their request was accepted and chat is ready
+    // Single unified event replaces old contact_request_accepted + new_chat_available
     await this.messagesGateway.notifyContactAccepted(
       request.fromHandleId, // Notify the sender (who sent the request)
-      request.toHandle,     // Data about the accepter
+      request.toHandle, // Data about the accepter
+      chat.id
+    );
+
+    // Notify accepter: new chat is available with the request sender
+    await this.messagesGateway.notifyNewChatAvailable(
+      request.toHandleId, // Notify the accepter
+      request.fromHandle, // Data about the sender
       chat.id
     );
 
@@ -253,7 +262,8 @@ export class ContactRequestService {
     return Promise.all(
       requests.map(async (request) => {
         // Get the other user (not the current user)
-        const otherHandle = request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
+        const otherHandle =
+          request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
         const avatarUrl = await this.mediaService.getAvatarUrlIfExists(otherHandle.id);
 
         return {
