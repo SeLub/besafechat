@@ -1,16 +1,55 @@
 # BeSafeChat Notification System
 
-**Document Version:** 1.0  
-**Last Updated:** February 9, 2026  
+**Document Version:** 2.0  
+**Last Updated:** February 25, 2026  
 **Status:** Production-ready
 
 ---
 
 ## Overview
 
-BeSafeChat implements a Redis-based notification system with real-time WebSocket synchronization, multi-device support, and offline recovery. The system provides instant notifications for contact requests, chat events, and team invitations without storing message content.
+BeSafeChat implements a **dual notification system** with distinct architecture and purpose:
 
-**Core Innovation:** Ephemeral Redis storage with 30-day TTL, atomic operations for unread counts, and room-based WebSocket broadcasting for instant multi-device synchronization.
+1. **Contact Requests System** - PostgreSQL-based, synchronizes contact request lifecycle
+2. **Notifications System (Inbox)** - Redis-based, stores persistent notifications
+
+Both systems use real-time WebSocket synchronization, multi-device support, and REST API fallbacks for offline recovery.
+
+**Core Innovation:** 
+- Contact Requests: Clean separation between pending/accepted/rejected states with modal-based UX
+- Notifications: Ephemeral Redis storage with 30-day TTL, atomic operations for unread counts, room-based WebSocket broadcasting
+
+---
+
+## System Comparison
+
+### System 1: Contact Requests
+
+| Aspect | Details |
+|--------|---------|
+| **Storage** | PostgreSQL (`contact_request` table) |
+| **States** | PENDING, ACCEPTED, REJECTED |
+| **Display** | Contact Request Modal + Contacts Page tabs |
+| **Sync** | WebSocket (contact_request_received, contact_accepted, contact_rejected) |
+| **Deduplication** | `shownRequestIds` Set in session (prevents duplicate modals) |
+| **REST Source** | `GET /contacts/requests?direction=both` - source of truth |
+| **Key Optimization** | REST is source of truth, WebSocket triggers UI (no reloadChats) |
+
+**Flow**: A sends request → B sees modal → B accepts → Creates chat + A gets notification
+
+### System 2: Notifications (Inbox)
+
+| Aspect | Details |
+|--------|---------|
+| **Storage** | Redis (sorted set, TTL 30 days) |
+| **Types** | contact_accepted, contact_rejected, new_chat, team_invite |
+| **Display** | Inbox / NotificationList component |
+| **Sync** | WebSocket (notification:created, notification:read, notification:all-read) |
+| **Badge Count** | Atomic counter (unread_count:{handleId}) |
+| **REST Source** | `GET /notifications` - full sync on reconnection |
+| **Multi-device** | Room-based broadcasting (user:{handleId}) |
+
+**Flow**: Event triggered → Redis store → WebSocket broadcast → Update all devices
 
 ---
 
@@ -18,8 +57,25 @@ BeSafeChat implements a Redis-based notification system with real-time WebSocket
 
 ### Backend Components
 
+#### Contact Requests Subsystem
+
+**ContactRequestService** - Business Logic
+- `sendRequest()` - Create request, load avatar, emit WebSocket
+- `getRequests()` - Fetch by direction (incoming/outgoing/both)
+- `acceptRequest()` - Update status, create chat, notify sender
+- `rejectRequest()` - Update status, notify sender
+- `checkRequestStatus()` - Check relationship between handles
+
+**ContactRequestController** - REST API
+- `POST /contacts/requests` - Send request
+- `GET /contacts/requests?direction=both` - Get all (unified endpoint)
+- `POST /contacts/requests/{id}/accept` - Accept (returns chatId + handle data)
+- `POST /contacts/requests/{id}/reject` - Reject
+
+#### Notifications Subsystem
+
 **NotificationService** - Core Redis Operations
-- `createNotification()` - Create notification with atomic counter increment
+- `createNotification()` - Create with atomic counter increment
 - `getUnreadNotifications()` - Fetch unread with pagination
 - `markAsRead()` - Mark single notification as read
 - `markAllAsRead()` - Bulk mark as read
@@ -32,40 +88,69 @@ BeSafeChat implements a Redis-based notification system with real-time WebSocket
 - `POST /notifications/read-all` - Mark all as read
 - `GET /notifications/unread-count` - Get unread count
 
+#### Shared Components
+
 **MessagesGateway** - WebSocket Integration
+- `notifyContactRequest()` - Emit contact_request_received event + create notification
+- `notifyContactAccepted()` - Emit contact_accepted event + create notification
+- `notifyRequestRejected()` - Emit contact_request_rejected event
 - `syncNotifications()` - Auto-sync on connect
-- `handleRequestSync()` - Manual sync request
 - `handleMarkAsRead()` - WebSocket mark as read
 - `handleMarkAllAsRead()` - WebSocket mark all as read
-- `notifyContactRequest()` - Create notification on events
-
-**NotificationModule** - NestJS Module
-- Exports: NotificationService
-- Imports: SessionModule, HandleModule, RedisService
-- Controllers: NotificationController
 
 ### Frontend Components
 
-**useNotificationHistory** - React Hook
+#### Contact Requests Components
+
+**useContactRequests()** - Hook
+- Manages badge counts (pending, accepted)
+- Methods: `clearRequests()`, `incrementPending()`, `incrementAccepted()`
+- Location: `frontend/app/hooks/use-contact-requests.tsx`
+
+**ContactsPage** - Component
+- Displays three tabs: Pending (incoming), Sent (outgoing), Connections
+- Real-time sync via WebSocket listeners
+- Actions: Accept, Reject, Message
+- Location: `frontend/app/components/contacts-page.tsx`
+
+**ContactRequestModal** - Component
+- Full-screen modal for incoming requests
+- Shows: Name, handle, avatar, bio, message
+- Actions: Accept, Reject, Later
+- Deduplication: `shownRequestIds` prevents duplicate modals
+- Location: `frontend/app/components/contact-request-modal.tsx`
+
+#### Notifications Components
+
+**useNotifications()** - Hook
 - `notifications` - Notification array state
-- `unreadCount` - Badge counter state
-- `loading` - Loading state
+- `unreadCount` - Badge counter
 - `markAsRead()` - Mark single as read
 - `markAllAsRead()` - Bulk mark as read
 - `refresh()` - Manual refresh
+- Location: `frontend/app/hooks/use-notifications.tsx`
 
 **NotificationList** - UI Component
-- Notification list display
+- Notification list display with pagination
 - Unread indicators (blue dot)
 - Time formatting (relative)
-- Avatar display
 - Mark as read on click
 - Empty state handling
+- Location: `frontend/app/components/notification-list.tsx`
+
+#### Shared Components
+
+**useWebSocketNotifications()** - Hook
+- Establishes Socket.IO connection
+- Listens for contact request events
+- Listens for notification events
+- Synchronizes multi-device updates
+- Location: `frontend/app/hooks/use-websocket-notifications.tsx`
 
 **Integration Points**
-- `hamburger-menu.tsx` - Red dot badge with count
+- `hamburger-menu.tsx` - Badges for both systems
 - `left-panel-pages.tsx` - Notifications page
-- `index.tsx` - Navigation state management
+- `index.tsx` - Contact requests modal + navigation
 
 ---
 
@@ -518,4 +603,31 @@ VITE_API_BASE_URL=http://localhost:4000
 
 ---
 
-_Last Updated: February 9, 2026_
+## Key Implementation Details
+
+### Contact Requests Lifecycle
+
+1. **Send** → REST POST /contacts/requests → WebSocket contact_request_received → Modal shows on recipient
+2. **Accept** → REST POST /contacts/requests/{id}/accept → Returns chatId + handle data → Chat added immediately
+3. **Sender Notified** → WebSocket contact_accepted event → Sender receives data from event
+4. **Deduplication** → shownRequestIds prevents modal showing multiple times in same session
+5. **REST Fallback** → GET /contacts/requests?direction=both always available for sync
+
+### Architecture Principle: REST + WebSocket Split
+
+- **REST**: Source of truth, guaranteed delivery, handles all critical operations
+- **WebSocket**: Real-time triggers for UI, best-effort, optional for UX (can miss and still recover via REST)
+- **No reloadChats()**: Chat added directly from REST response, no full list reload needed
+- **Modal dedup**: Uses session-based shownRequestIds (can be upgraded to VIEWED status in DB later)
+
+### Performance Optimizations
+
+- Contact Requests: No polling, REST/WebSocket hybrid
+- Notifications: Atomic counters, sorted set for efficiency
+- Multi-device: Room-based broadcasting (no per-user iteration)
+- Offline: Full sync on reconnection via REST
+- TTL: 30-day auto-cleanup in Redis
+
+---
+
+_Last Updated: February 25, 2026_

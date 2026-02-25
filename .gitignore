@@ -64,7 +64,6 @@ mcp*.*
 *.tsbuildinfo
 tests/*
 .kilocode/
-plans/
 cert.crt
 cert.key
 ca.crt

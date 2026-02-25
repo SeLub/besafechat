@@ -330,10 +330,6 @@ function ChatRouteContent() {
         if (isMobile) {
           setCurrentView('chat');
         }
-
-        // Reload chats from backend in the background to ensure consistency
-        // Do NOT await this - let it happen asynchronously
-        reloadChats().catch(err => console.error('Error reloading chats:', err));
       } else {
         toast.error('Failed to accept request');
       }
@@ -407,14 +403,11 @@ function ChatRouteContent() {
         if (isMobile) {
           setCurrentView('chat');
         }
-
-        // Reload chats in background for consistency
-        reloadChats().catch(err => console.error('Error reloading chats:', err));
       } catch (error) {
         console.error('❌ Error handling chat accepted:', error);
       }
     },
-    [addChat, isMobile, reloadChats]
+    [addChat, isMobile]
   );
 
   // Callback for incoming contact request
