@@ -119,10 +119,6 @@ export async function deriveKeyPairFromSeed(seedWords: string[]): Promise<KeyPai
   const privateKey = rawPrivateKeyToPkcs8(rawPrivateKey);
   const publicKeyBase64 = uint8ToBase64(publicKey);
 
-  // 🔥 ОЧИСТКА
-  secureWipe(rawPrivateKey);
-  secureWipe(seedBytes);
-
   return {
     privateKey,
     publicKey,
