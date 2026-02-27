@@ -1,4 +1,5 @@
-import * as ed from "@noble/ed25519";
+// /home/selub/Documents/progs/besafechat/frontend/app/lib/crypto/core/signatures.ts
+import * as ed from '@noble/ed25519';
 import { pkcs8ToRawPrivateKey } from '../utils/serialization';
 import { uint8ToBase64, base64ToUint8 } from '../utils/binary';
 
@@ -10,7 +11,7 @@ export async function signMessage(
   message: string | Uint8Array
 ): Promise<Uint8Array> {
   let rawPrivateKey: Uint8Array;
-  
+
   // Detect format: PKCS#8 is 48 bytes, raw is 32 bytes
   if (privateKey.length === 48) {
     rawPrivateKey = pkcs8ToRawPrivateKey(privateKey);
@@ -19,11 +20,9 @@ export async function signMessage(
   } else {
     throw new Error(`Invalid private key length: ${privateKey.length}`);
   }
-  
-  const messageBytes = typeof message === 'string' 
-    ? new TextEncoder().encode(message)
-    : message;
-  
+
+  const messageBytes = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+
   return await ed.sign(messageBytes, rawPrivateKey);
 }
 
@@ -35,10 +34,8 @@ export async function verifySignature(
   message: string | Uint8Array,
   signature: Uint8Array
 ): Promise<boolean> {
-  const messageBytes = typeof message === 'string'
-    ? new TextEncoder().encode(message)
-    : message;
-  
+  const messageBytes = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+
   return await ed.verify(signature, messageBytes, publicKey);
 }
 
@@ -98,7 +95,7 @@ export async function verifyMultipleSignatures(
   }>
 ): Promise<boolean[]> {
   const results = await Promise.all(
-    verifications.map(async (v) => {
+    verifications.map(async v => {
       try {
         return await verifySignature(v.publicKey, v.message, v.signature);
       } catch (error) {
@@ -107,6 +104,6 @@ export async function verifyMultipleSignatures(
       }
     })
   );
-  
+
   return results;
 }

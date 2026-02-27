@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/lib/crypto/core/encryption.ts
 import { 
   toArrayBuffer, 
   generateSalt, 

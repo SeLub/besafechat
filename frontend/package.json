@@ -17,6 +17,7 @@
     "test:phase5": "vitest run phase5-encryption-validation.spec.ts"
   },
   "dependencies": {
+    "@noble/curves": "^2.0.1",
     "@noble/ed25519": "^3.0.0",
     "@noble/hashes": "^2.0.1",
     "@radix-ui/react-dialog": "^1.1.15",

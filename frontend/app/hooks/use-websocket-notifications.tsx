@@ -5,22 +5,39 @@ import { useAuth } from './use-auth-context';
 import { useContactRequests } from './use-contact-requests';
 import { API_ENDPOINTS } from '@/services/api-gateway';
 
+interface ContactRequestData {
+  requestId: string;
+  fromHandle: {
+    id: string;
+    value: string;
+    alias: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+  message?: string;
+}
+
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
+  onContactRequest?: (request: ContactRequestData) => void,
   onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void,
   onNewChatAvailable?: (data: { fromHandle: any; chatId?: string }) => void
 ) {
   const { user } = useAuth();
-  const { incrementAccepted } = useContactRequests();
+  const { incrementAccepted, incrementPending } = useContactRequests();
 
   const callbacksRef = useRef({
     onChatCreated,
     onMessageReceived,
     onUserOnline,
     onUserOffline,
+    onContactRequest,
     onOnlineStatusChange,
     onNewChatAvailable,
   });
@@ -31,6 +48,7 @@ export function useWebSocketNotifications(
       onMessageReceived,
       onUserOnline,
       onUserOffline,
+      onContactRequest,
       onOnlineStatusChange,
       onNewChatAvailable,
     };
@@ -50,13 +68,31 @@ export function useWebSocketNotifications(
     // Store socket globally for message sending
     window.socketInstance = socket;
 
-    // Contact request received - toast notification only
-    // Actual modal handling is in use-contact-requests-sync
+    // Contact request received - show modal and toast
     socket.on('contact_request_received', data => {
-      const { fromHandle } = data;
+      console.log('🔔 contact_request_received - showing modal:', data);
+      const { requestId, fromHandle, message } = data;
+
+      // Show modal through callback
+      callbacksRef.current.onContactRequest?.({
+        requestId,
+        fromHandle: {
+          id: fromHandle.id,
+          value: fromHandle.value || fromHandle.handle,
+          alias: fromHandle.alias || null,
+          displayName: fromHandle.displayName,
+          firstName: fromHandle.firstName || null,
+          lastName: fromHandle.lastName || null,
+          avatarUrl: fromHandle.avatarUrl || null,
+          bio: fromHandle.bio || null,
+        },
+        message,
+      });
+
       const displayName = fromHandle?.displayName || `@${fromHandle?.value}` || 'Someone';
-      console.log('🔔 contact_request_received - toast feedback:', data);
       toast.info(`New contact request from ${displayName}`);
+
+      incrementPending();
     });
 
     // Contact accepted - WebSocket trigger (real-time notification)
@@ -153,5 +189,5 @@ export function useWebSocketNotifications(
       socket.disconnect();
       window.socketInstance = null;
     };
-  }, [user, incrementAccepted]);
+  }, [user, incrementAccepted, incrementPending]);
 }

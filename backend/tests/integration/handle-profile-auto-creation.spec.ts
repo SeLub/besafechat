@@ -3,7 +3,7 @@ jest.mock('uuid', () => ({
   v4: jest.fn(() => 'mocked-uuid'),
 }));
 
-import { beforeAll, describe, expect, it, afterAll } from '@jest/globals';
+import { beforeAll, describe, expect, it, afterAll, jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';

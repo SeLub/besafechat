@@ -1,4 +1,4 @@
-import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
+// /home/selub/Documents/progs/besafechat/frontend/app/lib/crypto/core/key-derivation.ts
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
@@ -14,6 +14,8 @@ import {
 } from '../utils/binary';
 import { rawPrivateKeyToPkcs8 } from '../utils/serialization';
 import type { KeyPair, EncryptedSeedData, Argon2Params } from '../types';
+import { secureWipe } from './secure-wipe';
+import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
 
 // Configure @noble/ed25519
 // eslint-disable-next-line no-import-assign
@@ -116,6 +118,10 @@ export async function deriveKeyPairFromSeed(seedWords: string[]): Promise<KeyPai
   // Convert to PKCS#8 format for Web Crypto API
   const privateKey = rawPrivateKeyToPkcs8(rawPrivateKey);
   const publicKeyBase64 = uint8ToBase64(publicKey);
+
+  // 🔥 ОЧИСТКА
+  secureWipe(rawPrivateKey);
+  secureWipe(seedBytes);
 
   return {
     privateKey,

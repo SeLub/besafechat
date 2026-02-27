@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/lib/crypto/utils/validation.ts
 import { validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import type { PasswordValidationResult, SeedValidationResult } from '../types';

@@ -433,6 +433,7 @@ function ChatRouteContent() {
     handleMessageReceived,
     handleUserOnline,
     handleUserOffline,
+    handleContactRequest,
     handleOnlineStatusChange,
     handleNewChatAvailable
   );
