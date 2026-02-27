@@ -92,4 +92,15 @@ export class DeviceService {
     if (/windows|linux|macintosh/.test(ua)) return 'desktop';
     return 'web';
   }
+
+  /**
+   * Get full user-agent string for session device name
+   * Used consistently across all session creation
+   */
+  static getUserAgent(): string {
+    if (typeof navigator !== 'undefined') {
+      return navigator.userAgent;
+    }
+    return 'Unknown Device';
+  }
 }

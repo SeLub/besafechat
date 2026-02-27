@@ -320,7 +320,7 @@ export class IdentityService {
       const sessionResult = await queryRunner.manager.update(
         Session,
         { identityId },
-        { revoked: true, isActive: false }
+        { revoked: true }
       );
       this.logger.log(`[Soft Delete] Revoked ${sessionResult.affected} session records`);
 

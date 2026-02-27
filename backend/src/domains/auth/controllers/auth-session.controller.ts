@@ -125,6 +125,7 @@ export class AuthSessionController {
 
     const { publicKey, deviceId, deviceName } = body;
     const ipAddress = req.ip || 'unknown';
+    const userAgent = (req as any).headers?.['user-agent'] || deviceName || 'Unknown device';
 
     if (!publicKey || !deviceId || !deviceName) {
       throw new BadRequestException('publicKey, deviceId, and deviceName are required');
@@ -135,10 +136,10 @@ export class AuthSessionController {
     // Perform login - this will create session if identity exists or create new one if first login
     const result = await this.authService.loginWithPublicKey(
       publicKey,
-      deviceName,
+      userAgent, // Use user-agent from headers if available, fallback to deviceName
       undefined, // deviceType
       ipAddress,
-      undefined // userAgent - will be obtained from the actual request object
+      userAgent
     );
 
     // Set HttpOnly cookies for security
@@ -192,6 +193,7 @@ export class AuthSessionController {
   ) {
     const { challengeId, publicKey, signature, deviceName } = validateChallengeDto;
     const ipAddress = req.ip || 'unknown';
+    const userAgent = (req as any).headers?.['user-agent'] || 'Unknown device';
 
     // Validate the challenge-response
     const isValid = await this.challengeService.validateChallenge(
@@ -208,10 +210,10 @@ export class AuthSessionController {
     // Perform login - this will create session if identity exists or create new one if first login
     const result = await this.authService.loginWithPublicKey(
       publicKey,
-      deviceName || 'Unknown device',
+      userAgent, // Use user-agent from headers instead of body
       undefined, // deviceType
       ipAddress,
-      undefined // userAgent - will be obtained from the actual request object
+      userAgent
     );
 
     // Set HttpOnly cookies for security
@@ -347,6 +349,84 @@ export class AuthSessionController {
       sessionId: result.session.id,
       activeHandleId: result.session.activeHandleId,
       message: 'New session created successfully',
+    });
+  }
+
+  @Post('sessions/switch-handle/:handleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Switch to different handle (reuse existing session or create new)',
+    description: `
+      ✅ Логика переключения:
+      1. Ищет существующую сессию для этого handle
+      2. Если найдена → переиспользует её (выдаёт новые токены)
+      3. Если не найдена → создаёт новую сессию
+      
+      Результат: новые cookies с tokens для целевого handle
+    `
+  })
+  @ApiCookieAuth()
+  @ApiParam({
+    name: 'handleId',
+    description: 'Handle ID to switch to',
+    type: String,
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Switched to handle successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            sessionId: { type: 'string' },
+            handleId: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid handle' })
+  @UseGuards(JwtSessionGuard)
+  async switchToHandle(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('handleId') handleId: string,
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: ResponseWithCookies
+  ) {
+    if (!handleId) {
+      throw new BadRequestException('Handle ID is required');
+    }
+
+    // Verify handle belongs to this identity
+    const handle = await this.sessionService.getHandleById(handleId);
+    if (!handle || handle.ownerIdentityId !== user.identityId) {
+      throw new BadRequestException('Handle not found or does not belong to this identity');
+    }
+
+    const ipAddress = req.ip || 'unknown';
+    const userAgent = (req as any).headers?.['user-agent'] || 'Unknown device';
+    const deviceName = userAgent.substring(0, 100);
+
+    // ✅ Переключение: переиспользование или создание новой сессии
+    const result = await this.sessionService.switchToHandle(
+      user.identityId,
+      handleId,
+      deviceName,
+      ipAddress
+    );
+
+    // Выдать новые cookies
+    this.setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+
+    return new ApiResponseDto(true, {
+      sessionId: result.session.id,
+      handleId: result.session.activeHandleId,
+      message: 'Switched to handle successfully',
     });
   }
 

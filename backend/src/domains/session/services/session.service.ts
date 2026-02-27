@@ -34,7 +34,7 @@ export class SessionService {
     });
 
     if (activeSessions >= 50) {
-      throw new UnauthorizedException('Maximum number of active sessions reached (5)');
+      throw new UnauthorizedException('Maximum number of active sessions reached (50)');
     }
 
     // Если activeHandleId не указан, найти primary handle
@@ -72,7 +72,6 @@ export class SessionService {
       refreshToken,
       expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 дней
       lastActiveAt: now,
-      isActive: true,
       revoked: false,
     });
 
@@ -92,6 +91,70 @@ export class SessionService {
       session: savedSession,
       tokens: { accessToken, refreshToken },
     };
+  }
+
+  /**
+   * ✅ Переключение handle или переиспользование существующей сессии
+   * 
+   * Логика:
+   * 1. SELECT сессию WHERE identityId=X AND handleId=B AND revoked=false
+   * 2. Если найдена → переиспользуем её (выдаём новые токены)
+   * 3. Если не найдена → CREATE новую сессию
+   */
+  async switchToHandle(
+    identityId: string,
+    handleId: string,
+    deviceName: string,
+    ipAddress?: string
+  ) {
+    console.log('[Session Service] switchToHandle called:', {
+      identityId,
+      handleId,
+      deviceName,
+    });
+
+    // 1. Ищем существующую сессию для этого handle
+    let session = await this.sessionRepository.findOne({
+      where: {
+        identityId,
+        activeHandleId: handleId,
+        revoked: false,
+      },
+      relations: ['identity', 'activeHandle'],
+    });
+
+    if (session) {
+      // 2a. Сессия найдена → переиспользуем её (выдаём новые токены)
+      console.log(`✅ Reusing existing session ${session.id} for handle ${handleId}`);
+      
+      const newAccessToken = randomBytes(32).toString('hex');
+      const newRefreshToken = randomBytes(64).toString('hex');
+      const now = new Date();
+
+      session.accessTokenHash = this.hashToken(newAccessToken);
+      session.refreshToken = newRefreshToken;
+      session.lastActiveAt = now;
+      if (ipAddress) session.ipAddress = ipAddress;
+
+      await this.sessionRepository.save(session);
+
+      return {
+        session,
+        tokens: { accessToken: newAccessToken, refreshToken: newRefreshToken },
+      };
+    } else {
+      // 2b. Сессия не найдена → CREATE новую
+      console.log(`📝 Creating new session for handle ${handleId}`);
+      
+      return this.createSession(
+        identityId,
+        deviceName,
+        undefined,
+        ipAddress,
+        undefined,
+        handleId
+      );
+    }
   }
 
   async revokeSession(identityId: string, sessionId: string) {
@@ -236,5 +299,9 @@ export class SessionService {
 
   async saveSession(session: Session): Promise<Session> {
     return this.sessionRepository.save(session);
+  }
+
+  async getHandleById(handleId: string) {
+    return this.handleService.findById(handleId);
   }
 }

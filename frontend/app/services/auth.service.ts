@@ -3,6 +3,7 @@ import type { ApiResponse, LoginCredentials, LoginResponse, ProfileResponse } fr
 import type { RefreshTokenResponse, Session } from '@/types/account';
 import type { FullProfile } from '~/types/profile';
 import { UserService } from './user.service';
+import { DeviceService } from './device.service';
 import { API_CONFIG } from './api-config';
 
 /**
@@ -16,10 +17,8 @@ export class AuthService {
    */
   static async login(credentials: LoginCredentials): Promise<LoginResponse> {
     const finalDeviceId = credentials.deviceId || `web-browser-${Date.now()}`;
-    // Generate deviceName from available browser info if not provided
-    const deviceName =
-      credentials.deviceName ||
-      (typeof navigator !== 'undefined' ? `${navigator.platform || 'Web'} Device` : 'Web Device');
+    // Generate deviceName from user-agent if not provided
+    const deviceName = credentials.deviceName || DeviceService.getUserAgent();
 
     // First, request a challenge from the server
     const challengeRes = await fetch(`${this.API_BASE}/auth/login/challenge`, {
@@ -226,12 +225,19 @@ export class AuthService {
   }
 
   /**
-   * Переключение на другой handle (создание новой сессии)
+   * ✅ Переключение на другой handle
+   * 
+   * Логика:
+   * 1. Ищет существующую сессию для этого handle
+   * 2. Если найдена → переиспользует её (выдаёт новые токены)
+   * 3. Если не найдена → создаёт новую сессию
+   * 4. Выдаёт новые cookies
+   * 5. WebSocket переподключается автоматически
    */
   static async switchToHandle(
     handleId: string
-  ): Promise<{ sessionId: string; activeHandleId: string }> {
-    const res = await fetch(`${this.API_BASE}/auth/sessions/create-with-handle/${handleId}`, {
+  ): Promise<{ sessionId: string; handleId: string }> {
+    const res = await fetch(`${this.API_BASE}/auth/sessions/switch-handle/${handleId}`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -241,7 +247,7 @@ export class AuthService {
       throw new Error(`Failed to switch handle: ${error}`);
     }
 
-    const data: ApiResponse<{ sessionId: string; activeHandleId: string; message: string }> =
+    const data: ApiResponse<{ sessionId: string; handleId: string; message: string }> =
       await res.json();
     if (!data.success) {
       throw new Error(data.error || 'Failed to switch handle');
@@ -253,7 +259,7 @@ export class AuthService {
 
     return {
       sessionId: data.data.sessionId,
-      activeHandleId: data.data.activeHandleId,
+      handleId: data.data.handleId,
     };
   }
 

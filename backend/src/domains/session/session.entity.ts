@@ -13,8 +13,8 @@ import { Identity } from '../identity/identity.entity';
 import { Handle } from '../handle/handle.entity';
 
 @Entity('sessions')
-@Index('idx_sessions_identity', ['identityId', 'isActive'])
-@Index('idx_sessions_last_active', ['lastActiveAt'], { where: '"isActive" = true' })
+@Index('idx_sessions_identity_handle', ['identityId', 'activeHandleId'])
+@Index('idx_sessions_last_active', ['lastActiveAt'])
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -29,13 +29,13 @@ export class Session {
   @Column({ type: 'uuid' })
   identityId!: string;
 
-  // Активный Handle для этой сессии
-  @ManyToOne(() => Handle, { nullable: true })
+  // ✅ Активный Handle для этой сессии
+  @ManyToOne(() => Handle, { nullable: false })
   @JoinColumn({ name: 'activeHandleId' })
-  activeHandle?: Handle;
+  activeHandle!: Handle;
 
-  @Column({ type: 'uuid', nullable: true })
-  activeHandleId?: string;
+  @Column({ type: 'uuid' })
+  activeHandleId!: string;
 
   // Информация об устройстве
   @Column({ type: 'varchar', length: 100 })
@@ -62,9 +62,6 @@ export class Session {
 
   @Column({ type: 'timestamptz' })
   expiresAt!: Date;
-
-  @Column({ type: 'boolean', default: true })
-  isActive!: boolean;
 
   @Column({ type: 'boolean', default: false })
   revoked!: boolean;
