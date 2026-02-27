@@ -1,31 +1,15 @@
+import { API_ENDPOINTS } from '@/services/api-gateway';
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth-context';
 import { useContactRequests } from './use-contact-requests';
-import { API_ENDPOINTS } from '@/services/api-gateway';
-
-interface ContactRequestData {
-  requestId: string;
-  fromHandle: {
-    id: string;
-    value: string;
-    alias: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  message?: string;
-}
 
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
   onMessageReceived?: (message: any) => void,
   onUserOnline?: (handleId: string) => void,
   onUserOffline?: (handleId: string) => void,
-  onContactRequest?: (request: ContactRequestData) => void,
   onOnlineStatusChange?: (handleId: string, isOnline: boolean) => void,
   onNewChatAvailable?: (data: { fromHandle: any; chatId?: string }) => void
 ) {
@@ -37,7 +21,6 @@ export function useWebSocketNotifications(
     onMessageReceived,
     onUserOnline,
     onUserOffline,
-    onContactRequest,
     onOnlineStatusChange,
     onNewChatAvailable,
   });
@@ -48,7 +31,6 @@ export function useWebSocketNotifications(
       onMessageReceived,
       onUserOnline,
       onUserOffline,
-      onContactRequest,
       onOnlineStatusChange,
       onNewChatAvailable,
     };
@@ -69,31 +51,31 @@ export function useWebSocketNotifications(
     window.socketInstance = socket;
 
     // Contact request received - show modal and toast
-    socket.on('contact_request_received', data => {
-      console.log('🔔 contact_request_received - showing modal:', data);
-      const { requestId, fromHandle, message } = data;
+    // socket.on('contact_request_received', data => {
+    //   console.log('🔔 contact_request_received - showing modal:', data);
+    //   const { requestId, fromHandle, message } = data;
 
-      // Show modal through callback
-      callbacksRef.current.onContactRequest?.({
-        requestId,
-        fromHandle: {
-          id: fromHandle.id,
-          value: fromHandle.value || fromHandle.handle,
-          alias: fromHandle.alias || null,
-          displayName: fromHandle.displayName,
-          firstName: fromHandle.firstName || null,
-          lastName: fromHandle.lastName || null,
-          avatarUrl: fromHandle.avatarUrl || null,
-          bio: fromHandle.bio || null,
-        },
-        message,
-      });
+    //   // Show modal through callback
+    //   // callbacksRef.current.onContactRequest?.({
+    //   //   requestId,
+    //   //   fromHandle: {
+    //   //     id: fromHandle.id,
+    //   //     value: fromHandle.value || fromHandle.handle,
+    //   //     alias: fromHandle.alias || null,
+    //   //     displayName: fromHandle.displayName,
+    //   //     firstName: fromHandle.firstName || null,
+    //   //     lastName: fromHandle.lastName || null,
+    //   //     avatarUrl: fromHandle.avatarUrl || null,
+    //   //     bio: fromHandle.bio || null,
+    //   //   },
+    //   //   message,
+    //   // });
 
-      const displayName = fromHandle?.displayName || `@${fromHandle?.value}` || 'Someone';
-      toast.info(`New contact request from ${displayName}`);
+    //   const displayName = fromHandle?.displayName || `@${fromHandle?.value}` || 'Someone';
+    //   toast.info(`New contact request from ${displayName}`);
 
-      incrementPending();
-    });
+    //   incrementPending();
+    // });
 
     // Contact accepted - WebSocket trigger (real-time notification)
     // WebSocket is trigger only; actual chat loading handled in use-contact-requests-sync
