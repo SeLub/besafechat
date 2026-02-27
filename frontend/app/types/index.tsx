@@ -8,6 +8,7 @@ export type {
   Language,
   RetentionPeriod,
   Mode,
+  ContactRequest,
 } from './api';
 
 export type { RefreshTokenResponse, Session, UpdateDisplayNameRequest } from './account';

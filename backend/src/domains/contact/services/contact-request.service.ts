@@ -27,7 +27,10 @@ export class ContactRequestService {
   async sendRequest(fromHandleId: string, toHandleId: string, message?: string) {
     // Check if handles exist
     const [fromHandle, toHandle] = await Promise.all([
-      this.handleRepository.findOne({ where: { id: fromHandleId }, relations: ['ownerIdentity', 'profile'] }),
+      this.handleRepository.findOne({
+        where: { id: fromHandleId },
+        relations: ['ownerIdentity', 'profile'],
+      }),
       this.handleRepository.findOne({ where: { id: toHandleId }, relations: ['ownerIdentity'] }),
     ]);
 
@@ -75,6 +78,43 @@ export class ContactRequestService {
     return savedRequest;
   }
 
+  async getRequests(handleId: string, direction: 'incoming' | 'outgoing' | 'both' = 'both') {
+    const relations = ['fromHandle', 'fromHandle.ownerIdentity', 'fromHandle.profile', 'toHandle'];
+    const orderBy = { createdAt: 'DESC' as const };
+
+    if (direction === 'incoming') {
+      return await this.contactRequestRepository.find({
+        where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
+        relations,
+        order: orderBy,
+      });
+    }
+
+    if (direction === 'outgoing') {
+      return await this.contactRequestRepository.find({
+        where: { fromHandleId: handleId, status: ContactRequestStatus.PENDING },
+        relations,
+        order: orderBy,
+      });
+    }
+
+    // direction === 'both'
+    const [incoming, outgoing] = await Promise.all([
+      this.contactRequestRepository.find({
+        where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
+        relations,
+        order: orderBy,
+      }),
+      this.contactRequestRepository.find({
+        where: { fromHandleId: handleId, status: ContactRequestStatus.PENDING },
+        relations,
+        order: orderBy,
+      }),
+    ]);
+
+    return { incoming, outgoing };
+  }
+
   async getIncomingRequests(handleId: string) {
     return await this.contactRequestRepository.find({
       where: { toHandleId: handleId, status: ContactRequestStatus.PENDING },
@@ -116,21 +156,38 @@ export class ContactRequestService {
       request.toHandleId
     );
 
-    // Send WebSocket notification to request sender (they now have a chat available with accepter)
-    await this.messagesGateway.notifyRequestAccepted(
-      request.fromHandleId, // Use handle ID instead of identity ID
-      request.toHandle,
+    // Notify sender: their request was accepted and chat is ready
+    // Single unified event replaces old contact_request_accepted + new_chat_available
+    await this.messagesGateway.notifyContactAccepted(
+      request.fromHandleId, // Notify the sender (who sent the request)
+      request.toHandle, // Data about the accepter
       chat.id
     );
 
-    // Also notify the user who accepted the request that a new chat is available
+    // Notify accepter: new chat is available with the request sender
     await this.messagesGateway.notifyNewChatAvailable(
       request.toHandleId, // Notify the accepter
-      request.fromHandle,
+      request.fromHandle, // Data about the sender
       chat.id
     );
 
-    return { success: true, chatId: chat.id };
+    // Get avatar URL for the sender
+    const fromHandleAvatarUrl = await this.mediaService.getAvatarUrlIfExists(request.fromHandle.id);
+
+    return {
+      success: true,
+      chatId: chat.id,
+      fromHandle: {
+        id: request.fromHandle.id,
+        value: request.fromHandle.value,
+        displayName: request.fromHandle.profile?.displayName,
+        firstName: request.fromHandle.profile?.firstName,
+        lastName: request.fromHandle.profile?.lastName,
+        avatarUrl: fromHandleAvatarUrl,
+        bio: request.fromHandle.profile?.bio,
+        alias: request.fromHandle.alias,
+      },
+    };
   }
 
   async rejectRequest(requestId: string, handleId: string) {
@@ -205,7 +262,8 @@ export class ContactRequestService {
     return Promise.all(
       requests.map(async (request) => {
         // Get the other user (not the current user)
-        const otherHandle = request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
+        const otherHandle =
+          request.fromHandleId === handleId ? request.toHandle : request.fromHandle;
         const avatarUrl = await this.mediaService.getAvatarUrlIfExists(otherHandle.id);
 
         return {

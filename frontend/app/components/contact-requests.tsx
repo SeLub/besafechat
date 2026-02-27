@@ -4,25 +4,9 @@ import { Check, Clock, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/services/api-gateway';
+import { handleApiResponse } from '@/services/api-utils';
 import { ResponsiveModal } from './ui/responsive-modal';
-interface ContactRequest {
-  id: string;
-  from: {
-    handleId: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
+import { type ContactRequest } from '@/types/api';
 
 interface ContactRequestsProps {
   isOpen: boolean;
@@ -43,25 +27,15 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const [incomingRes, outgoingRes] = await Promise.all([
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_INCOMING, {
-          credentials: 'include',
-        }),
-        fetch(API_ENDPOINTS.CONTACTS.REQUESTS_OUTGOING, {
-          credentials: 'include',
-        }),
-      ]);
+      const res = await fetch(API_ENDPOINTS.CONTACTS.REQUESTS('both'), {
+        credentials: 'include',
+      });
 
-      if (incomingRes.ok) {
-        const incomingData = await incomingRes.json();
-        setIncomingRequests(incomingData.requests || []);
-      }
-
-      if (outgoingRes.ok) {
-        const outgoingData = await outgoingRes.json();
-        setOutgoingRequests(outgoingData.requests || []);
-      }
-    } catch {
+      const data = await handleApiResponse<any>(res);
+      setIncomingRequests(data.incoming || []);
+      setOutgoingRequests(data.outgoing || []);
+    } catch (error) {
+      console.error('Failed to load requests:', error);
       toast.error('Failed to load requests');
     } finally {
       setLoading(false);
@@ -76,14 +50,12 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request accepted');
-        loadRequests();
-        // TODO: Handle chat creation when backend implements it
-      } else {
-        toast.error('Failed to accept request');
-      }
-    } catch {
+      await handleApiResponse<any>(res);
+      toast.success('Request accepted');
+      loadRequests();
+      // TODO: Handle chat creation when backend implements it
+    } catch (error) {
+      console.error('Error accepting request:', error);
       toast.error('Failed to accept request');
     } finally {
       setActionLoading(null);
@@ -98,13 +70,11 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
         credentials: 'include',
       });
 
-      if (res.ok) {
-        toast.success('Request rejected');
-        loadRequests();
-      } else {
-        toast.error('Failed to reject request');
-      }
-    } catch {
+      await handleApiResponse<any>(res);
+      toast.success('Request rejected');
+      loadRequests();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
       toast.error('Failed to reject request');
     } finally {
       setActionLoading(null);
@@ -149,19 +119,21 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
       <div className="flex border-b border-border -mx-6 px-6 mb-4">
         <button
           onClick={() => setActiveTab('incoming')}
-          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'incoming'
+          className={`flex-1 p-3 text-sm font-medium ${
+            activeTab === 'incoming'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-            }`}
+          }`}
         >
           Incoming ({incomingRequests.length})
         </button>
         <button
           onClick={() => setActiveTab('outgoing')}
-          className={`flex-1 p-3 text-sm font-medium ${activeTab === 'outgoing'
+          className={`flex-1 p-3 text-sm font-medium ${
+            activeTab === 'outgoing'
               ? 'text-primary border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
-            }`}
+          }`}
         >
           Sent ({outgoingRequests.length})
         </button>
@@ -254,12 +226,13 @@ export function ContactRequests({ isOpen, onClose }: ContactRequestsProps) {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div
-                            className={`text-xs px-2 py-1 rounded-full ${request.status === 'pending'
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              request.status === 'pending'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : request.status === 'accepted'
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
-                              }`}
+                            }`}
                           >
                             {request.status === 'pending' && (
                               <Clock className="h-3 w-3 inline mr-1" />

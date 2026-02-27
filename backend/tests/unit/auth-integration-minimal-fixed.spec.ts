@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { AuthService } from '../../src/domains/auth/services/auth.service';
 import { ChallengeService } from '../../src/domains/auth/services/challenge.service';
+import { Chat } from '../../src/domains/chat/chat.entity';
 import { Handle } from '../../src/domains/handle/handle.entity';
 import { HandleService } from '../../src/domains/handle/services/handle.service';
 import { Identity } from '../../src/domains/identity/identity.entity';
@@ -97,10 +98,15 @@ describe('Auth Integration Minimal Tests', () => {
           },
         },
         {
+          provide: getRepositoryToken(Chat),
+          useClass: Repository,
+        },
+        {
           provide: DataSource,
           useValue: {
             transaction: jest.fn(),
             getRepository: jest.fn(), // Add this to make it more realistic
+            createQueryRunner: jest.fn(),
           },
         },
       ],

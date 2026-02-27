@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -77,6 +78,90 @@ export class ContactRequestController {
       requestId: request.id,
       message: 'Contact request sent successfully',
     };
+  }
+
+  @Get('requests')
+  @ApiOperation({
+    summary: 'Get contact requests',
+    description:
+      'Retrieves contact requests (incoming, outgoing, or both) for the current user. Direction can be filtered via query parameter.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved contact requests',
+    schema: {
+      type: 'object',
+      properties: {
+        incoming: {
+          type: 'array',
+          description: 'Incoming contact requests (when direction=incoming or both)',
+        },
+        outgoing: {
+          type: 'array',
+          description: 'Outgoing contact requests (when direction=outgoing or both)',
+        },
+        requests: {
+          type: 'array',
+          description: 'Single array of requests (when direction is incoming or outgoing)',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
+  async getRequests(
+    @CurrentHandle() handle: any,
+    @Query('direction') direction?: 'incoming' | 'outgoing' | 'both'
+  ) {
+    const result = await this.contactRequestService.getRequests(
+      handle.id,
+      direction || 'both'
+    );
+
+    // If both direction or not specified, return both arrays
+    if (direction === 'both' || !direction) {
+      const incoming = await this.formatRequests((result as any).incoming);
+      const outgoing = await this.formatRequests((result as any).outgoing);
+      return {
+        success: true,
+        data: { incoming, outgoing },
+      };
+    }
+
+    // If single direction, return as requests array
+    const requests = await this.formatRequests(result as any);
+    return {
+      success: true,
+      data: { requests },
+    };
+  }
+
+  private async formatRequests(requestList: any[]): Promise<any[]> {
+    return Promise.all(
+      requestList.map(async (request) => {
+        const avatarUrl = request.fromHandle?.id
+          ? await this.mediaService.getAvatarUrlIfExists(request.fromHandle.id)
+          : null;
+
+        return {
+          id: request.id,
+          from: {
+            handleId: request.fromHandle?.id || '',
+            value: request.fromHandle?.value || '',
+            displayName: request.fromHandle?.profile?.displayName || '',
+            firstName: request.fromHandle?.profile?.firstName || null,
+            lastName: request.fromHandle?.profile?.lastName || null,
+            avatarUrl,
+            bio: request.fromHandle?.profile?.bio || null,
+          },
+          to: {
+            handleId: request.toHandle?.id || '',
+          },
+          message: request.message,
+          status: request.status,
+          createdAt: request.createdAt,
+        };
+      })
+    );
   }
 
   @Get('requests/incoming')
@@ -350,6 +435,9 @@ export class ContactRequestController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized - invalid or missing access token' })
   async getContacts(@CurrentHandle() handle: any) {
     const contacts = await this.contactRequestService.getAcceptedContacts(handle.id);
-    return { contacts };
+    return {
+      success: true,
+      data: { contacts },
+    };
   }
 }

@@ -1,26 +1,7 @@
 // /home/selub/Documents/progs/besafechat/frontend/app/hooks/contact-requests-store-context.tsx
 import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
-
-interface ContactRequest {
-  id: string;
-  from: {
-    id: string;
-    value: string;
-    displayName: string;
-    firstName: string | null;
-    lastName: string | null;
-    avatarUrl: string | null;
-    bio: string | null;
-    alias?: string;
-  };
-  to: {
-    handleId: string;
-  };
-  message?: string;
-  status?: string;
-  createdAt: string;
-}
+import { type ContactRequest } from '@/types/api';
 
 interface Contact {
   id: string;
@@ -37,15 +18,12 @@ interface Contact {
 }
 
 interface ContactRequestsStoreContextType {
+  [x: string]: any;
   contacts: Contact[];
-  incomingRequests: ContactRequest[];
   outgoingRequests: ContactRequest[];
   setContacts: (contacts: Contact[]) => void;
-  setIncomingRequests: (requests: ContactRequest[]) => void;
   setOutgoingRequests: (requests: ContactRequest[]) => void;
-  addIncomingRequest: (request: ContactRequest) => void;
   addContact: (contact: Contact) => void;
-  removeIncomingRequest: (requestId: string) => void;
   removeOutgoingRequest: (requestId: string) => void;
   removeContact: (contactId: string) => void;
 }
@@ -56,18 +34,7 @@ const ContactRequestsStoreContext = createContext<ContactRequestsStoreContextTyp
 
 export function ContactRequestsStoreProvider({ children }: { children: ReactNode }) {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([]);
-
-  const addIncomingRequest = useCallback((request: ContactRequest) => {
-    setIncomingRequests(prev => {
-      // Check if request already exists
-      if (prev.some(r => r.id === request.id)) {
-        return prev;
-      }
-      return [request, ...prev];
-    });
-  }, []);
 
   const addContact = useCallback((contact: Contact) => {
     setContacts(prev => {
@@ -76,10 +43,6 @@ export function ContactRequestsStoreProvider({ children }: { children: ReactNode
       }
       return [contact, ...prev];
     });
-  }, []);
-
-  const removeIncomingRequest = useCallback((requestId: string) => {
-    setIncomingRequests(prev => prev.filter(r => r.id !== requestId));
   }, []);
 
   const removeOutgoingRequest = useCallback((requestId: string) => {
@@ -94,14 +57,10 @@ export function ContactRequestsStoreProvider({ children }: { children: ReactNode
     <ContactRequestsStoreContext.Provider
       value={{
         contacts,
-        incomingRequests,
         outgoingRequests,
         setContacts,
-        setIncomingRequests,
         setOutgoingRequests,
-        addIncomingRequest,
         addContact,
-        removeIncomingRequest,
         removeOutgoingRequest,
         removeContact,
       }}

@@ -1,17 +1,29 @@
-// Core cryptography module exports
-// This file re-exports all core crypto functionality for convenience
+/**
+ * Core cryptography primitives
+ *
+ * This module exports low-level cryptographic operations.
+ * All functions use Web Crypto API where possible.
+ *
+ * ⚠️ These are building blocks - use the high-level API from ../index.ts
+ * for application logic.
+ */
 
+// ─────────────────────────────────────────────────────────────
+// Existing modules (re-export)
+// ─────────────────────────────────────────────────────────────
 export * from './key-derivation';
 export * from './encryption';
 export * from './signatures';
 
-// Common type re-exports
-export type {
-  KeyPair,
-  EncryptedData,
-  EncryptedSeedData,
-  PasswordValidationResult,
-  SeedValidationResult,
-  DerivationOptions,
-  Argon2Params
-} from '../types';
+// ─────────────────────────────────────────────────────────────
+// New E2EE primitives
+// ─────────────────────────────────────────────────────────────
+export * from './hkdf';
+export * from './ecdh';
+export * from './x3dh';
+export * from './recording-keys';
+
+// ─────────────────────────────────────────────────────────────
+// Security utilities
+// ─────────────────────────────────────────────────────────────
+export * from './secure-wipe';

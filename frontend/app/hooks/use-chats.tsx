@@ -57,6 +57,7 @@ export function useChats() {
             isOnline: false,
           };
         });
+        console.log('📚 Loaded chats from backend:', actualChats);
         setChats(actualChats);
       } else {
         // Fallback to empty array if no chats or API fails
@@ -68,13 +69,18 @@ export function useChats() {
     } finally {
       setLoading(false);
     }
-  }, []); // Removed user from dependency array
+  }, []);
 
   useEffect(() => {
     if (user) {
       loadChatsFromBackend();
     }
   }, [user, loadChatsFromBackend]);
+
+  // Function to reload chats when a new chat is created
+  const reloadChats = useCallback(async () => {
+    await loadChatsFromBackend();
+  }, [loadChatsFromBackend]);
 
   const addChat = (newChat: Partial<Chat>) => {
     const chat: Chat = {
@@ -88,13 +94,19 @@ export function useChats() {
     };
 
     setChats(prev => {
-      // Check if chat already exists by handleId or publicKey
+      // Check if chat already exists by id, handleId, or publicKey
       const exists = prev.find(
         c =>
+          c.id === chat.id ||
           (c.handleId && c.handleId === chat.handleId) ||
           (c.publicKey && c.publicKey === chat.publicKey)
       );
-      if (exists) return prev;
+      if (exists) {
+        // If chat exists but we're trying to add it with more complete data, update it
+        return prev.map(c => 
+          (c.id === chat.id || (c.handleId && c.handleId === chat.handleId)) ? { ...c, ...chat } : c
+        );
+      }
 
       return [chat, ...prev];
     });
@@ -137,5 +149,6 @@ export function useChats() {
     updateChatLastMessage,
     updateChatOnlineStatus,
     getChatById,
+    reloadChats,
   };
 }

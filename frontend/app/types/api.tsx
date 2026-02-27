@@ -52,3 +52,24 @@ export interface ProfileResponse {
     settings: Record<string, any>;
   };
 }
+
+export interface ContactRequest {
+  id: string;
+  from: {
+    id: string;
+    handleId?: string;
+    value: string;
+    displayName: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
+    alias?: string | null;
+  };
+  to?: {
+    handleId: string;
+  };
+  message?: string;
+  status?: string;
+  createdAt?: string;
+}

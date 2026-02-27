@@ -17,18 +17,17 @@ interface ContactRequestData {
   message?: string;
 }
 
+interface UseContactRequestsSyncOptions {
+  onIncomingRequest?: (data: ContactRequestData) => void;
+  onChatAccepted?: (chatId: string, otherHandle: any) => void;
+}
+
 /**
  * Hook для WebSocket синхронизации контактных запросов и контактов
  * Слушает события и обновляет глобальное состояние через useContactRequestsStore
  */
-export function useContactRequestsSync() {
-  const {
-    addIncomingRequest,
-    removeIncomingRequest,
-    removeOutgoingRequest,
-    addContact,
-    removeContact,
-  } = useContactRequestsStore();
+export function useContactRequestsSync(options?: UseContactRequestsSyncOptions) {
+  const { removeOutgoingRequest, removeContact } = useContactRequestsStore();
 
   useEffect(() => {
     if (!window.socketInstance) {
@@ -39,44 +38,33 @@ export function useContactRequestsSync() {
     console.log('📡 Setting up contact requests sync');
 
     // Handle incoming contact request
+    // Note: incomingRequests now stored locally in contacts-page component
+    // Store is responsible for trigger callback only
     const handleContactRequestReceived = (data: ContactRequestData) => {
-      console.log('📨 contact_request_received - adding to pending:', data);
-      addIncomingRequest({
-        id: data.requestId,
-        from: data.fromHandle,
-        to: { handleId: '' },
-        message: data.message,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
-      });
+      console.log('📨 contact_request_received - triggering modal:', data);
 
-      // Also add to contacts with avatar from the request
-      addContact({
-        id: data.fromHandle.id,
-        user: {
-          id: data.fromHandle.id,
-          displayName: data.fromHandle.displayName,
-          handle: data.fromHandle.value,
-          avatarUrl: data.fromHandle.avatarUrl,
-        },
-        acceptedAt: new Date().toISOString(),
-      });
+      // Notify parent to show modal
+      if (options?.onIncomingRequest) {
+        options.onIncomingRequest(data);
+      }
     };
 
-    // Handle request accepted (recipient accepts our request)
-    const handleRequestAccepted = (data: { byHandle: any; chatId?: string }) => {
-      console.log('✅ contact_request_accepted - adding contact:', data.byHandle);
-      removeOutgoingRequest(data.byHandle.id);
-      addContact({
-        id: data.byHandle.id,
-        user: {
-          id: data.byHandle.id,
-          displayName: data.byHandle.displayName,
-          handle: data.byHandle.handle,
-          avatarUrl: data.byHandle.avatarUrl,
-        },
-        acceptedAt: new Date().toISOString(),
-      });
+    // Handle contact accepted (WebSocket trigger only)
+    // Contact data comes from REST response, not WebSocket
+    const handleContactAccepted = (data: { otherHandle: any; chatId?: string }) => {
+      console.log(
+        '✅ contact_accepted - removing from outgoing, triggering chat load:',
+        data.otherHandle.id
+      );
+      removeOutgoingRequest(data.otherHandle.id);
+      // Note: addContact NOT called here - data comes from REST response instead
+      // WebSocket is trigger only, not data source
+
+      // Notify parent to load and open chat
+      if (data.chatId && options?.onChatAccepted) {
+        console.log('📊 Notifying parent to load chat:', data.chatId);
+        options.onChatAccepted(data.chatId, data.otherHandle);
+      }
     };
 
     // Handle request rejected
@@ -87,44 +75,16 @@ export function useContactRequestsSync() {
       removeContact(data.byHandle.id);
     };
 
-    // Handle new chat available (we accepted their request)
-    const handleNewChatAvailable = (data: { fromHandle: any; chatId?: string }) => {
-      console.log(
-        '💬 new_chat_available - removing from pending and adding to contacts:',
-        data.fromHandle
-      );
-      removeIncomingRequest(data.fromHandle.id);
-      addContact({
-        id: data.fromHandle.id,
-        user: {
-          id: data.fromHandle.id,
-          displayName: data.fromHandle.displayName,
-          handle: data.fromHandle.handle,
-          avatarUrl: data.fromHandle.avatarUrl,
-        },
-        acceptedAt: new Date().toISOString(),
-      });
-    };
-
-    // Handle when incoming request is rejected (locally, not from WebSocket)
-    // This is handled in contacts-page.tsx by calling removeIncomingRequest directly
-    // But we also remove the contact since they're not connected
-    const handleIncomingRequestRejected = (contactId: string) => {
-      console.log('⛔ Incoming request rejected - removing contact:', contactId);
-      removeContact(contactId);
-    };
-
+    // Setup listeners for contact state synchronization
     socket.on('contact_request_received', handleContactRequestReceived);
-    socket.on('contact_request_accepted', handleRequestAccepted);
+    socket.on('contact_accepted', handleContactAccepted);
     socket.on('contact_request_rejected', handleRequestRejected);
-    socket.on('new_chat_available', handleNewChatAvailable);
 
     return () => {
       console.log('🔌 Cleaning up contact requests sync');
       socket.off('contact_request_received', handleContactRequestReceived);
-      socket.off('contact_request_accepted', handleRequestAccepted);
+      socket.off('contact_accepted', handleContactAccepted);
       socket.off('contact_request_rejected', handleRequestRejected);
-      socket.off('new_chat_available', handleNewChatAvailable);
     };
-  }, [addIncomingRequest, removeIncomingRequest, removeOutgoingRequest, addContact, removeContact]);
+  }, [removeOutgoingRequest, removeContact, options]);
 }

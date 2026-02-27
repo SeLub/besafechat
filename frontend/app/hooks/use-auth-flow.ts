@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import { toast } from 'sonner';
-import { generateSeedPhrase } from '@/lib/crypto';
-import { AccountService } from '@/services/account.service';
+import { generateSeedPhrase, hashPrivateKey, pkcs8ToRawPrivateKey } from '@/lib/crypto';
+import {
+  AccountService,
+  secureClearUint8Array,
+  setSessionCryptoKey,
+} from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
 import { StorageService } from '@/services/storage.service';
 import { silentAuthCheck } from '@/lib/auth-utils';
@@ -126,7 +130,25 @@ export function useAuthFlow() {
     try {
       const { publicKeyBase64, privateKey } = await AccountService.recoverWithPassword(password);
       const loginResult = await loginOnly(publicKeyBase64, privateKey);
+
       await StorageService.initialize(loginResult.identityId);
+
+      const rawPrivateKey = pkcs8ToRawPrivateKey(privateKey); // privateKey ещё валиден (это копия)
+      const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+      const baseKey = await crypto.subtle.importKey(
+        'raw',
+        privateKeyHash as BufferSource,
+        { name: 'PBKDF2', hash: 'SHA-256' },
+        false, // 🔑 extractable: false
+        ['deriveKey']
+      );
+
+      await StorageService.storeEncryptionKey(loginResult.identityId, baseKey);
+      setSessionCryptoKey(baseKey);
+
+      secureClearUint8Array(privateKeyHash);
+      secureClearUint8Array(rawPrivateKey);
 
       const storedKey = await StorageService.getPublicKey();
       if (storedKey && storedKey !== publicKeyBase64) {
@@ -161,7 +183,25 @@ export function useAuthFlow() {
     try {
       const { publicKeyBase64, privateKey } = await AccountService.recoverWithSeed(recoveredSeed);
       const loginResult = await loginOnly(publicKeyBase64, privateKey);
+
       await StorageService.initialize(loginResult.identityId);
+
+      const rawPrivateKey = pkcs8ToRawPrivateKey(privateKey); // privateKey ещё валиден (это копия)
+      const privateKeyHash = await hashPrivateKey(rawPrivateKey);
+
+      const baseKey = await crypto.subtle.importKey(
+        'raw',
+        privateKeyHash as BufferSource,
+        { name: 'PBKDF2', hash: 'SHA-256' },
+        false, // 🔑 extractable: false
+        ['deriveKey']
+      );
+
+      await StorageService.storeEncryptionKey(loginResult.identityId, baseKey);
+      setSessionCryptoKey(baseKey);
+
+      secureClearUint8Array(privateKeyHash);
+      secureClearUint8Array(rawPrivateKey);
 
       const storedKey = await StorageService.getPublicKey();
       if (storedKey && storedKey !== publicKeyBase64) {

@@ -28,6 +28,7 @@ describe('AuthService Minimal Tests', () => {
           useValue: {
             findByIdentityPublicKey: jest.fn(),
             findByIdentityId: jest.fn(),
+            findDeletedByPublicKey: jest.fn(),
             registerIdentity: jest.fn(),
           },
         },
@@ -95,6 +96,7 @@ describe('AuthService Minimal Tests', () => {
 
       // Mock identity service
       jest.spyOn(identityService, 'findByIdentityPublicKey').mockResolvedValue(null as any);
+      jest.spyOn(identityService, 'findDeletedByPublicKey').mockResolvedValue(null as any);
       jest.spyOn(identityService, 'registerIdentity').mockResolvedValue(mockIdentity as any);
 
       // Mock handle service
@@ -154,6 +156,7 @@ describe('AuthService Minimal Tests', () => {
 
       // Mock identity service
       jest.spyOn(identityService, 'findByIdentityPublicKey').mockResolvedValue(existingIdentity as any);
+      jest.spyOn(identityService, 'findDeletedByPublicKey').mockResolvedValue(null as any);
 
       // Mock handle service
       jest.spyOn(handleService, 'getPrimaryHandle').mockResolvedValue(mockHandle as any);

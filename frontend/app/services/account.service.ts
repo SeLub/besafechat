@@ -11,7 +11,7 @@ import { CloudBackupService } from './cloud-backup.service';
 import { DeviceService } from './device.service';
 import { PasswordRecoveryService } from './password-recovery.service';
 import { StorageService } from './storage.service';
-
+console.log('📦 account.service.ts initialized');
 // Store seed temporarily in memory only (not in IndexedDB)
 let temporarySeed: string[] | null = null;
 
@@ -20,6 +20,37 @@ let temporarySeed: string[] | null = null;
 // This hash is used for encryption/decryption operations only
 let sessionPrivateKeyHash: Uint8Array | null = null;
 
+// ============================================================================
+// Session CryptoKey Management (RAM storage for fast access)
+// ============================================================================
+
+let sessionCryptoKey: CryptoKey | null = null;
+
+/**
+ * Store CryptoKey reference in RAM for current session
+ * Key itself is non-extractable and stored in IndexedDB
+ * This is just a reference for performance (avoid repeated DB reads)
+ */
+export function setSessionCryptoKey(key: CryptoKey): void {
+  sessionCryptoKey = key;
+}
+
+/**
+ * Get CryptoKey reference from RAM
+ * @returns CryptoKey or null if not set
+ */
+export function getSessionCryptoKey(): CryptoKey | null {
+  return sessionCryptoKey;
+}
+
+/**
+ * Clear RAM reference on logout
+ * Note: IndexedDB storage is cleared separately via StorageService.deleteEncryptionKey
+ */
+export function clearSessionCryptoKey(): void {
+  sessionCryptoKey = null;
+}
+
 /**
  * Set the hashed private key for encryption operations
  * Private key itself should be destroyed immediately after auth
@@ -27,6 +58,11 @@ let sessionPrivateKeyHash: Uint8Array | null = null;
  * CRITICAL: Never store full private key, only its hash
  */
 export function setSessionPrivateKeyHash(privateKeyHash: Uint8Array): void {
+  console.log('🔐 [SET] sessionPrivateKeyHash:', {
+    length: privateKeyHash?.length,
+    firstBytes: privateKeyHash?.slice(0, 8),
+    timestamp: Date.now(),
+  });
   sessionPrivateKeyHash = privateKeyHash;
 }
 
@@ -43,8 +79,7 @@ export function getSessionPrivateKeyHash(): Uint8Array | null {
  */
 export function clearSessionPrivateKeyHash(): void {
   if (sessionPrivateKeyHash) {
-    // Secure deletion: overwrite with random data before clearing
-    crypto.getRandomValues(sessionPrivateKeyHash);
+    crypto.getRandomValues(sessionPrivateKeyHash as Uint8Array<ArrayBuffer>);
     sessionPrivateKeyHash = null;
   }
 }
@@ -53,8 +88,10 @@ export function clearSessionPrivateKeyHash(): void {
  * Securely clear sensitive Uint8Array data
  * Overwrites with random data before clearing (defense against memory dumps)
  */
-function secureClearUint8Array(data: Uint8Array): void {
-  crypto.getRandomValues(data);
+export function secureClearUint8Array(data: Uint8Array): void {
+  // Создаём новую view с явным ArrayBuffer
+  const buffer = new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
+  crypto.getRandomValues(buffer);
 }
 
 export class AccountService {
@@ -104,16 +141,33 @@ export class AccountService {
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
     const privateKeyHash = await hashPrivateKey(rawPrivateKey);
 
+    // 🔐 Import as non-extractable CryptoKey for secure storage
+    const baseKey = await crypto.subtle.importKey(
+      'raw',
+      privateKeyHash as BufferSource, // Type assertion for TypeScript compatibility
+      { name: 'PBKDF2', hash: 'SHA-256' },
+      false, // 🔑 CRITICAL: extractable: false — key cannot be exported
+      ['deriveKey'] // Only allow key derivation operations
+    );
+
+    // 🔐 Store in IndexedDB for persistence across page refreshes
+    await StorageService.storeEncryptionKey(result.identityId, baseKey);
+
+    // 🔐 Keep RAM reference for performance (avoid DB reads on every encryption)
+    setSessionCryptoKey(baseKey);
+
+    // 🔐 Securely destroy raw hash (only CryptoKey remains, which is non-extractable)
+
     // Securely destroy the private key (overwrite with random before clearing)
     secureClearUint8Array(rawPrivateKey);
     secureClearUint8Array(keyPair.privateKey);
 
     // Store ONLY the hash for encryption operations
-    setSessionPrivateKeyHash(privateKeyHash);
+    secureClearUint8Array(privateKeyHash);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const encrypted = await encryptSeedForCloud(seed, password, result.identityId);
+    const encrypted = await encryptSeedForCloud(seed, password);
 
     // 8. Claim the password hash before backup
     const claimResult = await PasswordRecoveryService.claimPasswordWithRetry(password);
@@ -176,12 +230,29 @@ export class AccountService {
     const rawPrivateKey = pkcs8ToRawPrivateKey(keyPair.privateKey);
     const privateKeyHash = await hashPrivateKey(rawPrivateKey);
 
+    // 🔐 Import as non-extractable CryptoKey for secure storage
+    const baseKey = await crypto.subtle.importKey(
+      'raw',
+      privateKeyHash as BufferSource, // Type assertion for TypeScript compatibility
+      { name: 'PBKDF2', hash: 'SHA-256' },
+      false, // 🔑 CRITICAL: extractable: false — key cannot be exported
+      ['deriveKey'] // Only allow key derivation operations
+    );
+
+    // 🔐 Store in IndexedDB for persistence across page refreshes
+    await StorageService.storeEncryptionKey(result.identityId, baseKey);
+
+    // 🔐 Keep RAM reference for performance (avoid DB reads on every encryption)
+    setSessionCryptoKey(baseKey);
+
+    // 🔐 Securely destroy raw hash (only CryptoKey remains, which is non-extractable)
+
     // Securely destroy the private key
     secureClearUint8Array(rawPrivateKey);
     secureClearUint8Array(keyPair.privateKey);
 
     // Store ONLY the hash for encryption operations
-    setSessionPrivateKeyHash(privateKeyHash);
+    secureClearUint8Array(privateKeyHash);
 
     // Wait briefly to ensure user profile is created on the backend
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -219,7 +290,7 @@ export class AccountService {
     secureClearUint8Array(keyPair.privateKey);
 
     // Store only the hash for encryption
-    setSessionPrivateKeyHash(privateKeyHash);
+    secureClearUint8Array(privateKeyHash);
 
     return {
       publicKeyBase64: keyPair.publicKeyBase64,
@@ -251,7 +322,7 @@ export class AccountService {
     secureClearUint8Array(keyPair.privateKey);
 
     // Store only the hash for encryption
-    setSessionPrivateKeyHash(privateKeyHash);
+    secureClearUint8Array(privateKeyHash);
 
     return {
       publicKeyBase64: keyPair.publicKeyBase64,

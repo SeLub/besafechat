@@ -13,6 +13,7 @@ import { NotificationService } from '../../notification/services/notification.se
 import { MessagePayloadDto } from '../dtos/message-payload.dto';
 import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
+import { MediaService } from '../../media/media.service';
 import { getCorsConfig } from '../../../common/config/cors-origins';
 
 @WebSocketGateway({
@@ -28,7 +29,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private redisService: RedisService,
     private messageMetadataService: MessageMetadataService,
     private chatRoomService: ChatRoomService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private mediaService: MediaService
   ) {}
 
   async handleConnection(client: Socket) {
@@ -87,7 +89,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
         // 6. Уведомляем контакты о том, что пользователь онлайн
         await this.notifyContactsUserOnline(session.activeHandleId);
-        
+
         // 7. Синхронизация уведомлений при подключении
         await this.syncNotifications(client, session.activeHandleId);
       }
@@ -167,15 +169,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     requestId: string,
     message?: string
   ) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_request', {
-      fromHandle: {
-        id: fromHandle.id,
-        value: fromHandle.value,
-        displayName: fromHandle.profile?.displayName,
-      },
-      requestId,
-      message,
-    });
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_request',
+      {
+        fromHandle: {
+          id: fromHandle.id,
+          value: fromHandle.value,
+          displayName: fromHandle.profile?.displayName,
+        },
+        requestId,
+        message,
+      }
+    );
 
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_received', {
@@ -196,36 +202,65 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_accepted', {
-      fromHandle: {
-        id: byHandle.id,
-        value: byHandle.value,
-        displayName: byHandle.profile?.displayName,
-      },
-      chatId,
-    });
+  async notifyContactAccepted(toHandleId: string, otherHandle: any, chatId?: string) {
+    // Load avatar URL if it exists
+    const avatarUrl = otherHandle.id
+      ? await this.mediaService.getAvatarUrlIfExists(otherHandle.id)
+      : null;
 
+    // Create persistent notification (Redis/DB depending on config)
+    // Ensures delivery to offline users via TTL or DB persistence
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_accepted',
+      {
+        fromHandle: {
+          id: otherHandle.id,
+          value: otherHandle.value,
+          displayName: otherHandle.profile?.displayName,
+        },
+        chatId,
+      }
+    );
+
+    // WebSocket events act as real-time triggers:
+    // - notification:created: for client sync with notification history
+    // - contact_accepted: for immediate UI feedback (toast, contact list update)
+    // Event payload is denormalized for UX; REST API remains source of truth for mutations
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
-    this.server.to(`user:${toHandleId}`).emit('contact_request_accepted', {
-      byHandle: {
-        id: byHandle.id,
-        displayName: byHandle.profile?.displayName,
-        handle: byHandle.value,
+    this.server.to(`user:${toHandleId}`).emit('contact_accepted', {
+      otherHandle: {
+        id: otherHandle.id,
+        displayName: otherHandle.profile?.displayName,
+        handle: otherHandle.value,
+        firstName: otherHandle.profile?.firstName || null,
+        lastName: otherHandle.profile?.lastName || null,
+        avatarUrl,
+        bio: otherHandle.profile?.bio || null,
+        alias: otherHandle.alias || null,
       },
       chatId,
       timestamp: new Date().toISOString(),
     });
   }
 
+  // Deprecated: Use notifyContactAccepted instead
+  async notifyRequestAccepted(toHandleId: string, byHandle: any, chatId?: string) {
+    return this.notifyContactAccepted(toHandleId, byHandle, chatId);
+  }
+
   async notifyRequestRejected(toHandleId: string, byHandle: any) {
-    const notification = await this.notificationService.createNotification(toHandleId, 'contact_rejected', {
-      fromHandle: {
-        id: byHandle.id,
-        value: byHandle.value,
-        displayName: byHandle.profile?.displayName,
-      },
-    });
+    const notification = await this.notificationService.createNotification(
+      toHandleId,
+      'contact_rejected',
+      {
+        fromHandle: {
+          id: byHandle.id,
+          value: byHandle.value,
+          displayName: byHandle.profile?.displayName,
+        },
+      }
+    );
 
     this.server.to(`user:${toHandleId}`).emit('notification:created', notification);
     this.server.to(`user:${toHandleId}`).emit('contact_request_rejected', {
@@ -239,6 +274,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async notifyNewChatAvailable(toHandleId: string, fromHandle: any, chatId?: string) {
+    // Load avatar URL if it exists
+    const avatarUrl = fromHandle.id
+      ? await this.mediaService.getAvatarUrlIfExists(fromHandle.id)
+      : null;
+
     const notification = await this.notificationService.createNotification(toHandleId, 'new_chat', {
       fromHandle: {
         id: fromHandle.id,
@@ -254,6 +294,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         id: fromHandle.id,
         displayName: fromHandle.profile?.displayName,
         handle: fromHandle.value,
+        firstName: fromHandle.profile?.firstName || null,
+        lastName: fromHandle.profile?.lastName || null,
+        avatarUrl,
+        bio: fromHandle.profile?.bio || null,
+        alias: fromHandle.alias || null,
       },
       chatId,
       timestamp: new Date().toISOString(),
@@ -275,13 +320,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const notifications = await this.notificationService.getUnreadNotifications(handleId);
       const unreadCount = await this.notificationService.getUnreadCount(handleId);
-      
+
       client.emit('notifications:sync', {
         notifications,
         unreadCount,
         timestamp: new Date().toISOString(),
       });
-      
+
       console.log(`🔔 Synced ${notifications.length} notifications for handle: ${handleId}`);
     } catch (error) {
       console.error('❌ Error syncing notifications:', error);
@@ -300,7 +345,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (client.data?.activeHandleId) {
       await this.notificationService.markAsRead(client.data.activeHandleId, payload.notificationId);
       const unreadCount = await this.notificationService.getUnreadCount(client.data.activeHandleId);
-      
+
       // Уведомляем все устройства пользователя
       this.server.to(`user:${client.data.activeHandleId}`).emit('notification:read', {
         notificationId: payload.notificationId,
@@ -313,7 +358,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleMarkAllAsRead(client: Socket) {
     if (client.data?.activeHandleId) {
       await this.notificationService.markAllAsRead(client.data.activeHandleId);
-      
+
       // Уведомляем все устройства пользователя
       this.server.to(`user:${client.data.activeHandleId}`).emit('notification:all-read', {
         unreadCount: 0,
