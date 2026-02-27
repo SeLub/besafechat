@@ -14,7 +14,6 @@ import {
 } from '../utils/binary';
 import { rawPrivateKeyToPkcs8 } from '../utils/serialization';
 import type { KeyPair, EncryptedSeedData, Argon2Params } from '../types';
-import { secureWipe } from './secure-wipe';
 import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
 
 // Configure @noble/ed25519
@@ -118,10 +117,6 @@ export async function deriveKeyPairFromSeed(seedWords: string[]): Promise<KeyPai
   // Convert to PKCS#8 format for Web Crypto API
   const privateKey = rawPrivateKeyToPkcs8(rawPrivateKey);
   const publicKeyBase64 = uint8ToBase64(publicKey);
-
-  // 🔥 ОЧИСТКА
-  secureWipe(rawPrivateKey);
-  secureWipe(seedBytes);
 
   return {
     privateKey,

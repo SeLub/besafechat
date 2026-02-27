@@ -169,6 +169,111 @@
 
 ---
 
+### 4.2.1 Синхронизация исходящих сообщений между устройствами отправителя
+
+**When:**
+
+- User 1 отправляет сообщение User 2
+- User 1 онлайн на **нескольких устройствах** (например, компьютер + планшет)
+
+**Problem:**
+
+Без синхронизации исходящих сообщений:
+- Device A (отправитель) сохраняет сообщение локально
+- Device B (второе устройство отправителя) НЕ видит это сообщение в чате
+- История разных между устройствами → плохой UX
+
+**Flow:**
+
+1. User 1 (компьютер) отправляет сообщение на `/send` с `toHandleId` получателя
+2. Backend (MessagesGateway) получает в `handleMessage()`:
+   ```ts
+   {
+     messageId: string;
+     toHandleId: string;       // handleId получателя
+     encryptedPayload: string;
+     timestamp: number;
+   }
+   ```
+3. Сохранить метаданные в PostgreSQL (как обычно)
+4. **Отправить на все устройства получателя** (в комнату `user:{toHandleId}`):
+   ```ts
+   this.server.to(`user:${toHandleId}`).emit('message:new', {
+     messageId,
+     from: client.data.activeHandleId,
+     chatId,
+     encryptedPayload,
+     timestamp,
+   });
+   ```
+5. **🔄 Отправить на все устройства ОТПРАВИТЕЛЯ** (кроме текущего сокета):
+   ```ts
+   // Получить все сессии отправителя из Redis
+   const redis = this.redisService.getClient();
+   const senderSessions = await redis.smembers(
+     `sessions:${client.data.identityId}`
+   );
+   
+   // Для каждой сессии (кроме текущей)
+   for (const sessionData of senderSessions) {
+     const [sessionId, socketId] = sessionData.split(':');
+     if (socketId !== client.id) { // ← Исключаем текущий сокет
+       this.server.to(socketId).emit('message:sent', {
+         messageId,
+         toHandleId, // ← handleId адресата (для определения чата)
+         chatId,
+         encryptedPayload,
+         timestamp,
+         deliveredAt: Date.now(),
+       });
+     }
+   }
+   ```
+6. **Frontend — обработка на других устройствах отправителя**:
+   ```typescript
+   // useWebSocketNotifications или отдельный слушатель
+   socket.on('message:sent', (payload: any) => {
+     // Это мое сообщение, пришедшее с другого устройства
+     if (payload.toHandleId === selectedChat?.handleId) {
+       // Добавляем в UI с флагом isOwn=true
+       setMessages(prev => {
+         if (prev.some(m => m.id === payload.messageId)) {
+           return prev; // Дедупликация
+         }
+         return [...prev, {
+           id: payload.messageId,
+           text: decryptedText,
+           isOwn: true,
+           fromHandleId: currentUserHandleId,
+           timestamp: payload.timestamp,
+         }];
+       });
+       
+       // Сохраняем в IndexedDB
+       await StorageService.saveEncryptedMessage(
+         payload.chatId,
+         currentUserHandleId,
+         payload.encryptedPayload,
+         user.handle.id,
+         true, // ← isOwn = true
+         payload.messageId,
+         user.identity.id
+       );
+     }
+   });
+   ```
+
+**Key Points:**
+
+- ✅ Используется **Redis структура** `sessions:{identityId}` (SET сессий отправителя)
+- ✅ **Фильтрирование по socket.id** исключает текущее устройство (нет дублей)
+- ✅ **На фронтенде нет логики фильтрования** — просто слушаем 2 события: `message:new` (входящие) и `message:sent` (исходящие)
+- ✅ **Готовит инфраструктуру** для MESSAGE_DELIVERY_SYSTEM (Redis маршрутизация по sessionId)
+
+**Result:** User 1 видит отправленное сообщение на **всех своих устройствах** практически в реальном времени
+
+---
+
 ### 4.3 Синхронизация статуса печатания (Typing Indicator)
 
 **Сценарий:**
@@ -736,45 +841,198 @@ export function useMultiDeviceSync() {
 
 ### Этап 1: Инфраструктура Redis
 
-- [ ] Расширить `RedisService` методами:
-  - [ ] `storeSession(identityId, sessionId, handleId, socketId)`
-  - [ ] `getSessionsByHandleId(handleId): Promise<sessionId[]>`
-  - [ ] `setPresence(handleId, sessionId)`
-  - [ ] `clearPresence(handleId, sessionId)`
-  - [ ] `getReadStatus(chatId, handleId): Promise<lastReadMessageId>`
-  - [ ] `setReadStatus(chatId, handleId, lastReadMessageId)`
-- [ ] Настроить TTL для всех ключей (3600 сек по умолчанию)
-- [ ] Добавить мониторинг размера Redis-ключей
+**Цель**: Подготовить Redis для маршрутизации по сессиям и handle'ам.
+
+#### 1.1 Структуры Redis
+
+- [ ] `sessions:{identityId}` (SET) — все активные сессии пользователя
+  - Элемент: `{sessionId}:{socketId}` (разделитель `:`)
+  - TTL: 3600 сек (обновляется на heartbeat)
+  
+- [ ] `online:{handleId}` (SET) — активные сессии для конкретного handle'а
+  - Элемент: `sessionId`
+  - TTL: 3600 сек
+
+- [ ] `session:{sessionId}` (STRING) — маппинг сессии на handle и socket
+  - Значение: `{handleId}:{socketId}`
+  - TTL: 3600 сек
+
+#### 1.2 RedisService методы
+
+- [ ] `storeSession(identityId: string, sessionId: string, handleId: string, socketId: string): Promise<void>`
+  - Добавить в `sessions:{identityId}` элемент `{sessionId}:{socketId}`
+  - Добавить в `online:{handleId}` элемент `sessionId`
+  - Установить `session:{sessionId}` = `{handleId}:{socketId}`
+  - Установить TTL 3600 на все ключи
+
+- [ ] `getSessionsByIdentityId(identityId: string): Promise<{sessionId, socketId}[]>`
+  - Получить все элементы из `sessions:{identityId}`
+  - Распарсить и вернуть список
+
+- [ ] `getSessionsByHandleId(handleId: string): Promise<string[]>`
+  - Получить все sessionId из `online:{handleId}`
+
+- [ ] `clearSession(identityId: string, sessionId: string, handleId: string): Promise<void>`
+  - Удалить из `sessions:{identityId}` элемент `{sessionId}:*`
+  - Удалить из `online:{handleId}` элемент `sessionId`
+  - Удалить ключ `session:{sessionId}`
+
+- [ ] `refreshSessionTTL(identityId: string, handleId: string): Promise<void>`
+  - Вызывать на heartbeat
+  - Обновить TTL для `sessions:{identityId}`, `online:{handleId}`, `session:{sessionId}`
+
+- [ ] Добавить мониторинг размера Redis-ключей (логирование при превышении лимита)
 
 ---
 
 ### Этап 2: WebSocket Gateway
 
-- [ ] Реализовать `handleConnection()` с маппингом сессий и загрузкой CryptoKey
-- [ ] Реализовать `handleDisconnect()` с очисткой Redis
-- [ ] Реализовать `handleMessageSend()` с маршрутизацией по `toHandleId`
-- [ ] Добавить обработчики `typing:start`, `typing:stop`, `message:read`
-- [ ] Реализовать дедупликацию входящих сообщений на сервере (по `messageId`)
+**Цель**: Реализовать синхронизацию входящих и исходящих сообщений через WebSocket.
+
+#### 2.1 handleConnection()
+
+- [ ] При подключении клиента:
+  - [ ] Валидировать JWT и извлечь `identityId`, `sessionId`, `activeHandleId`
+  - [ ] Присоединить сокет к комнате `user:{activeHandleId}`
+  - [ ] **Сохранить в Redis** через `RedisService.storeSession()`
+  - [ ] Отправить клиенту подтверждение: `{ sessionId, identityId, activeHandleId }`
+  - [ ] Запустить heartbeat для поддержания TTL
+
+#### 2.2 handleDisconnect()
+
+- [ ] При отключении клиента:
+  - [ ] Получить `identityId`, `sessionId`, `activeHandleId` из `client.data`
+  - [ ] **Очистить Redis** через `RedisService.clearSession()`
+  - [ ] Уведомить контакты об офлайн-статусе
+
+#### 2.3 handleMessage() — Входящие сообщения
+
+- [ ] Получить сообщение от отправителя с `toHandleId`
+- [ ] Сохранить метаданные в PostgreSQL
+- [ ] **Отправить на все сессии получателя**:
+  - [ ] Получить список сессий из Redis: `RedisService.getSessionsByHandleId(toHandleId)`
+  - [ ] Для каждой сессии отправить событие `message:new`
+  - [ ] Логировать доставку для отладки
+
+#### 2.4 handleMessage() — Исходящие сообщения (NEW)
+
+- [ ] **После отправки на получателя** отправить на все сессии отправителя:
+  - [ ] Получить список сессий отправителя: `RedisService.getSessionsByIdentityId(client.data.identityId)`
+  - [ ] **Исключить текущий сокет**: `if (socketId !== client.id)`
+  - [ ] Отправить событие `message:sent` на каждый другой сокет
+  - [ ] Пример кода:
+    ```typescript
+    const senderSessions = await this.redisService.getSessionsByIdentityId(client.data.identityId);
+    for (const session of senderSessions) {
+      if (session.socketId !== client.id) {
+        this.server.to(session.socketId).emit('message:sent', {
+          messageId,
+          toHandleId,
+          chatId,
+          encryptedPayload,
+          timestamp,
+        });
+      }
+    }
+    ```
+
+#### 2.5 Heartbeat обработчик
+
+- [ ] Реализовать `handleHeartbeat()` для поддержания TTL в Redis
+- [ ] Клиент отправляет heartbeat каждые 20 сек
+- [ ] Сервер обновляет TTL через `RedisService.refreshSessionTTL()`
+
+#### 2.6 Дополнительно
+
+- [ ] Добавить обработчики `typing:start`, `typing:stop`, `message:read` (для § 4.3-4.4)
+- [ ] Реализовать дедупликацию входящих сообщений по `messageId` (не сохранять дубли)
 
 ---
 
 ### Этап 3: Маршрутизация сообщений
 
-- [ ] Функция `broadcastToSessions(handleId, event, data)`
-- [ ] Определить логику: онлайн vs офлайн (отправить vs сохранить в Redis)
-- [ ] Добавить дедупликацию входящих сообщений на клиенте (по `messageId` в IndexedDB)
-- [ ] Реализовать retry-логику для потерянных сообщений
+**Цель**: Интегрировать Redis маршрутизацию в `handleMessage()` для входящих и исходящих сообщений.
+
+#### 3.1 Входящие сообщения
+
+- [ ] В `handleMessage()` после сохранения метаданных:
+  - [ ] Получить список сессий получателя: `const sessions = await this.redisService.getSessionsByHandleId(toHandleId)`
+  - [ ] Для каждой сессии отправить `message:new` через `this.server.to(socketId).emit('message:new', {...})`
+  - [ ] Обновить статус в БД: `delivered = true`
+
+#### 3.2 Исходящие сообщения (NEW)
+
+- [ ] В `handleMessage()` после отправки на получателя:
+  - [ ] Получить список сессий отправителя: `const sessions = await this.redisService.getSessionsByIdentityId(client.data.identityId)`
+  - [ ] Для каждой сессии кроме текущей отправить `message:sent`
+  - [ ] Убедиться в правильности маппинга `socketId` из Redis
+
+#### 3.3 Дедупликация
+
+- [ ] На клиенте: проверять наличие сообщения по `messageId` перед добавлением в UI
+- [ ] На сервере: перед отправкой проверить, не отправляли ли это сообщение уже (опционально, для безопасности)
+- [ ] В IndexedDB: использовать `messageId` как UNIQUE key
+
+#### 3.4 Логирование
+
+- [ ] Логировать все доставки сообщений для отладки многоустройственного сценария:
+  - [ ] Какие сессии найдены для получателя/отправителя
+  - [ ] Какие сокеты исключены/включены в доставку
+  - [ ] Ошибки при отправке на конкретный сокет
 
 ---
 
 ### Этап 4: Фронтенд
 
-- [ ] Создать hook `useMultiDeviceSync()` с явной передачей `identityId`
-- [ ] Подписаться на WebSocket события (`message:incoming`, `typing:*`, `message:marked_as_read`)
-- [ ] Сохранять входящие сообщения в IndexedDB через `StorageService.saveEncryptedMessage(..., identityId)`
-- [ ] Отправлять typing events с debounce (300ms)
-- [ ] Синхронизировать статус прочтения при скролле до конца чата
+**Цель**: Реализовать слушатели WebSocket событий для входящих и исходящих сообщений.
+
+#### 4.1 Слушатель входящих сообщений
+
+- [ ] В `useWebSocketNotifications()` обновить обработчик `message:new`:
+  - [ ] Декодировать `encryptedPayload` из base64
+  - [ ] Вызвать callback `onMessageReceived()`
+  - [ ] Логировать для отладки
+
+#### 4.2 Слушатель исходящих сообщений (NEW)
+
+- [ ] В `useWebSocketNotifications()` добавить обработчик `message:sent`:
+  ```typescript
+  socket.on('message:sent', (payload: any) => {
+    // Это мое сообщение, пришедшее с другого устройства
+    const binaryString = atob(payload.encryptedPayload);
+    const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
+    const decoder = new TextDecoder();
+    const text = decoder.decode(bytes);
+    
+    callbacksRef.current.onOwnMessageReceived?.({
+      id: payload.messageId,
+      text,
+      toHandleId: payload.toHandleId,
+      chatId: payload.chatId,
+      isOwn: true,
+      timestamp: payload.timestamp,
+    });
+  });
+  ```
+
+#### 4.3 Обработка в маршруте (index.tsx)
+
+- [ ] Добавить callback `onOwnMessageReceived` в `useWebSocketNotifications()`
+- [ ] При получении `message:sent`:
+  - [ ] Проверить, что это текущему чату (`payload.toHandleId === selectedChat?.handleId`)
+  - [ ] Добавить сообщение в UI с `isOwn: true`
+  - [ ] Сохранить в IndexedDB через `StorageService.saveEncryptedMessage(..., true, identityId)`
+  - [ ] Обновить `updateChatLastMessage()` если это последнее сообщение
+
+#### 4.4 Дедупликация на фронтенде
+
+- [ ] При добавлении сообщения в UI проверить: `if (prev.some(m => m.id === message.id)) return prev`
+- [ ] Использовать `messageId` как уникальный ключ для дедупликации
+
+#### 4.5 Дополнительно
+
 - [ ] Реализовать модалку восстановления доступа при отсутствии CryptoKey
+- [ ] Убедиться, что `identityId` всегда передается явно в `StorageService` методы
 
 ---
 
