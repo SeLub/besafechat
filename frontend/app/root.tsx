@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/root.tsx
 import {
   isRouteErrorResponse,
   Links,

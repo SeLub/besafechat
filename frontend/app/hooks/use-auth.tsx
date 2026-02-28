@@ -1,3 +1,4 @@
+///home/selub/Documents/progs/besafechat/frontend/app/hooks/use-auth.tsx
 import { authenticateUser, clearAuthCookies, handleAuthError } from '@/lib/auth-utils';
 import { AccountService } from '@/services/account.service';
 import { AuthService } from '@/services/auth.service';
