@@ -1,9 +1,13 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/hooks/use-websocket-notifications.tsx
+
 import { API_ENDPOINTS } from '@/services/api-gateway';
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth-context';
 import { useContactRequests } from './use-contact-requests';
+import { useOnlineStatusContext } from './use-online-status-context';
+const CACHE_TTL = 1000 * 60 * 5; // 5 минут жизни кеша
 
 export function useWebSocketNotifications(
   onChatCreated?: (chatId: string) => void,
@@ -15,6 +19,7 @@ export function useWebSocketNotifications(
 ) {
   const { user } = useAuth();
   const { incrementAccepted, incrementPending } = useContactRequests();
+  const { bulkUpdateOnlineStatus } = useOnlineStatusContext();
 
   const callbacksRef = useRef({
     onChatCreated,
@@ -36,8 +41,37 @@ export function useWebSocketNotifications(
     };
   });
 
+  const getCacheKey = (handleId: string | undefined) =>
+    handleId ? `online_status_cache:${handleId}` : 'guest';
+
+  // 1. Инициализация из кэша (чтобы не мигало пустым)
   useEffect(() => {
-    if (!user) return;
+    if (!user?.handle.id) return;
+    const cacheKey = getCacheKey(user.handle.id);
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const { statuses, updatedAt } = JSON.parse(cached);
+        if (Date.now() - updatedAt < CACHE_TTL) {
+          Object.entries(statuses).forEach(([handle, isOnline]) => {
+            callbacksRef.current.onOnlineStatusChange?.(handle, isOnline as boolean);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('❌ Failed to parse cache, clearing...', e);
+      sessionStorage.removeItem(cacheKey);
+    }
+  }, [user?.handle.id]); // ← Зависимость от handleId
+
+  useEffect(() => {
+    if (!user?.handle.id) {
+      // Удаляем специфичный кэш пользователя при выходе
+      // Если id нет, можно просто очистить всё, что начинается с 'online_status_cache'
+      const cacheKey = getCacheKey(user?.handle.id);
+      sessionStorage.removeItem(cacheKey);
+      return;
+    }
 
     const socket: Socket = io(API_ENDPOINTS.WEBSOCKET.MESSAGES, {
       withCredentials: true,
@@ -50,32 +84,25 @@ export function useWebSocketNotifications(
     // Store socket globally for message sending
     window.socketInstance = socket;
 
-    // Contact request received - show modal and toast
-    // socket.on('contact_request_received', data => {
-    //   console.log('🔔 contact_request_received - showing modal:', data);
-    //   const { requestId, fromHandle, message } = data;
+    // ОБРАБОТЧИК presence_sync
+    const handlePresenceSync = (data: { statuses: Record<string, boolean> }) => {
+      console.log('⚡ Presence sync received:', data);
 
-    //   // Show modal through callback
-    //   // callbacksRef.current.onContactRequest?.({
-    //   //   requestId,
-    //   //   fromHandle: {
-    //   //     id: fromHandle.id,
-    //   //     value: fromHandle.value || fromHandle.handle,
-    //   //     alias: fromHandle.alias || null,
-    //   //     displayName: fromHandle.displayName,
-    //   //     firstName: fromHandle.firstName || null,
-    //   //     lastName: fromHandle.lastName || null,
-    //   //     avatarUrl: fromHandle.avatarUrl || null,
-    //   //     bio: fromHandle.bio || null,
-    //   //   },
-    //   //   message,
-    //   // });
+      // 1. Обновляем локальный стейт (через контекст)
+      bulkUpdateOnlineStatus(data.statuses);
 
-    //   const displayName = fromHandle?.displayName || `@${fromHandle?.value}` || 'Someone';
-    //   toast.info(`New contact request from ${displayName}`);
+      // 2. Сохраняем в кэш
+      const cacheKey = getCacheKey(user?.handle.id);
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          statuses: data.statuses,
+          updatedAt: Date.now(),
+        })
+      );
+    };
 
-    //   incrementPending();
-    // });
+    socket.on('presence_sync', handlePresenceSync);
 
     // Contact accepted - WebSocket trigger (real-time notification)
     // WebSocket is trigger only; actual chat loading handled in use-contact-requests-sync
@@ -168,8 +195,9 @@ export function useWebSocketNotifications(
       socket.off('disconnect');
       socket.off('connect');
       socket.off('connect_error');
+      socket.off('presence_sync', handlePresenceSync);
       socket.disconnect();
       window.socketInstance = null;
     };
-  }, [user, incrementAccepted, incrementPending]);
+  }, [user?.handle.id, incrementAccepted, incrementPending, bulkUpdateOnlineStatus]);
 }

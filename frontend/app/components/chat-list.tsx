@@ -1,3 +1,4 @@
+// /home/selub/Documents/progs/besafechat/frontend/app/components/chat-list.tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getInitials } from '@/lib/utils';
