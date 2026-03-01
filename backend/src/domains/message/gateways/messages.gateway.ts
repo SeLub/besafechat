@@ -15,6 +15,7 @@ import { ChatRoomService } from '../services/chat-room.service';
 import { MessageMetadataService } from '../services/message-metadata.service';
 import { MediaService } from '../../media/media.service';
 import { getCorsConfig } from '../../../common/config/cors-origins';
+import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   namespace: '/messages',
@@ -23,6 +24,7 @@ import { getCorsConfig } from '../../../common/config/cors-origins';
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
+  private readonly logger = new Logger(MessagesGateway.name);
 
   constructor(
     private sessionService: SessionService,
@@ -35,12 +37,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async handleConnection(client: Socket) {
     try {
-      console.log('🔌 WebSocket connection attempt');
+      this.logger.warn('🔌 WebSocket connection attempt');
 
       // 1. Извлекаем access_token из кук (Socket.IO поддерживает!)
       const cookieHeader = client.handshake.headers.cookie;
       if (!cookieHeader) {
-        console.log('❌ No cookie header found');
+        this.logger.warn('❌ No cookie header found');
         client.disconnect(true);
         return;
       }
@@ -51,7 +53,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         ?.split('=')[1];
 
       if (!accessToken) {
-        console.log('❌ No access token found in cookies');
+        this.logger.warn('❌ No access token found in cookies');
         client.disconnect(true);
         return;
       }
@@ -59,7 +61,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // 2. Валидируем сессию
       const session = await this.sessionService.validateAccessToken(accessToken);
       if (!session || session.revoked) {
-        console.log('❌ Invalid or revoked session');
+        this.logger.warn('❌ Invalid or revoked session');
         client.disconnect(true);
         return;
       }
@@ -69,15 +71,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.data.activeHandleId = session.activeHandleId;
       client.data.sessionId = session.id;
 
-      console.log(
+      this.logger.warn(
         `👤 Client connected: identity=${session.identity.id}, handle=${session.activeHandleId}`
       );
 
       // 4. Подключаем к комнате по handleId (пользователь может иметь несколько handle'ов)
       if (session.activeHandleId) {
-        console.log(`🚪 Joining room: user:${session.activeHandleId}`);
+        this.logger.warn(`🚪 Joining room: user:${session.activeHandleId}`);
         await client.join(`user:${session.activeHandleId}`);
-        console.log(`✅ Joined room: user:${session.activeHandleId}`);
+        this.logger.warn(`✅ Joined room: user:${session.activeHandleId}`);
       }
 
       // 5. Обновляем онлайн-статус по handleId
@@ -85,16 +87,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         const redis = this.redisService.getClient();
         // Set online status with TTL of 120 seconds to handle connection failures
         await redis.setex(`online:${session.activeHandleId}`, 120, '1');
-        console.log(`🌐 Online status set for handle: ${session.activeHandleId}`);
 
-        // 6. Уведомляем контакты о том, что пользователь онлайн
+        // 6.Отсылаем статуты всех связанных handles
+        await this.sendPresenceSync(client, session.activeHandleId);
+
+        // 7. Уведомляем контакты о том, что пользователь онлайн
         await this.notifyContactsUserOnline(session.activeHandleId);
 
-        // 7. Синхронизация уведомлений при подключении
+        // 8. Синхронизация уведомлений при подключении
         await this.syncNotifications(client, session.activeHandleId);
       }
     } catch (error) {
-      console.error('❌ WebSocket connection error:', error);
+      this.logger.error('❌ WebSocket connection error:', error);
       client.disconnect(true);
     }
   }
@@ -117,10 +121,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const { to, type, encryptedContent, encryptedKey, timestamp } = payload;
 
-      console.log(
+      this.logger.warn(
         `📨 Message received: from=${client.data.activeHandleId}, to=${to}, type=${type}`
       );
-      console.log(
+      this.logger.warn(
         `📊 Payload details: encryptedKey length=${encryptedKey.length}, timestamp=${timestamp}`
       );
 
@@ -132,12 +136,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload
       );
       const { chatId, messageId } = result;
-      console.log(`💾 Message metadata saved, chatId=${chatId}, messageId=${messageId}`);
+      this.logger.warn(`💾 Message metadata saved, chatId=${chatId}, messageId=${messageId}`);
 
       // Check if the target room has any connected sockets
       const room = this.server.sockets.adapter?.rooms?.get(`user:${to}`);
       const roomSize = room ? room.size : 0;
-      console.log(`👥 Target room 'user:${to}' has ${roomSize} connected sockets`);
+      this.logger.warn(`👥 Target room 'user:${to}' has ${roomSize} connected sockets`);
 
       // Generate a unique message ID for client-side tracking if not available from metadata
       const uniqueMessageId =
@@ -145,7 +149,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         `${client.data.activeHandleId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Отправляем сообщение всем онлайн-сокетам получателя (по handleId)
-      console.log(`📤 Emitting message to room: user:${to}`);
+      this.logger.warn(`📤 Emitting message to room: user:${to}`);
       this.server.to(`user:${to}`).emit('message:new', {
         id: uniqueMessageId,
         from: client.data.activeHandleId, // ✅ Use activeHandleId instead of identityId
@@ -155,9 +159,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         encryptedKey,
         timestamp,
       });
-      console.log(`✅ Message emitted to room: user:${to}`);
+      this.logger.warn(`✅ Message emitted to room: user:${to}`);
     } catch (error) {
-      console.error('❌ Message handling error:', error);
+      this.logger.error('❌ Message handling error:', error);
       client.emit('message:error', { error: 'Failed to send message' });
     }
   }
@@ -327,9 +331,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         timestamp: new Date().toISOString(),
       });
 
-      console.log(`🔔 Synced ${notifications.length} notifications for handle: ${handleId}`);
+      this.logger.warn(`🔔 Synced ${notifications.length} notifications for handle: ${handleId}`);
     } catch (error) {
-      console.error('❌ Error syncing notifications:', error);
+      this.logger.error('❌ Error syncing notifications:', error);
     }
   }
 
@@ -369,61 +373,111 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Уведомление контактов о статусе онлайн
   async notifyContactsUserOnline(activeHandleId: string) {
     try {
-      console.log(`🌐 Notifying contacts that handle ${activeHandleId} is online`);
+      this.logger.warn(`🌐 Notifying contacts that handle ${activeHandleId} is online`);
 
       // Get all handles that share chats with the active handle
       const relatedHandles = await this.getRelatedHandles(activeHandleId);
-      console.log(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
+      this.logger.warn(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
 
       // Emit to each related user's room
       for (const handleId of relatedHandles) {
-        console.log(`📤 Emitting online status to handle: ${handleId}`);
+        this.logger.warn(`📤 Emitting online status to handle: ${handleId}`);
 
         // Check if the target room has any connected sockets
         const room = this.server.sockets.adapter?.rooms?.get(`user:${handleId}`);
         const roomSize = room ? room.size : 0;
-        console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
+        this.logger.warn(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
 
         this.server.to(`user:${handleId}`).emit('user_online', { handleId: activeHandleId });
-        console.log(`✅ Online status emitted to handle: ${handleId}`);
+        this.logger.warn(`✅ Online status emitted to handle: ${handleId}`);
       }
     } catch (error) {
-      console.error('Error notifying contacts of online status:', error);
+      this.logger.error('Error notifying contacts of online status:', error);
     }
   }
 
   // Уведомление контактов о статусе оффлайн
   async notifyContactsUserOffline(activeHandleId: string) {
     try {
-      console.log(`📴 Notifying contacts that handle ${activeHandleId} is offline`);
+      this.logger.warn(`📴 Notifying contacts that handle ${activeHandleId} is offline`);
 
       // Get all handles that share chats with the active handle
       const relatedHandles = await this.getRelatedHandles(activeHandleId);
-      console.log(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
+      this.logger.warn(`🔗 Found ${relatedHandles.length} related handles:`, relatedHandles);
 
       // Emit to each related user's room
       for (const handleId of relatedHandles) {
-        console.log(`📤 Emitting offline status to handle: ${handleId}`);
+        this.logger.warn(`📤 Emitting offline status to handle: ${handleId}`);
 
         // Check if the target room has any connected sockets
         const room = this.server.sockets.adapter?.rooms?.get(`user:${handleId}`);
         const roomSize = room ? room.size : 0;
-        console.log(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
+        this.logger.warn(`👥 Target room 'user:${handleId}' has ${roomSize} connected sockets`);
 
         this.server.to(`user:${handleId}`).emit('user_offline', { handleId: activeHandleId });
-        console.log(`✅ Offline status emitted to handle: ${handleId}`);
+        this.logger.warn(`✅ Offline status emitted to handle: ${handleId}`);
       }
     } catch (error) {
-      console.error('Error notifying contacts of offline status:', error);
+      this.logger.error('Error notifying contacts of offline status:', error);
+    }
+  }
+
+  // Готовим статусы всех связанных handles
+  // messages.gateway.ts — добавьте константы в класс
+  private readonly MAX_PRESENCE_SYNC_CONTACTS = 500;
+
+  private async sendPresenceSync(client: Socket, handleId: string) {
+    try {
+      const start = Date.now();
+      const relatedHandles = await this.getRelatedHandles(handleId);
+
+      if (relatedHandles.length === 0) return;
+
+      // 🔒 Лимит для защиты от abuse
+      const handlesToCheck = relatedHandles.slice(0, this.MAX_PRESENCE_SYNC_CONTACTS);
+
+      if (relatedHandles.length > this.MAX_PRESENCE_SYNC_CONTACTS) {
+        this.logger.warn(
+          `User ${handleId} has ${relatedHandles.length} contacts, ` +
+            `syncing only first ${this.MAX_PRESENCE_SYNC_CONTACTS} for presence`
+        );
+      }
+
+      const redis = this.redisService.getClient();
+      const keys = handlesToCheck.map((h) => `online:${h}`);
+      const results = await redis.mget(...keys);
+
+      const statuses: Record<string, boolean> = {};
+      handlesToCheck.forEach((handle, index) => {
+        statuses[handle] = results[index] === '1';
+      });
+
+      client.emit('presence_sync', {
+        statuses,
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - start}ms`,
+        totalCount: relatedHandles.length,
+        syncedCount: handlesToCheck.length,
+        truncated: relatedHandles.length > this.MAX_PRESENCE_SYNC_CONTACTS,
+      });
+    } catch (error) {
+      this.logger.warn(`❌ Error syncing presence for ${handleId}:`, error);
+      // Graceful: отправляем пустой ответ, чтобы фронт не ждал
+      client.emit('presence_sync', {
+        statuses: {},
+        timestamp: new Date().toISOString(),
+        error: true,
+        reason: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
   // Helper method to find handles related to a given handle (through chats or contacts)
   private async getRelatedHandles(handleId: string): Promise<string[]> {
-    console.log(`🔍 Finding related handles for: ${handleId}`);
+    this.logger.warn(`🔍 Finding related handles for: ${handleId}`);
     // Use the ChatRoomService to find handles that share chats with the given handle
     const relatedHandles = await this.chatRoomService.getRelatedHandles(handleId);
-    console.log(`🔍 Found related handles for ${handleId}:`, relatedHandles);
+    this.logger.warn(`🔍 Found related handles for ${handleId}:`, relatedHandles);
     return relatedHandles;
   }
 }

@@ -85,21 +85,39 @@ export function useWebSocketNotifications(
     window.socketInstance = socket;
 
     // ОБРАБОТЧИК presence_sync
-    const handlePresenceSync = (data: { statuses: Record<string, boolean> }) => {
-      console.log('⚡ Presence sync received:', data);
+    const handlePresenceSync = (data: {
+      statuses: Record<string, boolean>;
+      error?: boolean;
+      reason?: string;
+      duration?: string;
+      truncated?: boolean;
+    }) => {
+      // 🛡️ Проверка на ошибку от backend
+      if (data.error) {
+        console.warn('⚠️ Presence sync returned error:', data.reason);
+        return; // Не применяем пустые статусы при ошибке
+      }
 
-      // 1. Обновляем локальный стейт (через контекст)
+      // 📊 Опционально: логирование метрик
+      if (data.duration) {
+        console.log(`📊 [presence_sync] Backend: ${data.duration}, truncated: ${!!data.truncated}`);
+      }
+
+      // 1. Обновляем контекст (основное действие)
       bulkUpdateOnlineStatus(data.statuses);
 
-      // 2. Сохраняем в кэш
+      // 2. Кэшируем в sessionStorage
       const cacheKey = getCacheKey(user?.handle.id);
-      sessionStorage.setItem(
-        cacheKey,
-        JSON.stringify({
-          statuses: data.statuses,
-          updatedAt: Date.now(),
-        })
-      );
+      if (cacheKey) {
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({ statuses: data.statuses, updatedAt: Date.now() })
+          );
+        } catch (e) {
+          console.warn('Failed to cache statuses:', e);
+        }
+      }
     };
 
     socket.on('presence_sync', handlePresenceSync);
