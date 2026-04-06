@@ -1,3 +1,4 @@
+// backend/src/domains/media/media.service.ts
 import {
   DeleteObjectCommand,
   HeadObjectCommand,
@@ -23,39 +24,74 @@ export class MediaService {
   private s3: S3Client;
   private bucket: string;
   private baseUrl: string;
+  private avatarUrl!: string;
+  private usePathStyle: boolean;
 
   constructor(private configService: ConfigService) {
-    const accessKeyId = this.configService.get<string>('STORAGE_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('STORAGE_SECRET_ACCESS_KEY');
-    const endpoint = this.configService.get<string>('STORAGE_ENDPOINT');
-    this.bucket = this.configService.get<string>('STORAGE_BUCKET_NAME') || 'besafe.backet';
-    this.baseUrl = `https://s3.tebi.io/${this.bucket}`;
+    // === Чтение конфигурации из env (новые имена переменных) ===
+    const accessKeyId = this.configService.get<string>('S3_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>('S3_SECRET_KEY');
+    const endpoint = this.configService.get<string>('S3_ENDPOINT');
+    const region = this.configService.get<string>('S3_REGION') || 'auto';
+    this.bucket = this.configService.get<string>('S3_BUCKET') || 'besafechat-mvp';
 
-    if (!accessKeyId || !secretAccessKey) {
-      throw new Error('STORAGE_ACCESS_KEY_ID and STORAGE_SECRET_ACCESS_KEY are required');
+    // forcePathStyle: false = virtual-hosted style (bucket.domain.com) — рекомендуется для R2
+    // forcePathStyle: true = path style (domain.com/bucket) — для MinIO или старых провайдеров
+    this.usePathStyle = this.configService.get<boolean>('S3_FORCE_PATH_STYLE', false);
+
+    // === Валидация обязательных полей ===
+    if (!accessKeyId || !secretAccessKey || !endpoint) {
+      throw new Error('S3_ACCESS_KEY, S3_SECRET_KEY, S3_ENDPOINT and S3_AVATAR_URL are required');
     }
 
+    // === Построение base URL для публичного доступа ===
+    // Virtual-hosted style: https://bucket.endpoint-host/path
+    // Path style: https://endpoint-host/bucket/path
+    this.avatarUrl = this.configService.get<string>('S3_AVATAR_URL') ?? '';
+    if (!this.avatarUrl) {
+      throw new Error('S3_AVATAR_URL is required');
+    }
+
+    try {
+      const endpointUrl = new URL(endpoint);
+      if (this.usePathStyle) {
+        this.baseUrl = `${endpoint}/${this.bucket}`;
+      } else {
+        const host = endpointUrl.hostname;
+        const port = endpointUrl.port ? `:${endpointUrl.port}` : '';
+        this.baseUrl = `https://${this.bucket}.${host}${port}`;
+      }
+    } catch (error) {
+      console.warn('Invalid S3_ENDPOINT, falling back to manual URL construction:', error);
+      this.baseUrl = this.usePathStyle
+        ? `${endpoint}/${this.bucket}`
+        : `https://${this.bucket}.${endpoint}`;
+    }
+
+    // === Инициализация S3 Client (provider-agnostic) ===
     this.s3 = new S3Client({
-      endpoint: endpoint || 'https://s3.tebi.io',
-      region: 'auto',
-      credentials: { accessKeyId, secretAccessKey },
-      forcePathStyle: true,
+      endpoint,
+      region, // ← Берётся из env, по умолчанию 'auto' для R2
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+      forcePathStyle: this.usePathStyle,
     });
   }
 
-  // Upload methods
+  // ==================== Upload Methods ====================
+
   async uploadAvatar(handleId: string, imageBuffer: Buffer): Promise<string> {
     const processedImage = await this.processImageForAvatar(imageBuffer);
     const path = this.getAvatarPath(handleId);
-
     await this.uploadToS3(path, processedImage, 'image/png');
-    return this.getPublicUrl(path);
+    return `${this.avatarUrl}/${path}`;
   }
 
   async uploadImage(handleId: string, imageBuffer: Buffer, messageId?: string): Promise<string> {
     const filename = messageId ? `${messageId}_${Date.now()}.jpg` : `${Date.now()}.jpg`;
     const path = this.getMediaPath(handleId, 'images', filename);
-
     await this.uploadToS3(path, imageBuffer, 'image/jpeg');
     return this.getPublicUrl(path);
   }
@@ -68,7 +104,6 @@ export class MediaService {
   ): Promise<string> {
     const safeName = this.sanitizeFilename(filename);
     const path = this.getMediaPath(handleId, 'documents', safeName);
-
     await this.uploadToS3(path, docBuffer, contentType);
     return this.getPublicUrl(path);
   }
@@ -76,7 +111,6 @@ export class MediaService {
   async uploadAudio(handleId: string, audioBuffer: Buffer, messageId?: string): Promise<string> {
     const filename = messageId ? `${messageId}_voice.mp3` : `${Date.now()}.mp3`;
     const path = this.getMediaPath(handleId, 'audio', filename);
-
     await this.uploadToS3(path, audioBuffer, 'audio/mpeg');
     return this.getPublicUrl(path);
   }
@@ -84,7 +118,6 @@ export class MediaService {
   async uploadVideo(handleId: string, videoBuffer: Buffer, messageId?: string): Promise<string> {
     const filename = messageId ? `${messageId}_${Date.now()}.mp4` : `${Date.now()}.mp4`;
     const path = this.getMediaPath(handleId, 'videos', filename);
-
     await this.uploadToS3(path, videoBuffer, 'video/mp4');
     return this.getPublicUrl(path);
   }
@@ -97,12 +130,12 @@ export class MediaService {
   async uploadBackup(handleId: string, backupBuffer: Buffer, type: string): Promise<string> {
     const filename = `${type}_${Date.now()}.enc`;
     const path = this.getBackupPath(handleId, filename);
-
     await this.uploadToS3(path, backupBuffer, 'application/octet-stream');
     return this.getPublicUrl(path);
   }
 
-  // Delete methods
+  // ==================== Delete Methods ====================
+
   async deleteAvatar(handleId: string): Promise<void> {
     const path = this.getAvatarPath(handleId);
     await this.deleteFromS3(path);
@@ -112,24 +145,21 @@ export class MediaService {
     await this.deleteFromS3(path);
   }
 
-  // Get URL methods
+  // ==================== Get URL Methods ====================
+
   async getAvatarUrlIfExists(handleId: string): Promise<string | null> {
     const path = this.getAvatarPath(handleId);
     const exists = await this.fileExists(path);
-    return exists ? this.getPublicUrl(path) : null;
+    if (!exists) return null;
+    return `${this.avatarUrl}/${path}`;
   }
 
   getAvatarUrl(handleId: string): string {
-    return this.getPublicUrl(this.getAvatarPath(handleId));
+    return `${this.avatarUrl}/${this.getAvatarPath(handleId)}`;
   }
 
-  // getSeed is not used anywhere in the current codebase, so commenting out to avoid lint errors
-  // async getSeed(_passwordHash: string): Promise<Buffer> {
-  //   // Implementation would fetch from S3
-  //   throw new Error('Not implemented yet');
-  // }
+  // ==================== Path Generation (Public) ====================
 
-  // Path generation methods (public for controller access)
   getHandleHash(handleId: string): string {
     return createHash('sha256').update(handleId).digest('hex').substring(0, 16);
   }
@@ -161,7 +191,8 @@ export class MediaService {
     return `${this.baseUrl}/${path}`;
   }
 
-  // S3 operations
+  // ==================== S3 Operations (Private) ====================
+
   private async uploadToS3(key: string, data: Buffer, contentType: string): Promise<void> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -179,8 +210,11 @@ export class MediaService {
         Key: key,
       });
       await this.s3.send(command);
-    } catch {
-      // Ignore 404 errors
+    } catch (error: any) {
+      // Игнорируем 404 — файл уже удалён
+      if (error?.name !== 'NotFound' && error?.$metadata?.httpStatusCode !== 404) {
+        throw error;
+      }
     }
   }
 
@@ -197,7 +231,8 @@ export class MediaService {
     }
   }
 
-  // File processing
+  // ==================== File Processing ====================
+
   private async processImageForAvatar(buffer: Buffer): Promise<Buffer> {
     try {
       return await sharp(buffer)
@@ -206,7 +241,7 @@ export class MediaService {
         .toBuffer();
     } catch (error) {
       console.error('Image processing error:', error);
-      return buffer; // Fallback to original
+      return buffer; // Fallback к оригиналу
     }
   }
 
@@ -214,7 +249,8 @@ export class MediaService {
     return filename.replace(/[^a-zA-Z0-9.-]/g, '_');
   }
 
-  // Validation
+  // ==================== Validation ====================
+
   validateContentType(contentType: string): void {
     const supportedTypes = [
       'image/jpeg',
